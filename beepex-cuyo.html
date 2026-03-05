@@ -1,0 +1,2237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beepex Cuyo — Catálogo Mayorista</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0e0f14;--surface:#16181f;--card:#1c1f2a;--border:#2a2d3a;--accent:#4a7cff;--accent2:#f5a623;--green:#22c55e;--red:#ef4444;--preventa:#a78bfa;--text:#f0f2ff;--muted:#8b90a8;--tag-bg:#1e2130;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
+  .header{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;padding:10px 16px;}
+  .header-inner{display:flex;align-items:center;gap:12px;max-width:960px;margin:0 auto;}
+  .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,#7c6af7,#4a7cff);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+  .logo-text h1{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;line-height:1.1;}
+  .logo-text p{font-size:11px;color:var(--muted);}
+  .header-actions{margin-left:auto;display:flex;align-items:center;gap:8px;}
+  .iva-toggle{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;white-space:nowrap;user-select:none;}
+  .iva-toggle .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background .2s;}
+  .iva-toggle.active .dot{background:var(--green);}
+  .iva-toggle.active{border-color:var(--green);color:var(--green);}
+  .cart-btn{background:var(--accent);color:#fff;border:none;border-radius:20px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .2s;white-space:nowrap;}
+  .cart-btn:hover{background:#3a6cf0;}
+  .cart-count{background:var(--accent2);color:#000;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;min-width:20px;}
+  .toolbar{max-width:960px;margin:0 auto;padding:14px 16px 0;display:flex;flex-direction:column;gap:10px;}
+  .search-input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;transition:border .2s;}
+  .search-input::placeholder{color:var(--muted);}
+  .search-input:focus{border-color:var(--accent);}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;}
+  .filter-btn{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .2s;}
+  .filter-btn.active,.filter-btn:hover{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .filter-btn.f-stock.active,.filter-btn.f-stock:hover{background:var(--green);border-color:var(--green);color:#fff;}
+  .filter-btn.f-preventa.active,.filter-btn.f-preventa:hover{background:var(--preventa);border-color:var(--preventa);color:#fff;}
+  .filter-btn.f-nostock.active,.filter-btn.f-nostock:hover{background:var(--red);border-color:var(--red);color:#fff;}
+  .filter-sep{width:1px;background:var(--border);margin:0 2px;align-self:stretch;}
+  .product-count{font-size:12px;color:var(--muted);}
+  .grid{max-width:960px;margin:0 auto;padding:14px 16px 140px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr);}}
+  @media(min-width:900px){.grid{grid-template-columns:repeat(4,1fr);}}
+  .section-title{grid-column:1/-1;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:8px 0 0;}
+  .no-results{grid-column:1/-1;text-align:center;color:var(--muted);padding:60px 0;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s;}
+  .card:hover{transform:translateY(-2px);border-color:#3a3f55;}
+  .card.in-cart{border-color:var(--accent);}
+  .card.is-preventa{border-color:rgba(167,139,250,.3);}
+  .card.is-preventa.in-cart{border-color:var(--preventa);}
+  .card.is-nostock{opacity:.55;}
+  .card-img{width:100%;aspect-ratio:1;background:var(--tag-bg);position:relative;overflow:hidden;}
+  .card-img img{width:100%;height:100%;object-fit:cover;display:none;}
+  .card-img img.visible{display:block;}
+  .card-img .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--border);}
+  .preventa-banner{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(109,40,217,.85),transparent);color:#fff;font-size:10px;font-weight:700;padding:16px 8px 6px;text-align:center;letter-spacing:.5px;}
+  .card-body{padding:10px;flex:1;display:flex;flex-direction:column;gap:4px;}
+  .tags{display:flex;gap:4px;flex-wrap:wrap;}
+  .tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:var(--tag-bg);}
+  .tag.brand-beepaw{color:#a0aaff;}
+  .tag.brand-gen{color:#f9a8d4;}
+  .tag.t-stock{color:var(--green);}
+  .tag.t-nostock{color:var(--red);}
+  .tag.t-preventa{color:var(--preventa);background:rgba(167,139,250,.12);}
+  .iva-label{font-size:10px;color:var(--muted);margin-top:2px;}
+  .prod-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;line-height:1.2;margin-top:2px;}
+  .sku{font-size:10px;color:var(--muted);}
+  .price{font-size:18px;font-weight:700;margin-top:4px;}
+  .price-note{font-size:10px;color:var(--muted);margin-top:1px;}
+  .pvp{font-size:11px;color:var(--muted);}
+  .pvp span{color:var(--accent2);font-weight:600;}
+  .qty-row{display:flex;align-items:center;gap:6px;margin-top:8px;}
+  .qty-btn{background:var(--tag-bg);border:none;border-radius:7px;width:28px;height:28px;color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
+  .qty-btn:hover{background:var(--accent);}
+  .card.is-preventa .qty-btn:hover{background:var(--preventa);}
+  .qty-val{font-size:14px;font-weight:600;min-width:22px;text-align:center;}
+  .add-btn{flex:1;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;padding:7px 4px;cursor:pointer;transition:background .15s;font-family:inherit;}
+  .add-btn:hover{background:#3a6cf0;}
+  .add-btn.btn-preventa{background:var(--preventa);}
+  .add-btn.btn-preventa:hover{background:#8b5cf6;}
+  .add-btn:disabled{background:var(--tag-bg);color:var(--muted);cursor:not-allowed;}
+  .cart-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;}
+  .cart-overlay.open{display:block;}
+  .cart-drawer{position:fixed;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
+  .cart-drawer.open{transform:translateX(0);}
+  .cart-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .cart-header h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;flex:1;}
+  .close-btn{background:var(--card);border:none;border-radius:8px;width:32px;height:32px;color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .cart-items{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;}
+  .cart-empty{text-align:center;color:var(--muted);margin-top:60px;font-size:14px;line-height:2.2;}
+  .cart-section-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:4px 0 2px;}
+  .cart-item{background:var(--card);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;}
+  .cart-item.ci-preventa{border-left:2px solid var(--preventa);}
+  .cart-item-img{width:44px;height:44px;border-radius:8px;background:var(--tag-bg);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:18px;}
+  .cart-item-img img{width:100%;height:100%;object-fit:cover;display:none;}
+  .cart-item-img img.visible{display:block;}
+  .cart-item-info{flex:1;min-width:0;}
+  .cart-item-name{font-size:12px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .cart-item-sku{font-size:10px;color:var(--muted);}
+  .cart-item-price{font-size:12px;color:var(--accent2);font-weight:600;margin-top:2px;}
+  .cart-item-badge{font-size:9px;font-weight:700;color:var(--preventa);margin-top:1px;}
+  .cart-item-qty{display:flex;align-items:center;gap:4px;margin-top:4px;}
+  .cart-item-qty button{background:var(--tag-bg);border:none;border-radius:5px;width:22px;height:22px;color:var(--text);font-size:13px;cursor:pointer;font-family:inherit;}
+  .cart-item-qty span{font-size:12px;font-weight:600;min-width:18px;text-align:center;}
+  .cart-remove{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px;flex-shrink:0;}
+  .cart-remove:hover{color:var(--red);}
+  .cart-footer{border-top:1px solid var(--border);padding:14px 16px;display:flex;flex-direction:column;gap:10px;flex-shrink:0;}
+  .cart-input{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;transition:border .2s;width:100%;}
+  .cart-input:focus{border-color:var(--accent);}
+  .cart-input::placeholder{color:var(--muted);}
+  .cart-iva-row{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;}
+  .toggle-switch{position:relative;width:40px;height:22px;flex-shrink:0;}
+  .toggle-switch input{opacity:0;width:0;height:0;}
+  .toggle-slider{position:absolute;inset:0;background:var(--tag-bg);border-radius:22px;cursor:pointer;transition:background .2s;}
+  .toggle-slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:transform .2s;}
+  .toggle-switch input:checked+.toggle-slider{background:var(--green);}
+  .toggle-switch input:checked+.toggle-slider:before{transform:translateX(18px);}
+  .totals{background:var(--card);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:4px;}
+  .total-row{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);}
+  .total-row.big{color:var(--text);font-weight:700;font-size:16px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);}
+  .wa-btn{background:#25d366;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;padding:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s;font-family:inherit;}
+  .wa-btn:hover{background:#1db954;}
+  .wa-btn:disabled{background:var(--tag-bg);color:var(--muted);cursor:not-allowed;}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-inner">
+    <div class="logo-icon">🐾</div>
+    <div class="logo-text">
+      <h1>Beepex Cuyo</h1>
+      <p>Catálogo Mayorista · Marzo 2026</p>
+    </div>
+    <div class="header-actions">
+      <div class="iva-toggle" id="ivaToggleHeader" onclick="toggleIVA()">
+        <div class="dot"></div><span id="ivaLabel">Sin IVA</span>
+      </div>
+      <button class="cart-btn" onclick="openCart()">
+        🛒 Pedido <span class="cart-count" id="cartCount">0</span>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="toolbar">
+  <input class="search-input" id="searchInput" placeholder="🔍  Buscar producto, SKU, marca..." oninput="renderGrid()">
+  <div class="filters" id="brandFilters"></div>
+  <div class="product-count" id="productCount"></div>
+</div>
+<div class="grid" id="grid"></div>
+<div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
+<div class="cart-drawer" id="cartDrawer">
+  <div class="cart-header">
+    <h2>🛒 Tu pedido</h2>
+    <button class="close-btn" onclick="closeCart()">✕</button>
+  </div>
+  <div class="cart-items" id="cartItems"></div>
+  <div class="cart-footer">
+    <input class="cart-input" id="clientName" placeholder="👤 Tu nombre">
+    <input class="cart-input" id="clientObs" placeholder="💬 Observaciones (opcional)">
+    <div class="cart-iva-row">
+      <span>Agregar IVA al total</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="ivaCheck" onchange="syncIVA(this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="totals" id="totals"></div>
+    <button class="wa-btn" id="waBtn" onclick="sendWhatsApp()" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      Enviar pedido por WhatsApp
+    </button>
+  </div>
+</div>
+<script>
+const GITHUB_USER='fmz-mza',GITHUB_REPO='Beepexcuyo',GITHUB_BRANCH='main',IMG_FOLDER='';
+const EXTENSIONS=['jpg','jpeg','png','webp','JPG','PNG','WEBP'];
+const WA_NUMBER='5492616000000';
+
+function imgBase(sku){return`https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/SKU_${sku}`;}
+function tryLoadImg(el,sku,i=0){
+  if(i>=EXTENSIONS.length)return;
+  el.onerror=()=>tryLoadImg(el,sku,i+1);
+  el.onload=()=>{el.classList.add('visible');el.parentElement.querySelector('.ph')?.remove();};
+  el.src=`${imgBase(sku)}.${EXTENSIONS[i]}`;
+}
+function stockType(s){
+  if(!s||s==='NOSTOCK')return'NOSTOCK';
+  if(s==='STOCK')return'STOCK';
+  if(s.toUpperCase().includes('PREVENTA'))return'PREVENTA';
+  return'NOSTOCK';
+}
+function stockLabel(s){
+  const t=stockType(s);
+  if(t==='STOCK')return'EN STOCK';
+  if(t==='PREVENTA')return s;
+  return'SIN STOCK';
+}
+
+const products=[
+  {
+    "sku": "11288",
+    "name": "ROCK-E",
+    "brand": "BEEPAW",
+    "price": 394800,
+    "pvp": 659999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11153",
+    "name": "SAND-E",
+    "brand": "BEEPAW",
+    "price": 478800,
+    "pvp": 799999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11363",
+    "name": "BOLSAS SAND-E",
+    "brand": "BEEPAW",
+    "price": 4634,
+    "pvp": 12399,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11362",
+    "name": "BOLSAS ROCK-E",
+    "brand": "BEEPAW",
+    "price": 2758,
+    "pvp": 9899,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11364",
+    "name": "ALFOMBRA LITERAS",
+    "brand": "BEEPAW",
+    "price": 7252,
+    "pvp": 19799,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11126",
+    "name": "BUBBL-E",
+    "brand": "BEEPAW",
+    "price": 14140,
+    "pvp": 24999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11370",
+    "name": "STROCK-E (ROSA)",
+    "brand": "BEEPAW",
+    "price": 13999,
+    "pvp": 25499,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11369",
+    "name": "STROCK-E (VERDE)",
+    "brand": "BEEPAW",
+    "price": 13999,
+    "pvp": 25499,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11128",
+    "name": "STROCK-E (BLANCO)",
+    "brand": "BEEPAW",
+    "price": 13999,
+    "pvp": 25499,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11127",
+    "name": "GROOM-E (AMARILLO)",
+    "brand": "BEEPAW",
+    "price": 10999,
+    "pvp": 19999,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11133",
+    "name": "GROOM-E (BLANCO)",
+    "brand": "BEEPAW",
+    "price": 10999,
+    "pvp": 19999,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11297",
+    "name": "SHARP-E (ROSA)",
+    "brand": "BEEPAW",
+    "price": 7826,
+    "pvp": 16499,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11298",
+    "name": "SHARP-E (CELESTE)",
+    "brand": "BEEPAW",
+    "price": 7826,
+    "pvp": 16499,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11100",
+    "name": "NAIL-E (ROSA)",
+    "brand": "BEEPAW",
+    "price": 7630,
+    "pvp": 15399,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11101",
+    "name": "NAIL-E (CELESTE)",
+    "brand": "BEEPAW",
+    "price": 7630,
+    "pvp": 15399,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11030",
+    "name": "CUT-E (ROSA)",
+    "brand": "BEEPAW",
+    "price": 5278,
+    "pvp": 10999,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11031",
+    "name": "CUT-E (CELESTE)",
+    "brand": "BEEPAW",
+    "price": 5278,
+    "pvp": 10999,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11145",
+    "name": "BRUSH-E PELO LARGO (CELESTE)",
+    "brand": "BEEPAW",
+    "price": 4690,
+    "pvp": 9899,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11146",
+    "name": "BRUSH-E PELO LARGO (ROSA)",
+    "brand": "BEEPAW",
+    "price": 4690,
+    "pvp": 9899,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11144",
+    "name": "BRUSH-E PELO CORTO (CELESTE)",
+    "brand": "BEEPAW",
+    "price": 4690,
+    "pvp": 9899,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11143",
+    "name": "BRUSH-E PELO CORTO (ROSA)",
+    "brand": "BEEPAW",
+    "price": 4690,
+    "pvp": 9899,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11155",
+    "name": "FLUFF-E",
+    "brand": "BEEPAW",
+    "price": 13496,
+    "pvp": 28599,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11293",
+    "name": "FOOD-E (BLANCO CON CÁMARA)",
+    "brand": "BEEPAW",
+    "price": 137088,
+    "pvp": 228799,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11294",
+    "name": "FOOD-E (NEGRO CON CÁMARA)",
+    "brand": "BEEPAW",
+    "price": 137088,
+    "pvp": 228799,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11295",
+    "name": "FOOD-E (BLANCO SIN CÁMARA)",
+    "brand": "BEEPAW",
+    "price": 86184,
+    "pvp": 142999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11296",
+    "name": "FOOD-E (NEGRO SIN CÁMARA)",
+    "brand": "BEEPAW",
+    "price": 86184,
+    "pvp": 142999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11291",
+    "name": "SLOW-E (GRIS)",
+    "brand": "BEEPAW",
+    "price": 39060,
+    "pvp": 71499,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11292",
+    "name": "SLOW-E (NEGRO)",
+    "brand": "BEEPAW",
+    "price": 39060,
+    "pvp": 71499,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11289",
+    "name": "BOWL-E (GRIS)",
+    "brand": "BEEPAW",
+    "price": 45080,
+    "pvp": 82499,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11290",
+    "name": "BOWL-E (NEGRO)",
+    "brand": "BEEPAW",
+    "price": 45080,
+    "pvp": 82499,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11151",
+    "name": "FEED-E C/CAMARA",
+    "brand": "BEEPAW",
+    "price": 186200,
+    "pvp": 310199,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11152",
+    "name": "FEED-E S/CAMARA",
+    "brand": "BEEPAW",
+    "price": 107800,
+    "pvp": 180399,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11156",
+    "name": "FOUNT-E",
+    "brand": "BEEPAW",
+    "price": 27998,
+    "pvp": 49499,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11154",
+    "name": "DRINK-E (NEGRO)",
+    "brand": "BEEPAW",
+    "price": 11732,
+    "pvp": 24199,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11401",
+    "name": "DRINK-E (ROSA)",
+    "brand": "BEEPAW",
+    "price": 11732,
+    "pvp": 24199,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11402",
+    "name": "DRINK-E (BLANCO)",
+    "brand": "BEEPAW",
+    "price": 11732,
+    "pvp": 24199,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11157",
+    "name": "FILTRO (FOUNT-E)",
+    "brand": "BEEPAW",
+    "price": 10346,
+    "pvp": 17599,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11403",
+    "name": "BEBEDERO DE ACERO PARA CLEAN-E",
+    "brand": "BEEPAW",
+    "price": 5772,
+    "pvp": 9999,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11150",
+    "name": "CLEAN-E",
+    "brand": "BEEPAW",
+    "price": 48077,
+    "pvp": 84999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11367",
+    "name": "ROLL-E (ROJA)",
+    "brand": "BEEPAW",
+    "price": 12499,
+    "pvp": 20999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11366",
+    "name": "ROLL-E (AZUL)",
+    "brand": "BEEPAW",
+    "price": 12499,
+    "pvp": 20999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11397",
+    "name": "TUK-E",
+    "brand": "BEEPAW",
+    "price": 12999,
+    "pvp": 21499,
+    "iva": 10.5,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11399",
+    "name": "TUIT-E",
+    "brand": "BEEPAW",
+    "price": 12999,
+    "pvp": 21499,
+    "iva": 10.5,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11398",
+    "name": "OWL-E",
+    "brand": "BEEPAW",
+    "price": 12999,
+    "pvp": 21499,
+    "iva": 10.5,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "1400",
+    "name": "CARDUM-E",
+    "brand": "BEEPAW",
+    "price": 14999,
+    "pvp": 24999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11304",
+    "name": "SNACK-E (VERDE)",
+    "brand": "BEEPAW",
+    "price": 22624,
+    "pvp": 39999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11306",
+    "name": "SNACK-E (GRIS CLARO)",
+    "brand": "BEEPAW",
+    "price": 22624,
+    "pvp": 39999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11303",
+    "name": "SNACK-E (GRIS OSCURO)",
+    "brand": "BEEPAW",
+    "price": 22624,
+    "pvp": 39999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11302",
+    "name": "SHOOT-E (NARANJA)",
+    "brand": "BEEPAW",
+    "price": 87670,
+    "pvp": 154999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11300",
+    "name": "SHOOT-E (VERDE AGUA)",
+    "brand": "BEEPAW",
+    "price": 87670,
+    "pvp": 154999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "10903",
+    "name": "BALL-E (CELESTE)",
+    "brand": "BEEPAW",
+    "price": 9632,
+    "pvp": 18699,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "10911",
+    "name": "BALL-E (ROSA)",
+    "brand": "BEEPAW",
+    "price": 9632,
+    "pvp": 18699,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11025",
+    "name": "JUMP-E BIG (AZUL)",
+    "brand": "BEEPAW",
+    "price": 15414,
+    "pvp": 29699,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11024",
+    "name": "JUMP-E BIG (NARANJA)",
+    "brand": "BEEPAW",
+    "price": 15414,
+    "pvp": 29699,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11022",
+    "name": "JUMP-E SMALL (AZUL)",
+    "brand": "BEEPAW",
+    "price": 11060,
+    "pvp": 20899,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11023",
+    "name": "JUMP-E SMALL (NARANJA)",
+    "brand": "BEEPAW",
+    "price": 11620,
+    "pvp": 21999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11029",
+    "name": "WAND-E (ROSA)",
+    "brand": "BEEPAW",
+    "price": 7630,
+    "pvp": 15999,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11032",
+    "name": "WAND-E (CELESTE)",
+    "brand": "BEEPAW",
+    "price": 7630,
+    "pvp": 15999,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "10904",
+    "name": "DUCK-E",
+    "brand": "BEEPAW",
+    "price": 15400,
+    "pvp": 29299,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11099",
+    "name": "SPEED-E (AZUL)",
+    "brand": "BEEPAW",
+    "price": 12208,
+    "pvp": 23299,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11098",
+    "name": "SPEED-E (ROJO)",
+    "brand": "BEEPAW",
+    "price": 12208,
+    "pvp": 23299,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11028",
+    "name": "CRICK-E",
+    "brand": "BEEPAW",
+    "price": 4494,
+    "pvp": 8599,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11027",
+    "name": "FROG-E",
+    "brand": "BEEPAW",
+    "price": 4494,
+    "pvp": 8599,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11026",
+    "name": "BIRD-E",
+    "brand": "BEEPAW",
+    "price": 4494,
+    "pvp": 8599,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "10905",
+    "name": "WHEEL-E (NARANJA)",
+    "brand": "BEEPAW",
+    "price": 19278,
+    "pvp": 36699,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "10906",
+    "name": "WHEEL-E (CELESTE)",
+    "brand": "BEEPAW",
+    "price": 19278,
+    "pvp": 36699,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11148",
+    "name": "FISH-E SMALL",
+    "brand": "BEEPAW",
+    "price": 12852,
+    "pvp": 24499,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11147",
+    "name": "FISH-E BIG",
+    "brand": "BEEPAW",
+    "price": 12852,
+    "pvp": 24499,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11149",
+    "name": "OVN-E",
+    "brand": "BEEPAW",
+    "price": 23499,
+    "pvp": 38999,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11307",
+    "name": "TRAIN-E (SMALL x50)",
+    "brand": "BEEPAW",
+    "price": 11899,
+    "pvp": 21499,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11308",
+    "name": "TRAIN-E (MEDIUM x40)",
+    "brand": "BEEPAW",
+    "price": 12670,
+    "pvp": 22999,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11309",
+    "name": "TRAIN-E (BIG x20)",
+    "brand": "BEEPAW",
+    "price": 10570,
+    "pvp": 19299,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11104",
+    "name": "EXHIBIDOR BEEPAW (BLANCO)",
+    "brand": "BEEPAW",
+    "price": 0,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11103",
+    "name": "EXHIBIDOR BEEPAW (NEGRO)",
+    "brand": "BEEPAW",
+    "price": 0,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11355",
+    "name": "EXHIBIDOR DE EXPERIENCIA",
+    "brand": "BEEPAW",
+    "price": 0,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11248",
+    "name": "ROBOT CON CAMARA Y MANDO A DISTANCIA, CON DISPENSER DE COMIDA",
+    "brand": "GENÉRICOS",
+    "price": 348600,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11361",
+    "name": "ROBOT CON CAMARA Y MANDO BLANCO Y NEGRO",
+    "brand": "GENÉRICOS",
+    "price": 142000,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11312",
+    "name": "BOLSO CROSSBODY SMALL NEGRO/AZUL",
+    "brand": "GENÉRICOS",
+    "price": 14224,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11206",
+    "name": "MOCHILA TRANSPORTADORA (NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 18200,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11235",
+    "name": "MOCHILA TRANSPORTADORA (ROJO)",
+    "brand": "GENÉRICOS",
+    "price": 18200,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11360",
+    "name": "MOCHILA TRANSPORTADORA (GRIS)",
+    "brand": "GENÉRICOS",
+    "price": 18200,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11354",
+    "name": "FUNDA CUBRE ASIENTO TRASERO PERMIUM CON BOLISILLO (NARANJA Y NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 43400,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11244",
+    "name": "FUNDA CUBRE ASIENTOS TRASERO PREMIUM (NARANJA)",
+    "brand": "GENÉRICOS",
+    "price": 40600,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11245",
+    "name": "FUNDA CUBRE ASIENTO TRASERO (NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 26600,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11246",
+    "name": "FUNDA CUBRE ASIENTOS TRASEROS SIMPLE",
+    "brand": "GENÉRICOS",
+    "price": 13860,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11247",
+    "name": "FUNDA CUBRE ASIENTOS COPILOTO (NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 20860,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11183",
+    "name": "SILLA DE SEGURIDAD (GRIS)",
+    "brand": "GENÉRICOS",
+    "price": 17500,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11164",
+    "name": "SILLA DE DEGURIDAD (NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 17500,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11184",
+    "name": "SILLA DE DEGURIDAD (AZUL)",
+    "brand": "GENÉRICOS",
+    "price": 17500,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11182",
+    "name": "SILLA DE DEGURIDAD (ROJO)",
+    "brand": "GENÉRICOS",
+    "price": 17500,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11195",
+    "name": "BOLSO TRANSPORTADOR S (VERDE)",
+    "brand": "GENÉRICOS",
+    "price": 18060,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11193",
+    "name": "BOLSO TRANSPORTADOR S (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 18060,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11196",
+    "name": "BOLSO TRANSPORTADOR S (ROJO)",
+    "brand": "GENÉRICOS",
+    "price": 18060,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11167",
+    "name": "BOLSO TRANSPORTADOR S (NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 18060,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11194",
+    "name": "BOLSO TRANSPORTADOR S (AZUL)",
+    "brand": "GENÉRICOS",
+    "price": 18060,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11191",
+    "name": "BOLSO TRANSPORTADOR M (VERDE)",
+    "brand": "GENÉRICOS",
+    "price": 20300,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11189",
+    "name": "BOLSO TRANSPORTADOR M (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 20300,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11192",
+    "name": "BOLSO TRANSPORTADOR MEDIUM (ROJO)",
+    "brand": "GENÉRICOS",
+    "price": 20300,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11166",
+    "name": "BOLSO TRANSPORTADOR M (NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 20300,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11190",
+    "name": "BOLSO TRANSPORTADOR M (AZUL)",
+    "brand": "GENÉRICOS",
+    "price": 20300,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11187",
+    "name": "BOLSO TRANSPORTADOR L (VERDE)",
+    "brand": "GENÉRICOS",
+    "price": 21700,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11185",
+    "name": "BOLSO TRANSPORTADOR L (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 21700,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11188",
+    "name": "BOLSO TRANSPORTADOR L (ROJO)",
+    "brand": "GENÉRICOS",
+    "price": 21700,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11165",
+    "name": "BOLSO TRANSPORTADOR L (NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 21700,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11186",
+    "name": "BOLSO TRANSPORTADOR L (AZUL)",
+    "brand": "GENÉRICOS",
+    "price": 21700,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11197",
+    "name": "BOLSO PREMIUM AZUL",
+    "brand": "GENÉRICOS",
+    "price": 43260,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11168",
+    "name": "BOLSO PREMIUM ROSA",
+    "brand": "GENÉRICOS",
+    "price": 43260,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11198",
+    "name": "BOLSO PREMIUM GRIS",
+    "brand": "GENÉRICOS",
+    "price": 43260,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11208",
+    "name": "BOLSO EXTENSIBLE (GRIS CON CELESTE)",
+    "brand": "GENÉRICOS",
+    "price": 51800,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11209",
+    "name": "BOLSO EXTENSIBLE (GRIS CON NARANJA)",
+    "brand": "GENÉRICOS",
+    "price": 51800,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11169",
+    "name": "BOLSO EXTENSIBLE (GRIS CON VERDE)",
+    "brand": "GENÉRICOS",
+    "price": 51800,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11210",
+    "name": "BOLSO EXTENSIBLE (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 51800,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11212",
+    "name": "BOLSO EXTENSIBLE (NEGRO CON BLANCO)",
+    "brand": "GENÉRICOS",
+    "price": 51800,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11211",
+    "name": "BOLSO EXTENSIBLE (NEGRO CON ROJO)",
+    "brand": "GENÉRICOS",
+    "price": 51800,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11178",
+    "name": "LANZA PELOTA (VERDE MANZANA)",
+    "brand": "GENÉRICOS",
+    "price": 98000,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11177",
+    "name": "LANZA PELOTA (VERDE FLUOR)",
+    "brand": "GENÉRICOS",
+    "price": 98000,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11181",
+    "name": "JUGUETE INTERACTIVO CON DISPENSER DE COMIDA (AZUL)",
+    "brand": "GENÉRICOS",
+    "price": 26600,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11162",
+    "name": "JUGUETE INTERACTIVO CON DISPENSER DE COMIDA (GRIS)",
+    "brand": "GENÉRICOS",
+    "price": 26600,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11110",
+    "name": "CATNIP PALTA VERDE",
+    "brand": "GENÉRICOS",
+    "price": 1750,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11254",
+    "name": "CATNIP PALTA CON PLUMA VERDE CON DISPENSER DE COMIDA TAMAÑO GRANDE",
+    "brand": "GENÉRICOS",
+    "price": 6986,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11255",
+    "name": "CATNIP QUESO AMARILLO",
+    "brand": "GENÉRICOS",
+    "price": 2086,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11256",
+    "name": "CATNIP HELADO ROSA",
+    "brand": "GENÉRICOS",
+    "price": 2508,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11257",
+    "name": "CATNIP HELADO CELESTE",
+    "brand": "GENÉRICOS",
+    "price": 2508,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11258",
+    "name": "CATNIP ÁRBOL DOS CAPAS CELESTE",
+    "brand": "GENÉRICOS",
+    "price": 5866,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11261",
+    "name": "CATNIP ÁRBOL TRES CAPAS CELESTE",
+    "brand": "GENÉRICOS",
+    "price": 8666,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11259",
+    "name": "CATNIP ÁRBOL DOS CAPAS VERDE",
+    "brand": "GENÉRICOS",
+    "price": 5866,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11262",
+    "name": "CATNIP ÁRBOL TRES CAPAS VERDE",
+    "brand": "GENÉRICOS",
+    "price": 8666,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11260",
+    "name": "CATNIP ÁRBOL DOS CAPAS ROSA",
+    "brand": "GENÉRICOS",
+    "price": 5866,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11263",
+    "name": "CATNIP ÁRBOL TRES CAPAS ROSA",
+    "brand": "GENÉRICOS",
+    "price": 8666,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11317",
+    "name": "BANDEJA SANITARIA PARA PERROS SMALL 47,5CM*34,5CM*6,5CM",
+    "brand": "GENÉRICOS",
+    "price": 19516,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11318",
+    "name": "BANDEJA SANITARIA PARA PERROS MEDIUM 67CM*41,5CM*4CM",
+    "brand": "GENÉRICOS",
+    "price": 33068,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11373",
+    "name": "CEPILLO DE CARDINAS CON MANGO (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 8999,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11372",
+    "name": "CEPILLO DE CARDINAS CON MANGO (VERDE)",
+    "brand": "GENÉRICOS",
+    "price": 8999,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11371",
+    "name": "CEPILLO DE CARDINAS CON MANGO (BLANCO)",
+    "brand": "GENÉRICOS",
+    "price": 8999,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11074",
+    "name": "CEPILLO ORCA (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 7126,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "10969",
+    "name": "CEPILLO GATO C/MANGO (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 7126,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11061",
+    "name": "CEPILLO FRUTA (AMARILLO)",
+    "brand": "GENÉRICOS",
+    "price": 3206,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "10879",
+    "name": "CEPILLO FRUTA (VERDE)",
+    "brand": "GENÉRICOS",
+    "price": 3206,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11175",
+    "name": "CEPILLO PANDA (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 4900,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11159",
+    "name": "CEPILLO PANDA (BLANCO)",
+    "brand": "GENÉRICOS",
+    "price": 4900,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11250",
+    "name": "JUGUETE TORRE 3 EN 1 BLANCO",
+    "brand": "GENÉRICOS",
+    "price": 54999,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11251",
+    "name": "JUGUETE FANTASMA GATO NEGRO",
+    "brand": "GENÉRICOS",
+    "price": 54999,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11319",
+    "name": "BOTELLA DISPENSADORA DE AGUA (CELESTE)",
+    "brand": "GENÉRICOS",
+    "price": 10878,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11320",
+    "name": "BOTELLA DISPENSADORA DE AGUA (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 10878,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11321",
+    "name": "BOTELLA DISPENSADORA DE AGUA (VERDE)",
+    "brand": "GENÉRICOS",
+    "price": 10878,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11322",
+    "name": "BOTELLA DISPENSADORA DE AGUA CON OREJAS (CELESTE)",
+    "brand": "GENÉRICOS",
+    "price": 8792,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11323",
+    "name": "BOTELLA DISPENSADORA DE AGUA CON OREJAS (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 8792,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11324",
+    "name": "BOTELLA DISPENSADORA DE AGUA CON OREJAS (BLANCO)",
+    "brand": "GENÉRICOS",
+    "price": 8792,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11325",
+    "name": "BOTELLA DISPENSADORA DE AGUA Y BOLSAS CON OREJAS (BLANCA)",
+    "brand": "GENÉRICOS",
+    "price": 12852,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11326",
+    "name": "BOTELLA DISPENSADORA DE AGUA Y BOLSAS CON OREJAS (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 12852,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11327",
+    "name": "BOTELLA DISPENSADORA DE AGUA Y BOLSAS CON OREJAS (CELESTE)",
+    "brand": "GENÉRICOS",
+    "price": 12852,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11328",
+    "name": "BOTELLA DISPENSADORA DE AGUA PLEGABLE (CELESTE)",
+    "brand": "GENÉRICOS",
+    "price": 12684,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11329",
+    "name": "BOTELLA DISPENSADORA DE AGUA PLEGABLE (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 12684,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11330",
+    "name": "BOTELLA DISPENSADORA DE AGUA PLEGABLE (BLANCA)",
+    "brand": "GENÉRICOS",
+    "price": 12684,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11331",
+    "name": "BOTELLA DISPENSADORA DE AGUA Y COMIDA PLEGABLE (CELESTE)",
+    "brand": "GENÉRICOS",
+    "price": 13048,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11332",
+    "name": "BOTELLA DISPENSADORA DE AGUA Y COMIDA PLEGABLE (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 13048,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11333",
+    "name": "BOTELLA DISPENSADORA DE AGUA Y COMIDA PLEGABLE (BLANCA)",
+    "brand": "GENÉRICOS",
+    "price": 13048,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11334",
+    "name": "BOTELLA DISPENSADORA DE AGUA Y COMIDA (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 11046,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11335",
+    "name": "BOTELLA DISPENSADORA DE AGUA Y COMIDA (ROSA)",
+    "brand": "GENÉRICOS",
+    "price": 11942,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11199",
+    "name": "BOTELLA DISPENSADORA AGUA Y COMIDA CELESTE",
+    "brand": "GENÉRICOS",
+    "price": 20664,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11200",
+    "name": "BOTELLA DISPENSADORA AGUA Y COMIDA ROSA",
+    "brand": "GENÉRICOS",
+    "price": 20664,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11252",
+    "name": "COLLAR ANTI LADRIDO DE VIBRACION (SIN SHOCK ELECTRICO",
+    "brand": "GENÉRICOS",
+    "price": 25059,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "NOSTOCK"
+  },
+  {
+    "sku": "11253",
+    "name": "COLLAR ANTI LADRIDO DE VIBRACION (SIN SHOCK ELECTRICO",
+    "brand": "GENÉRICOS",
+    "price": 25059,
+    "pvp": 0,
+    "iva": 10.5,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11160",
+    "name": "CAMARA HD CON COLLAR (BLANCO)",
+    "brand": "GENÉRICOS",
+    "price": 68600,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11176",
+    "name": "CAMARA HD CON COLLAR (NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 68600,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11336",
+    "name": "CORREA DE PASEO RETRACTIL DOBLE, CON LINTERNA Y RECIPIENTE PARA BOLSAS BEEPAW 3M (AZUL)",
+    "brand": "GENÉRICOS",
+    "price": 24724,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11392",
+    "name": "CORREA DE PASEO RETRACTIL DOBLE, CON LINTERNA Y RECIPIENTE PARA BOLSAS BEEPAW 3M (ROJO)",
+    "brand": "GENÉRICOS",
+    "price": 24724,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11393",
+    "name": "CORREA DE PASEO RETRACTIL DOBLE, CON LINTERNA Y RECIPIENTE PARA BOLSAS BEEPAW 3M (NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 24724,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11374",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (30 x 60 cm - NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 3430,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11375",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (30 x 60 cm - GRIS OSCURO)",
+    "brand": "GENÉRICOS",
+    "price": 3430,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11376",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (30 x 60 cm - GRIS CLARO)",
+    "brand": "GENÉRICOS",
+    "price": 3430,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11394",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (30 x 60 cm - AZUL)",
+    "brand": "GENÉRICOS",
+    "price": 3430,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11378",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (30 x 60 cm - MARRÓN)",
+    "brand": "GENÉRICOS",
+    "price": 3430,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11377",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (30 x 60 cm - BEIGE)",
+    "brand": "GENÉRICOS",
+    "price": 3430,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11382",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (60 x 60 cm - NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 6090,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11381",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (60 x 60 cm - GRIS OSCURO)",
+    "brand": "GENÉRICOS",
+    "price": 6090,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11380",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (60 x 60 cm - GRIS CLARO)",
+    "brand": "GENÉRICOS",
+    "price": 6090,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11379",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (60 x 60 cm - AZUL)",
+    "brand": "GENÉRICOS",
+    "price": 6090,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11384",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (60 x 60 cm - MARRÓN)",
+    "brand": "GENÉRICOS",
+    "price": 6090,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11383",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (60 x 60 cm - BEIGE)",
+    "brand": "GENÉRICOS",
+    "price": 6090,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11388",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (40 x 100 cm - NEGRO)",
+    "brand": "GENÉRICOS",
+    "price": 6846,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11395",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (40 x 100 cm - GRIS OSCURO)",
+    "brand": "GENÉRICOS",
+    "price": 6846,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11385",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (40 x 100 cm - GRIS CLARO)",
+    "brand": "GENÉRICOS",
+    "price": 6846,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11387",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (40 x 100 cm - AZUL)",
+    "brand": "GENÉRICOS",
+    "price": 6846,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11389",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (40 x 100 cm - MARRÓN)",
+    "brand": "GENÉRICOS",
+    "price": 6846,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11386",
+    "name": "CUBRE SILLON ANTIDESGARRO RASCADOR (40 x 100 cm - BEIGE)",
+    "brand": "GENÉRICOS",
+    "price": 6846,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11414",
+    "name": "ARBOL PARA GATOS BEEPAW TRIPLE AZUL Y SALMON CON PEZ",
+    "brand": "GENÉRICOS",
+    "price": 86999,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11416",
+    "name": "ARBOL PARA GATOS BEEPAW AMARILLO CON PLATAFORMA",
+    "brand": "GENÉRICOS",
+    "price": 79999,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11417",
+    "name": "ARBOL PARA GATOS BEEPAW 3 PISOS GRIS, ROSA Y BEIGE CON RASCADOR Y CASITA",
+    "brand": "GENÉRICOS",
+    "price": 107999,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11418",
+    "name": "ARBOL PARA GATOS BEEPAW PREMIUM 3 PISOS TERCIOPELO VERDE",
+    "brand": "GENÉRICOS",
+    "price": 109999,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11345",
+    "name": "ARBOL PARA GATOS BEEPAW (BEIGE)",
+    "brand": "GENÉRICOS",
+    "price": 95843,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11346",
+    "name": "ARBOL PARA GATOS BEEPAW (AZUL)",
+    "brand": "GENÉRICOS",
+    "price": 95843,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11413",
+    "name": "ARBOL PARA GATOS BEEPAW PREMIUM DE MADERA",
+    "brand": "GENÉRICOS",
+    "price": 114999,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11352",
+    "name": "ARBOL PARA GATOS BEEPAW PREMIUM DE MADERA",
+    "brand": "GENÉRICOS",
+    "price": 115780,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11350",
+    "name": "ARBOL PARA GATOS BEEPAW TERCIOPELO GRIS CLARO",
+    "brand": "GENÉRICOS",
+    "price": 70504,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11349",
+    "name": "ARBOL PARA GATOS BEEPAW TERCIOPELO GRIS",
+    "brand": "GENÉRICOS",
+    "price": 83902,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11347",
+    "name": "PALO RASCADOR PARA GATOS BEEPAW GRIS",
+    "brand": "GENÉRICOS",
+    "price": 28952,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11348",
+    "name": "PALO RASCADOR PARA GATOS BEEPAW MARRON",
+    "brand": "GENÉRICOS",
+    "price": 29106,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "Preventa 18/03"
+  },
+  {
+    "sku": "11351",
+    "name": "PALO RASCADOR PARA GATOS CON PLATAFORMA BEEPAW GRIS",
+    "brand": "GENÉRICOS",
+    "price": 35910,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11337",
+    "name": "CAMA EN ALTURA MALLADA PARA PERROS M",
+    "brand": "GENÉRICOS",
+    "price": 37800,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11338",
+    "name": "CAMA EN ALTURA MALLADA PARA PERROS L",
+    "brand": "GENÉRICOS",
+    "price": 42840,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11339",
+    "name": "CAMA EN ALTURA MALLADA PARA PERROS XL",
+    "brand": "GENÉRICOS",
+    "price": 52416,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11353",
+    "name": "RAMPA PARA MASCOTAS BEEPAW (CHICA)",
+    "brand": "GENÉRICOS",
+    "price": 47502,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11365",
+    "name": "RAMPA PARA MASCOTAS BEEPAW (GRANDE)",
+    "brand": "GENÉRICOS",
+    "price": 57960,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  },
+  {
+    "sku": "11344",
+    "name": "MECEDORA PARA MASCOTAS ROJO CON NEGRO",
+    "brand": "GENÉRICOS",
+    "price": 32844,
+    "pvp": 0,
+    "iva": 21.0,
+    "stock": "STOCK"
+  }
+];
+
+let cart={},includeIVA=false,activeBrand='ALL',activeStock='ALL';
+const fmt=n=>'$'+Math.round(n).toLocaleString('es-AR').replace(/,/g,'.');
+
+// ── Precio mayorista: se le suma IVA del producto si el toggle está activo
+// ── PVP: NUNCA se modifica, siempre se muestra tal cual viene del Excel
+const mayorista = p => includeIVA ? Math.round(p.price*(1+p.iva/100)) : p.price;
+
+function toggleIVA(){syncIVA(!includeIVA);}
+function syncIVA(v){
+  includeIVA=v;
+  document.getElementById('ivaToggleHeader').classList.toggle('active',v);
+  document.getElementById('ivaLabel').textContent=v?'Con IVA':'Sin IVA';
+  document.getElementById('ivaCheck').checked=v;
+  renderGrid();renderCart();
+}
+function renderBrands(){
+  const brands=['ALL',...new Set(products.map(p=>p.brand).filter(Boolean))];
+  let html=brands.map(b=>`<button class="filter-btn ${b===activeBrand?'active':''}" onclick="setBrand('${b}')">${b==='ALL'?'🐾 Todos':b}</button>`).join('');
+  html+=`<div class="filter-sep"></div>`;
+  html+=`<button class="filter-btn f-stock ${activeStock==='STOCK'?'active':''}" onclick="setStock('STOCK')">✅ En stock</button>`;
+  html+=`<button class="filter-btn f-preventa ${activeStock==='PREVENTA'?'active':''}" onclick="setStock('PREVENTA')">🕐 Preventa</button>`;
+  html+=`<button class="filter-btn f-nostock ${activeStock==='NOSTOCK'?'active':''}" onclick="setStock('NOSTOCK')">❌ Sin stock</button>`;
+  document.getElementById('brandFilters').innerHTML=html;
+}
+function setBrand(b){activeBrand=b;renderBrands();renderGrid();}
+function setStock(s){activeStock=activeStock===s?'ALL':s;renderBrands();renderGrid();}
+
+function renderGrid(){
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  const list=products.filter(p=>{
+    const okBrand=activeBrand==='ALL'||p.brand===activeBrand;
+    const okQ=!q||p.name.toLowerCase().includes(q)||String(p.sku).includes(q)||(p.brand||'').toLowerCase().includes(q);
+    const okStock=activeStock==='ALL'||stockType(p.stock)===activeStock;
+    return okBrand&&okQ&&okStock;
+  });
+  document.getElementById('productCount').textContent=`${list.length} producto${list.length!==1?'s':''} · Precio mayorista ${includeIVA?'con':'sin'} IVA`;
+  if(!list.length){document.getElementById('grid').innerHTML='<div class="no-results">😿 No se encontraron productos</div>';return;}
+  const groups={};
+  list.forEach(p=>{const k=p.brand||'Sin marca';(groups[k]=groups[k]||[]).push(p);});
+  const keys=Object.keys(groups);
+  let html='';
+  keys.forEach(brand=>{
+    if(keys.length>1||activeBrand==='ALL')html+=`<div class="section-title">📦 ${brand}</div>`;
+    groups[brand].forEach(p=>{
+      const qty=cart[p.sku]?.qty||0;
+      const precio=mayorista(p);  // precio mayorista con/sin IVA según toggle
+      const st=stockType(p.stock);
+      const isPrev=st==='PREVENTA', isNoStock=st==='NOSTOCK';
+      const brandClass=p.brand==='BEEPAW'?'brand-beepaw':'brand-gen';
+      const tagClass=st==='STOCK'?'t-stock':st==='PREVENTA'?'t-preventa':'t-nostock';
+      const cardExtra=`${qty>0?'in-cart':''} ${isPrev?'is-preventa':''} ${isNoStock?'is-nostock':''}`;
+      html+=`
+      <div class="card ${cardExtra}" id="card-${p.sku}">
+        <div class="card-img">
+          <img id="img-${p.sku}" alt="${p.name}">
+          <div class="ph">📷</div>
+          ${isPrev?`<div class="preventa-banner">🕐 ${p.stock.toUpperCase()}</div>`:''}
+        </div>
+        <div class="card-body">
+          <div class="tags">
+            <span class="tag ${brandClass}">${p.brand}</span>
+            <span class="tag ${tagClass}">${stockLabel(p.stock)}</span>
+          </div>
+          <div class="iva-label">IVA ${p.iva}%</div>
+          <div class="prod-name">${p.name}</div>
+          <div class="sku">SKU: ${p.sku}</div>
+          <div class="price">${fmt(precio)}</div>
+          <div class="price-note">${includeIVA?'Precio c/IVA incluido':'Precio s/IVA'}</div>
+          ${p.pvp>0?`<div class="pvp">PVP sugerido <span>${fmt(p.pvp)}</span></div>`:''}
+          <div class="qty-row">
+            <button class="qty-btn" onclick="chg('${p.sku}',-1)">−</button>
+            <span class="qty-val">${qty}</span>
+            <button class="qty-btn" onclick="chg('${p.sku}',1)">+</button>
+            <button class="${isPrev?'add-btn btn-preventa':'add-btn'}" onclick="add('${p.sku}')" ${isNoStock?'disabled':''}>
+              ${qty>0?'✓ Agregar':'+ Agregar'}
+            </button>
+          </div>
+        </div>
+      </div>`;
+    });
+  });
+  document.getElementById('grid').innerHTML=html;
+  list.forEach(p=>{const el=document.getElementById(`img-${p.sku}`);if(el)tryLoadImg(el,p.sku);});
+}
+function add(sku){
+  const p=products.find(x=>x.sku==sku);
+  if(!p||stockType(p.stock)==='NOSTOCK')return;
+  cart[sku]={product:p,qty:(cart[sku]?.qty||0)+1};
+  sync();
+}
+function chg(sku,d){
+  const p=products.find(x=>x.sku==sku);
+  if(!p)return;
+  const q=(cart[sku]?.qty||0)+d;
+  if(q<=0)delete cart[sku];else cart[sku]={product:p,qty:q};
+  sync();
+}
+function sync(){updateCount();renderGrid();renderCart();}
+function updateCount(){document.getElementById('cartCount').textContent=Object.values(cart).reduce((a,c)=>a+c.qty,0);}
+function openCart(){document.getElementById('cartOverlay').classList.add('open');document.getElementById('cartDrawer').classList.add('open');renderCart();}
+function closeCart(){document.getElementById('cartOverlay').classList.remove('open');document.getElementById('cartDrawer').classList.remove('open');}
+function renderCart(){
+  const items=Object.values(cart).filter(c=>c.qty>0);
+  const box=document.getElementById('cartItems');
+  if(!items.length){
+    box.innerHTML='<div class="cart-empty">🛒<br>El pedido está vacío<br><small>Agregá productos desde el catálogo</small></div>';
+    document.getElementById('totals').innerHTML='';document.getElementById('waBtn').disabled=true;return;
+  }
+  document.getElementById('waBtn').disabled=false;
+  const groups={};
+  items.forEach(c=>{const b=c.product.brand||'Sin marca';(groups[b]=groups[b]||[]).push(c);});
+  let html='';
+  Object.entries(groups).forEach(([brand,list])=>{
+    html+=`<div class="cart-section-label">📦 ${brand}</div>`;
+    list.forEach(c=>{
+      const p=c.product,precio=mayorista(p);
+      const isPrev=stockType(p.stock)==='PREVENTA';
+      html+=`
+      <div class="cart-item ${isPrev?'ci-preventa':''}">
+        <div class="cart-item-img"><img id="ci-${p.sku}" alt="${p.name}"><span id="cp-${p.sku}">📦</span></div>
+        <div class="cart-item-info">
+          <div class="cart-item-name">${p.name}</div>
+          <div class="cart-item-sku">SKU ${p.sku}</div>
+          <div class="cart-item-price">${fmt(precio)} × ${c.qty} = ${fmt(precio*c.qty)}</div>
+          ${isPrev?`<div class="cart-item-badge">🕐 ${p.stock}</div>`:''}
+          <div class="cart-item-qty">
+            <button onclick="chg('${p.sku}',-1)">−</button>
+            <span>${c.qty}</span>
+            <button onclick="chg('${p.sku}',1)">+</button>
+          </div>
+        </div>
+        <button class="cart-remove" onclick="chg('${p.sku}',${-c.qty})">🗑</button>
+      </div>`;
+    });
+  });
+  box.innerHTML=html;
+  items.forEach(c=>{
+    const el=document.getElementById(`ci-${c.product.sku}`);
+    if(!el)return;
+    const gi=document.getElementById(`img-${c.product.sku}`);
+    if(gi?.src&&gi.classList.contains('visible')){el.src=gi.src;el.onload=()=>{el.classList.add('visible');document.getElementById(`cp-${c.product.sku}`)?.remove();};}
+    else tryLoadImg(el,c.product.sku);
+  });
+  // Totales: base siempre sin IVA, IVA calculado por producto
+  let sub=0,ivaTot=0;
+  items.forEach(c=>{
+    sub+=c.product.price*c.qty;
+    ivaTot+=Math.round(c.product.price*c.qty*c.product.iva/100);
+  });
+  const total=includeIVA?sub+ivaTot:sub;
+  const totalU=items.reduce((a,c)=>a+c.qty,0);
+  const hasPrev=items.some(c=>stockType(c.product.stock)==='PREVENTA');
+  document.getElementById('totals').innerHTML=`
+    <div class="total-row"><span>Subtotal s/IVA</span><span>${fmt(sub)}</span></div>
+    ${includeIVA?`<div class="total-row"><span>IVA (por producto)</span><span>+ ${fmt(ivaTot)}</span></div>`:''}
+    <div class="total-row big"><span>TOTAL (${totalU} prod.)</span><span>${fmt(total)}</span></div>
+    ${hasPrev?`<div class="total-row" style="color:var(--preventa);font-size:11px;margin-top:6px">🕐 Incluye productos en preventa</div>`:''}`;
+}
+function sendWhatsApp(){
+  const name=document.getElementById('clientName').value.trim()||'Sin nombre';
+  const obs=document.getElementById('clientObs').value.trim();
+  const today=new Date().toLocaleDateString('es-AR');
+  const items=Object.values(cart).filter(c=>c.qty>0);
+  if(!items.length)return;
+  const groups={};
+  items.forEach(c=>{const b=c.product.brand||'Sin marca';(groups[b]=groups[b]||[]).push(c);});
+  let sub=0,ivaTot=0;
+  items.forEach(c=>{sub+=c.product.price*c.qty;ivaTot+=Math.round(c.product.price*c.qty*c.product.iva/100);});
+  const total=includeIVA?sub+ivaTot:sub;
+  const totalU=items.reduce((a,c)=>a+c.qty,0);
+  const hasPrev=items.some(c=>stockType(c.product.stock)==='PREVENTA');
+  let msg=`🐾 *PEDIDO BEEPEX CUYO*\n━━━━━━━━━━━━━━━━━━\n`;
+  msg+=`👤 *Cliente:* ${name}\n📅 *Fecha:* ${today}\n💰 *Precios:* ${includeIVA?'Con IVA':'Sin IVA'}\n━━━━━━━━━━━━━━━━━━\n\n`;
+  Object.entries(groups).forEach(([brand,list])=>{
+    msg+=`📦 *${brand}*\n`;
+    list.forEach(c=>{
+      const precio=mayorista(c.product);
+      const isPrev=stockType(c.product.stock)==='PREVENTA';
+      msg+=`• ${c.product.name} (SKU ${c.product.sku})${isPrev?' 🕐 '+c.product.stock:''}\n`;
+      msg+=`  Cant: ${c.qty} × ${fmt(precio)} = *${fmt(precio*c.qty)}*\n`;
+    });
+    msg+='\n';
+  });
+  msg+=`━━━━━━━━━━━━━━━━━━\n📊 *Subtotal s/IVA:* ${fmt(sub)}\n`;
+  if(includeIVA)msg+=`💳 *IVA:* + ${fmt(ivaTot)}\n`;
+  msg+=`✅ *TOTAL (${totalU} productos):* *${fmt(total)}*`;
+  if(hasPrev)msg+=`\n🕐 *Incluye productos en preventa*`;
+  if(obs)msg+=`\n\n💬 *Obs:* ${obs}`;
+  window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+renderBrands();
+renderGrid();
+</script>
+</body>
+</html>
