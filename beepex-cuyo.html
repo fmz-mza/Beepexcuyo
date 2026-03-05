@@ -671,25 +671,25 @@ function add(sku){
   const p=productMap[sku];
   if(!p||stockType(p.stock)==='NOSTOCK') return;
   cart[sku]={product:p, qty:(cart[sku]?.qty||0)+1};
-  syncCart();
+  syncCart(sku);
 }
 function chg(sku,d){
   const p=productMap[sku]; if(!p) return;
   const q=(cart[sku]?.qty||0)+d;
   if(q<=0) delete cart[sku]; else cart[sku]={product:p,qty:q};
-  syncCart();
+  syncCart(sku);
 }
 
-// syncCart: actualiza carrito Y parchea cards visibles SIN recrear el grid
-function syncCart(){
+// syncCart: parchea SOLO la card del SKU modificado, sin tocar el resto
+function syncCart(sku){
   saveCart();
   updateCount();
-  // Parchear solo las cards de los SKUs afectados que están en el DOM
-  lastRenderedSkus.forEach(sku=>{
+  // Solo actualizar la card específica que cambió
+  if(sku){
     const cardEl=document.getElementById(`card-${sku}`);
     const p=productMap[sku];
     if(cardEl&&p) patchCard(cardEl,p);
-  });
+  }
   renderCart();
 }
 
