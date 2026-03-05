@@ -41,14 +41,14 @@
   .section-title{grid-column:1/-1;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:8px 0 0;}
   .section-title.hidden{display:none;}
   .no-results{grid-column:1/-1;text-align:center;color:var(--muted);padding:60px 0;}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s,opacity .15s;}
-  .card.hidden{opacity:0;pointer-events:none;height:0;min-height:0;padding:0;margin:0;border:none;overflow:hidden;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s;}
+  .card.hidden{display:none;}
   .card:hover{transform:translateY(-2px);border-color:#3a3f55;}
   .card.in-cart{border-color:var(--accent);}
   .card.is-preventa{border-color:rgba(167,139,250,.3);}
   .card.is-preventa.in-cart{border-color:var(--preventa);}
   .card.is-nostock{opacity:.55;}
-  .card-img{width:100%;aspect-ratio:1;background:var(--tag-bg);position:relative;overflow:hidden;will-change:transform;transform:translateZ(0);}
+  .card-img{width:100%;aspect-ratio:1;background:var(--tag-bg);position:relative;overflow:hidden;contain:layout style;}
   .card-img img{width:100%;height:100%;object-fit:cover;display:none;}
   .card-img img.visible{display:block;}
   .card-img .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--border);}
@@ -208,10 +208,10 @@ const imgObserver = new IntersectionObserver((entries)=>{
   entries.forEach(e=>{
     if(!e.isIntersecting) return;
     const el=e.target, sku=el.dataset.sku;
-    if(sku && !el.src) tryLoadImg(el, sku);
+    if(sku && !el.getAttribute('src')) tryLoadImg(el, sku);
     imgObserver.unobserve(el);
   });
-}, { rootMargin:'200px' });
+}, { rootMargin:'400px', threshold:0 });
 
 // ── Helpers de stock ─────────────────────────────────────────────────────────
 function stockType(s){
@@ -587,9 +587,17 @@ function renderGrid(){
         cardEl=createCard(p);
         grid.appendChild(cardEl);
       }
-      // Mostrar/ocultar con clase hidden — sin display:none que causa parpadeo
-      if(visibleSkus.has(p.sku)) cardEl.classList.remove('hidden');
-      else cardEl.classList.add('hidden');
+      // Mostrar/ocultar con display:none via clase hidden
+      if(visibleSkus.has(p.sku)){
+        cardEl.classList.remove('hidden');
+        // Si la imagen aun no cargo, intentar ahora que es visible
+        const imgEl=cardEl.querySelector('img');
+        if(imgEl && !imgEl.src && imgEl.dataset.sku){
+          tryLoadImg(imgEl, imgEl.dataset.sku);
+        }
+      } else {
+        cardEl.classList.add('hidden');
+      }
       cardEl.style.order=orderIdx++;
     });
   });
@@ -639,9 +647,17 @@ function createCard(p){
         </button>
       </div>
     </div>`;
-  // Registrar imagen para lazy load
+  // Cargar imagen: directo si hay cache, lazy si no
   const imgEl=div.querySelector(`#img-${p.sku}`);
-  if(imgEl) imgObserver.observe(imgEl);
+  if(imgEl){
+    if(imgCache[p.sku] && imgCache[p.sku]!=='error'){
+      // Cache hit: cargar inmediatamente sin observer
+      tryLoadImg(imgEl, p.sku);
+    } else {
+      // Sin cache: lazy load con observer
+      imgObserver.observe(imgEl);
+    }
+  }
   return div;
 }
 
