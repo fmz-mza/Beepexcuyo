@@ -46,7 +46,7 @@
   .card.is-preventa{border-color:rgba(167,139,250,.3);}
   .card.is-preventa.in-cart{border-color:var(--preventa);}
   .card.is-nostock{opacity:.55;}
-  .card-img{width:100%;aspect-ratio:1;background:var(--tag-bg);position:relative;overflow:hidden;}
+  .card-img{width:100%;aspect-ratio:1;background:var(--tag-bg);position:relative;overflow:hidden;will-change:transform;transform:translateZ(0);}
   .card-img img{width:100%;height:100%;object-fit:cover;display:none;}
   .card-img img.visible{display:block;}
   .card-img .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--border);}
@@ -583,11 +583,10 @@ function renderGrid(){
       if(!cardEl){
         cardEl=createCard(p);
         grid.appendChild(cardEl);
-      } else {
-        patchCard(cardEl,p);
       }
-      // Mostrar/ocultar según filtro y asignar orden CSS
-      cardEl.style.display=visibleSkus.has(p.sku)?'':'none';
+      // Mostrar/ocultar según filtro y asignar orden CSS — sin tocar contenido
+      const shouldShow=visibleSkus.has(p.sku);
+      if((cardEl.style.display==='none')===shouldShow) cardEl.style.display=shouldShow?'':'none';
       cardEl.style.order=orderIdx++;
     });
   });
@@ -643,24 +642,39 @@ function createCard(p){
   return div;
 }
 
-// Patch de card existente: actualiza solo los campos que pueden cambiar
+// Patch de card existente: solo escribe en el DOM si el valor realmente cambió
 function patchCard(cardEl, p){
   const qty=cart[p.sku]?.qty||0;
-  const precio=mayorista(p);
+  const precio=fmt(mayorista(p));
   const st=stockType(p.stock);
   const isPrev=st==='PREVENTA', isNoStock=st==='NOSTOCK';
-  cardEl.classList.toggle('in-cart', qty>0);
+
+  // Clase in-cart: solo tocar si cambió
+  const shouldInCart=qty>0;
+  if(cardEl.classList.contains('in-cart')!==shouldInCart)
+    cardEl.classList.toggle('in-cart', shouldInCart);
+
+  // Cantidad
   const qtyVal=cardEl.querySelector('.qty-val');
-  if(qtyVal) qtyVal.textContent=qty;
+  if(qtyVal && qtyVal.textContent!=qty) qtyVal.textContent=qty;
+
+  // Precio
   const priceEl=cardEl.querySelector('.price');
-  if(priceEl) priceEl.textContent=fmt(precio);
+  if(priceEl && priceEl.textContent!==precio) priceEl.textContent=precio;
+
+  // Nota precio
+  const nota=includeIVA?'Precio c/IVA incluido':'Precio s/IVA';
   const noteEl=cardEl.querySelector('.price-note');
-  if(noteEl) noteEl.textContent=includeIVA?'Precio c/IVA incluido':'Precio s/IVA';
+  if(noteEl && noteEl.textContent!==nota) noteEl.textContent=nota;
+
+  // Botón: calcular nuevo estado
   const btn=cardEl.querySelector('.add-btn');
   if(btn){
-    btn.className=`${isPrev?'add-btn btn-preventa':'add-btn'}${qty>0?' in-cart-btn':''}`;
-    btn.textContent=qty>0?`✓ En pedido (${qty})`:'+ Agregar';
-    btn.disabled=isNoStock;
+    const newClass=`${isPrev?'add-btn btn-preventa':'add-btn'}${qty>0?' in-cart-btn':''}`;
+    const newText=qty>0?`✓ En pedido (${qty})`:'+ Agregar';
+    if(btn.className!==newClass) btn.className=newClass;
+    if(btn.textContent!==newText) btn.textContent=newText;
+    if(btn.disabled!==isNoStock) btn.disabled=isNoStock;
   }
 }
 
