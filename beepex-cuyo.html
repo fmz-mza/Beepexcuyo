@@ -39,8 +39,10 @@
   @media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr);}}
   @media(min-width:900px){.grid{grid-template-columns:repeat(4,1fr);}}
   .section-title{grid-column:1/-1;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:8px 0 0;}
+  .section-title.hidden{display:none;}
   .no-results{grid-column:1/-1;text-align:center;color:var(--muted);padding:60px 0;}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s,opacity .15s;}
+  .card.hidden{opacity:0;pointer-events:none;height:0;min-height:0;padding:0;margin:0;border:none;overflow:hidden;}
   .card:hover{transform:translateY(-2px);border-color:#3a3f55;}
   .card.in-cart{border-color:var(--accent);}
   .card.is-preventa{border-color:rgba(167,139,250,.3);}
@@ -542,16 +544,17 @@ function renderGrid(){
 
   if(!list.length){
     // Ocultar todo en lugar de destruir
-    grid.querySelectorAll('.card,.section-title').forEach(el=>el.style.display='none');
+    grid.querySelectorAll('.card').forEach(el=>el.classList.add('hidden'));
+    grid.querySelectorAll('.section-title').forEach(el=>el.classList.add('hidden'));
     let noRes=grid.querySelector('.no-results');
     if(!noRes){ noRes=document.createElement('div'); noRes.className='no-results'; noRes.textContent='😿 No se encontraron productos'; grid.appendChild(noRes); }
-    noRes.style.display='';
+    noRes.classList.remove('hidden');
     return;
   }
 
   // Ocultar mensaje de sin resultados si existe
   const noRes=grid.querySelector('.no-results');
-  if(noRes) noRes.style.display='none';
+  if(noRes) noRes.classList.add('hidden');
 
   const visibleSkus=new Set(list.map(p=>p.sku));
   const groups={};
@@ -560,7 +563,7 @@ function renderGrid(){
   const showTitles=keys.length>1||activeBrand==='ALL';
 
   // Ocultar todos los títulos primero
-  grid.querySelectorAll('.section-title').forEach(el=>el.style.display='none');
+  grid.querySelectorAll('.section-title').forEach(el=>el.classList.add('hidden'));
 
   // Calcular el orden de cada item: título de marca justo antes de sus cards
   let orderIdx=0;
@@ -574,7 +577,7 @@ function renderGrid(){
       titleEl.textContent=`📦 ${brand}`;
       grid.appendChild(titleEl);
     }
-    titleEl.style.display=showTitles?'':'none';
+    if(showTitles) titleEl.classList.remove('hidden'); else titleEl.classList.add('hidden');
     titleEl.style.order=orderIdx++;
 
     groups[brand].forEach(({p})=>{
@@ -584,9 +587,9 @@ function renderGrid(){
         cardEl=createCard(p);
         grid.appendChild(cardEl);
       }
-      // Mostrar/ocultar según filtro y asignar orden CSS — sin tocar contenido
-      const shouldShow=visibleSkus.has(p.sku);
-      if((cardEl.style.display==='none')===shouldShow) cardEl.style.display=shouldShow?'':'none';
+      // Mostrar/ocultar con clase hidden — sin display:none que causa parpadeo
+      if(visibleSkus.has(p.sku)) cardEl.classList.remove('hidden');
+      else cardEl.classList.add('hidden');
       cardEl.style.order=orderIdx++;
     });
   });
@@ -594,7 +597,7 @@ function renderGrid(){
   // Ocultar cards de productos que no están en ningún grupo visible
   grid.querySelectorAll('.card[id^="card-"]').forEach(el=>{
     const sku=el.id.replace('card-','');
-    if(!visibleSkus.has(sku)) el.style.display='none';
+    if(!visibleSkus.has(sku)) el.classList.add('hidden');
   });
 }
 
