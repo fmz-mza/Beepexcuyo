@@ -35,6 +35,7 @@
   .filter-sep{width:1px;background:var(--border);margin:0 2px;align-self:stretch;}
   .product-count{font-size:12px;color:var(--muted);}
   .grid{max-width:960px;margin:0 auto;padding:14px 16px 140px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .grid>.card,.grid>.section-title{order:9999;}
   @media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr);}}
   @media(min-width:900px){.grid{grid-template-columns:repeat(4,1fr);}}
   .section-title{grid-column:1/-1;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:8px 0 0;}
@@ -179,31 +180,38 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ── Configuración ──────────────────────────────────────────────────────────
+// ── Configuración ────────────────────────────────────────────────────────────
 const GITHUB_USER='fmz-mza', GITHUB_REPO='Beepexcuyo', GITHUB_BRANCH='main';
 const EXTENSIONS=['jpg','jpeg','png','webp','JPG','PNG'];
 const WA_NUMBER='5492616220850';
 
-// ── Cache de extensiones: evita reintentar extensiones fallidas ─────────────
-const imgCache = {}; // sku → src exitoso
-
+// ── Cache de imágenes ────────────────────────────────────────────────────────
+const imgCache = {}; // sku → url exitosa | 'error'
 function imgBase(sku){ return `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/images/SKU_${sku}`; }
-
 function tryLoadImg(el, sku, i=0){
-  // Si ya sabemos qué extensión funciona, usarla directo
+  if(imgCache[sku]==='error') return;
   if(imgCache[sku]){ el.src=imgCache[sku]; el.onload=()=>onImgLoaded(el); return; }
-  if(i>=EXTENSIONS.length) return;
-  el.onerror = () => tryLoadImg(el, sku, i+1);
-  el.onload  = () => { imgCache[sku]=el.src; onImgLoaded(el); };
-  el.src = `${imgBase(sku)}.${EXTENSIONS[i]}`;
+  if(i>=EXTENSIONS.length){ imgCache[sku]='error'; return; }
+  el.onerror=()=>tryLoadImg(el,sku,i+1);
+  el.onload=()=>{ imgCache[sku]=el.src; onImgLoaded(el); };
+  el.src=`${imgBase(sku)}.${EXTENSIONS[i]}`;
 }
-
 function onImgLoaded(el){
   el.classList.add('visible');
   el.parentElement.querySelector('.ph')?.remove();
 }
 
-// ── Helpers de stock ────────────────────────────────────────────────────────
+// ── Lazy loading con IntersectionObserver ────────────────────────────────────
+const imgObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(!e.isIntersecting) return;
+    const el=e.target, sku=el.dataset.sku;
+    if(sku && !el.src) tryLoadImg(el, sku);
+    imgObserver.unobserve(el);
+  });
+}, { rootMargin:'200px' });
+
+// ── Helpers de stock ─────────────────────────────────────────────────────────
 function stockType(s){
   if(!s||s==='NOSTOCK') return 'NOSTOCK';
   if(s==='STOCK') return 'STOCK';
@@ -217,7 +225,7 @@ function stockLabel(s){
   return 'SIN STOCK';
 }
 
-// ── Datos de productos ──────────────────────────────────────────────────────
+// ── Datos de productos ───────────────────────────────────────────────────────
 const products=[
   {"sku":"11288","name":"ROCK-E","brand":"BEEPAW","price":394800,"pvp":659999,"iva":10.5,"stock":"STOCK"},
   {"sku":"11153","name":"SAND-E","brand":"BEEPAW","price":478800,"pvp":799999,"iva":10.5,"stock":"STOCK"},
@@ -426,158 +434,265 @@ const products=[
   {"sku":"11344","name":"MECEDORA PARA MASCOTAS ROJO CON NEGRO","brand":"GENÉRICOS","price":32844,"pvp":0,"iva":21.0,"stock":"STOCK"}
 ];
 
-// ── Estado ──────────────────────────────────────────────────────────────────
+// ── Mapa rápido de productos por SKU ─────────────────────────────────────────
+const productMap = Object.fromEntries(products.map(p=>[p.sku, p]));
+
+// ── Estado ────────────────────────────────────────────────────────────────────
 let cart={}, includeIVA=false, activeBrand='ALL', activeStock='ALL';
 let renderTimer=null;
+// Último listado filtrado renderizado
+let lastRenderedSkus = [];
 
 const fmt = n => '$'+Math.round(n).toLocaleString('es-AR').replace(/,/g,'.');
 const mayorista = p => includeIVA ? Math.round(p.price*(1+p.iva/100)) : p.price;
 
-// ── Persistencia del carrito ─────────────────────────────────────────────────
+// ── Persistencia ──────────────────────────────────────────────────────────────
 function saveCart(){
   try {
-    const data = {
-      cart,
-      includeIVA,
+    sessionStorage.setItem('beepex_cart', JSON.stringify({
+      cart, includeIVA,
       clientName: document.getElementById('clientName').value,
       clientObs:  document.getElementById('clientObs').value
-    };
-    sessionStorage.setItem('beepex_cart', JSON.stringify(data));
+    }));
   } catch(e){}
 }
-
 function loadCart(){
   try {
     const raw = sessionStorage.getItem('beepex_cart');
     if(!raw) return;
     const data = JSON.parse(raw);
     cart = data.cart || {};
-    // Restaurar referencias a objetos producto
-    Object.keys(cart).forEach(sku => {
-      const p = products.find(x=>x.sku==sku);
-      if(p) cart[sku].product = p; else delete cart[sku];
+    Object.keys(cart).forEach(sku=>{
+      const p=productMap[sku];
+      if(p) cart[sku].product=p; else delete cart[sku];
     });
-    if(data.clientName) document.getElementById('clientName').value = data.clientName;
-    if(data.clientObs)  document.getElementById('clientObs').value  = data.clientObs;
+    if(data.clientName) document.getElementById('clientName').value=data.clientName;
+    if(data.clientObs)  document.getElementById('clientObs').value=data.clientObs;
     if(data.includeIVA) syncIVA(true);
-    const count = Object.values(cart).reduce((a,c)=>a+c.qty,0);
-    if(count>0) showToast(`🛒 Pedido restaurado (${count} productos)`);
+    const n=Object.values(cart).reduce((a,c)=>a+c.qty,0);
+    if(n>0) showToast(`🛒 Pedido restaurado (${n} productos)`);
   } catch(e){ sessionStorage.removeItem('beepex_cart'); }
 }
 
 function showToast(msg){
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 3000);
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
 }
 
-// ── IVA ──────────────────────────────────────────────────────────────────────
+// ── IVA ───────────────────────────────────────────────────────────────────────
 function toggleIVA(){ syncIVA(!includeIVA); }
 function syncIVA(v){
   includeIVA=v;
   document.getElementById('ivaToggleHeader').classList.toggle('active',v);
-  document.getElementById('ivaLabel').textContent = v?'Con IVA':'Sin IVA';
-  document.getElementById('ivaCheck').checked = v;
+  document.getElementById('ivaLabel').textContent=v?'Con IVA':'Sin IVA';
+  document.getElementById('ivaCheck').checked=v;
   saveCart();
-  renderGrid();
+  // Al cambiar IVA solo hay que actualizar precios en cards existentes, no recrearlas
+  patchPrices();
   renderCart();
 }
 
-// ── Filtros ──────────────────────────────────────────────────────────────────
+// ── Patch de precios: actualiza solo texto de precio sin recrear DOM ──────────
+function patchPrices(){
+  lastRenderedSkus.forEach(sku=>{
+    const p=productMap[sku]; if(!p) return;
+    const priceEl=document.querySelector(`#card-${sku} .price`);
+    const noteEl=document.querySelector(`#card-${sku} .price-note`);
+    if(priceEl) priceEl.textContent=fmt(mayorista(p));
+    if(noteEl) noteEl.textContent=includeIVA?'Precio c/IVA incluido':'Precio s/IVA';
+  });
+  document.getElementById('productCount').textContent=
+    `${lastRenderedSkus.length} producto${lastRenderedSkus.length!==1?'s':''} · Precio mayorista ${includeIVA?'con':'sin'} IVA`;
+}
+
+// ── Filtros ───────────────────────────────────────────────────────────────────
 function renderBrands(){
   const brands=['ALL',...new Set(products.map(p=>p.brand).filter(Boolean))];
-  let html = brands.map(b=>`<button class="filter-btn ${b===activeBrand?'active':''}" onclick="setBrand('${b}')">${b==='ALL'?'🐾 Todos':b}</button>`).join('');
-  html += `<div class="filter-sep"></div>`;
-  html += `<button class="filter-btn f-stock ${activeStock==='STOCK'?'active':''}" onclick="setStock('STOCK')">✅ En stock</button>`;
-  html += `<button class="filter-btn f-preventa ${activeStock==='PREVENTA'?'active':''}" onclick="setStock('PREVENTA')">🕐 Preventa</button>`;
-  html += `<button class="filter-btn f-nostock ${activeStock==='NOSTOCK'?'active':''}" onclick="setStock('NOSTOCK')">❌ Sin stock</button>`;
-  document.getElementById('brandFilters').innerHTML = html;
+  let html=brands.map(b=>`<button class="filter-btn ${b===activeBrand?'active':''}" onclick="setBrand('${b}')">${b==='ALL'?'🐾 Todos':b}</button>`).join('');
+  html+=`<div class="filter-sep"></div>`;
+  html+=`<button class="filter-btn f-stock ${activeStock==='STOCK'?'active':''}" onclick="setStock('STOCK')">✅ En stock</button>`;
+  html+=`<button class="filter-btn f-preventa ${activeStock==='PREVENTA'?'active':''}" onclick="setStock('PREVENTA')">🕐 Preventa</button>`;
+  html+=`<button class="filter-btn f-nostock ${activeStock==='NOSTOCK'?'active':''}" onclick="setStock('NOSTOCK')">❌ Sin stock</button>`;
+  document.getElementById('brandFilters').innerHTML=html;
 }
 function setBrand(b){ activeBrand=b; renderBrands(); renderGrid(); }
 function setStock(s){ activeStock=activeStock===s?'ALL':s; renderBrands(); renderGrid(); }
 
-// ── Debounce para el buscador ────────────────────────────────────────────────
+// ── Debounce para el buscador ─────────────────────────────────────────────────
 function scheduleRender(){
   clearTimeout(renderTimer);
-  renderTimer = setTimeout(renderGrid, 200);
+  renderTimer=setTimeout(renderGrid, 200);
 }
 
-// ── Grid ─────────────────────────────────────────────────────────────────────
+// ── Grid: DOM diferencial — show/hide + CSS order, nunca destruye nodos ────
 function renderGrid(){
-  const q = document.getElementById('searchInput').value.toLowerCase();
-  const list = products.filter(p=>{
-    const okBrand  = activeBrand==='ALL'||p.brand===activeBrand;
-    const okQ      = !q||p.name.toLowerCase().includes(q)||String(p.sku).includes(q)||(p.brand||'').toLowerCase().includes(q);
-    const okStock  = activeStock==='ALL'||stockType(p.stock)===activeStock;
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  const list=products.filter(p=>{
+    const okBrand=activeBrand==='ALL'||p.brand===activeBrand;
+    const okQ=!q||p.name.toLowerCase().includes(q)||String(p.sku).includes(q)||(p.brand||'').toLowerCase().includes(q);
+    const okStock=activeStock==='ALL'||stockType(p.stock)===activeStock;
     return okBrand&&okQ&&okStock;
   });
-  document.getElementById('productCount').textContent = `${list.length} producto${list.length!==1?'s':''} · Precio mayorista ${includeIVA?'con':'sin'} IVA`;
-  if(!list.length){ document.getElementById('grid').innerHTML='<div class="no-results">😿 No se encontraron productos</div>'; return; }
+
+  lastRenderedSkus=list.map(p=>p.sku);
+  const grid=document.getElementById('grid');
+  document.getElementById('productCount').textContent=
+    `${list.length} producto${list.length!==1?'s':''} · Precio mayorista ${includeIVA?'con':'sin'} IVA`;
+
+  if(!list.length){
+    // Ocultar todo en lugar de destruir
+    grid.querySelectorAll('.card,.section-title').forEach(el=>el.style.display='none');
+    let noRes=grid.querySelector('.no-results');
+    if(!noRes){ noRes=document.createElement('div'); noRes.className='no-results'; noRes.textContent='😿 No se encontraron productos'; grid.appendChild(noRes); }
+    noRes.style.display='';
+    return;
+  }
+
+  // Ocultar mensaje de sin resultados si existe
+  const noRes=grid.querySelector('.no-results');
+  if(noRes) noRes.style.display='none';
+
+  const visibleSkus=new Set(list.map(p=>p.sku));
   const groups={};
-  list.forEach(p=>{ const k=p.brand||'Sin marca'; (groups[k]=groups[k]||[]).push(p); });
+  list.forEach((p,i)=>{ const k=p.brand||'Sin marca'; (groups[k]=groups[k]||[]).push({p,i}); });
   const keys=Object.keys(groups);
-  let html='';
+  const showTitles=keys.length>1||activeBrand==='ALL';
+
+  // Ocultar todos los títulos primero
+  grid.querySelectorAll('.section-title').forEach(el=>el.style.display='none');
+
+  // Calcular el orden de cada item: título de marca justo antes de sus cards
+  let orderIdx=0;
   keys.forEach(brand=>{
-    if(keys.length>1||activeBrand==='ALL') html+=`<div class="section-title">📦 ${brand}</div>`;
-    groups[brand].forEach(p=>{
-      const qty = cart[p.sku]?.qty||0;
-      const precio = mayorista(p);
-      const st = stockType(p.stock);
-      const isPrev=st==='PREVENTA', isNoStock=st==='NOSTOCK';
-      const brandClass = p.brand==='BEEPAW'?'brand-beepaw':'brand-gen';
-      const tagClass   = st==='STOCK'?'t-stock':st==='PREVENTA'?'t-preventa':'t-nostock';
-      const cardExtra  = `${qty>0?'in-cart':''} ${isPrev?'is-preventa':''} ${isNoStock?'is-nostock':''}`;
-      // Botón mejorado: outline cuando ya está en carrito
-      const btnClass = `${isPrev?'add-btn btn-preventa':'add-btn'}${qty>0?' in-cart-btn':''}`;
-      const btnLabel = qty>0 ? `✓ En pedido (${qty})` : '+ Agregar';
-      html+=`
-      <div class="card ${cardExtra}" id="card-${p.sku}">
-        <div class="card-img">
-          <img id="img-${p.sku}" alt="${p.name}">
-          <div class="ph">📷</div>
-          ${isPrev?`<div class="preventa-banner">🕐 ${p.stock.toUpperCase()}</div>`:''}
-        </div>
-        <div class="card-body">
-          <div class="tags">
-            <span class="tag ${brandClass}">${p.brand}</span>
-            <span class="tag ${tagClass}">${stockLabel(p.stock)}</span>
-          </div>
-          <div class="iva-label">IVA ${p.iva}%</div>
-          <div class="prod-name">${p.name}</div>
-          <div class="sku">SKU: ${p.sku}</div>
-          <div class="price">${fmt(precio)}</div>
-          <div class="price-note">${includeIVA?'Precio c/IVA incluido':'Precio s/IVA'}</div>
-          ${p.pvp>0?`<div class="pvp">PVP sugerido <span>${fmt(p.pvp)}</span></div>`:''}
-          <div class="qty-row">
-            <button class="qty-btn" onclick="chg('${p.sku}',-1)">−</button>
-            <span class="qty-val">${qty}</span>
-            <button class="qty-btn" onclick="chg('${p.sku}',1)">+</button>
-            <button class="${btnClass}" onclick="add('${p.sku}')" ${isNoStock?'disabled':''}>${btnLabel}</button>
-          </div>
-        </div>
-      </div>`;
+    // Section title
+    let titleEl=grid.querySelector(`.section-title[data-brand="${brand}"]`);
+    if(!titleEl){
+      titleEl=document.createElement('div');
+      titleEl.className='section-title';
+      titleEl.dataset.brand=brand;
+      titleEl.textContent=`📦 ${brand}`;
+      grid.appendChild(titleEl);
+    }
+    titleEl.style.display=showTitles?'':'none';
+    titleEl.style.order=orderIdx++;
+
+    groups[brand].forEach(({p})=>{
+      // Card: crear si no existe, parchear si existe
+      let cardEl=document.getElementById(`card-${p.sku}`);
+      if(!cardEl){
+        cardEl=createCard(p);
+        grid.appendChild(cardEl);
+      } else {
+        patchCard(cardEl,p);
+      }
+      // Mostrar/ocultar según filtro y asignar orden CSS
+      cardEl.style.display=visibleSkus.has(p.sku)?'':'none';
+      cardEl.style.order=orderIdx++;
     });
   });
-  document.getElementById('grid').innerHTML=html;
-  list.forEach(p=>{ const el=document.getElementById(`img-${p.sku}`); if(el) tryLoadImg(el,p.sku); });
+
+  // Ocultar cards de productos que no están en ningún grupo visible
+  grid.querySelectorAll('.card[id^="card-"]').forEach(el=>{
+    const sku=el.id.replace('card-','');
+    if(!visibleSkus.has(sku)) el.style.display='none';
+  });
 }
 
-// ── Carrito ──────────────────────────────────────────────────────────────────
+// Crear una card nueva completa
+function createCard(p){
+  const qty=cart[p.sku]?.qty||0;
+  const precio=mayorista(p);
+  const st=stockType(p.stock);
+  const isPrev=st==='PREVENTA', isNoStock=st==='NOSTOCK';
+  const brandClass=p.brand==='BEEPAW'?'brand-beepaw':'brand-gen';
+  const tagClass=st==='STOCK'?'t-stock':st==='PREVENTA'?'t-preventa':'t-nostock';
+  const div=document.createElement('div');
+  div.id=`card-${p.sku}`;
+  div.className=`card${qty>0?' in-cart':''}${isPrev?' is-preventa':''}${isNoStock?' is-nostock':''}`;
+  div.innerHTML=`
+    <div class="card-img">
+      <img id="img-${p.sku}" data-sku="${p.sku}" alt="${p.name}">
+      <div class="ph">📷</div>
+      ${isPrev?`<div class="preventa-banner">🕐 ${p.stock.toUpperCase()}</div>`:''}
+    </div>
+    <div class="card-body">
+      <div class="tags">
+        <span class="tag ${brandClass}">${p.brand}</span>
+        <span class="tag ${tagClass}">${stockLabel(p.stock)}</span>
+      </div>
+      <div class="iva-label">IVA ${p.iva}%</div>
+      <div class="prod-name">${p.name}</div>
+      <div class="sku">SKU: ${p.sku}</div>
+      <div class="price">${fmt(precio)}</div>
+      <div class="price-note">${includeIVA?'Precio c/IVA incluido':'Precio s/IVA'}</div>
+      ${p.pvp>0?`<div class="pvp">PVP sugerido <span>${fmt(p.pvp)}</span></div>`:''}
+      <div class="qty-row">
+        <button class="qty-btn" onclick="chg('${p.sku}',-1)">−</button>
+        <span class="qty-val">${qty}</span>
+        <button class="qty-btn" onclick="chg('${p.sku}',1)">+</button>
+        <button class="${qty>0?(isPrev?'add-btn btn-preventa in-cart-btn':'add-btn in-cart-btn'):(isPrev?'add-btn btn-preventa':'add-btn')}"
+          onclick="add('${p.sku}')" ${isNoStock?'disabled':''}>
+          ${qty>0?`✓ En pedido (${qty})`:'+ Agregar'}
+        </button>
+      </div>
+    </div>`;
+  // Registrar imagen para lazy load
+  const imgEl=div.querySelector(`#img-${p.sku}`);
+  if(imgEl) imgObserver.observe(imgEl);
+  return div;
+}
+
+// Patch de card existente: actualiza solo los campos que pueden cambiar
+function patchCard(cardEl, p){
+  const qty=cart[p.sku]?.qty||0;
+  const precio=mayorista(p);
+  const st=stockType(p.stock);
+  const isPrev=st==='PREVENTA', isNoStock=st==='NOSTOCK';
+  cardEl.classList.toggle('in-cart', qty>0);
+  const qtyVal=cardEl.querySelector('.qty-val');
+  if(qtyVal) qtyVal.textContent=qty;
+  const priceEl=cardEl.querySelector('.price');
+  if(priceEl) priceEl.textContent=fmt(precio);
+  const noteEl=cardEl.querySelector('.price-note');
+  if(noteEl) noteEl.textContent=includeIVA?'Precio c/IVA incluido':'Precio s/IVA';
+  const btn=cardEl.querySelector('.add-btn');
+  if(btn){
+    btn.className=`${isPrev?'add-btn btn-preventa':'add-btn'}${qty>0?' in-cart-btn':''}`;
+    btn.textContent=qty>0?`✓ En pedido (${qty})`:'+ Agregar';
+    btn.disabled=isNoStock;
+  }
+}
+
+// reorderGrid eliminado — el orden se maneja con CSS order en renderGrid
+
+// ── Operaciones de carrito ────────────────────────────────────────────────────
 function add(sku){
-  const p=products.find(x=>x.sku==sku);
+  const p=productMap[sku];
   if(!p||stockType(p.stock)==='NOSTOCK') return;
   cart[sku]={product:p, qty:(cart[sku]?.qty||0)+1};
-  sync();
+  syncCart();
 }
 function chg(sku,d){
-  const p=products.find(x=>x.sku==sku);
-  if(!p) return;
+  const p=productMap[sku]; if(!p) return;
   const q=(cart[sku]?.qty||0)+d;
   if(q<=0) delete cart[sku]; else cart[sku]={product:p,qty:q};
-  sync();
+  syncCart();
 }
-function sync(){ saveCart(); updateCount(); renderGrid(); renderCart(); }
+
+// syncCart: actualiza carrito Y parchea cards visibles SIN recrear el grid
+function syncCart(){
+  saveCart();
+  updateCount();
+  // Parchear solo las cards de los SKUs afectados que están en el DOM
+  lastRenderedSkus.forEach(sku=>{
+    const cardEl=document.getElementById(`card-${sku}`);
+    const p=productMap[sku];
+    if(cardEl&&p) patchCard(cardEl,p);
+  });
+  renderCart();
+}
+
 function updateCount(){ document.getElementById('cartCount').textContent=Object.values(cart).reduce((a,c)=>a+c.qty,0); }
 function openCart(){ document.getElementById('cartOverlay').classList.add('open'); document.getElementById('cartDrawer').classList.add('open'); renderCart(); }
 function closeCart(){ document.getElementById('cartOverlay').classList.remove('open'); document.getElementById('cartDrawer').classList.remove('open'); }
@@ -602,9 +717,7 @@ function renderCart(){
       const isPrev=stockType(p.stock)==='PREVENTA';
       html+=`
       <div class="cart-item ${isPrev?'ci-preventa':''}">
-        <div class="cart-item-img" id="ci-wrap-${p.sku}">
-          <img id="ci-${p.sku}" alt="${p.name}"><span id="cp-${p.sku}">📦</span>
-        </div>
+        <div class="cart-item-img"><img id="ci-${p.sku}" alt="${p.name}"><span id="cp-${p.sku}">📦</span></div>
         <div class="cart-item-info">
           <div class="cart-item-name">${p.name}</div>
           <div class="cart-item-sku">SKU ${p.sku}</div>
@@ -621,21 +734,15 @@ function renderCart(){
     });
   });
   box.innerHTML=html;
-
-  // Reutilizar imagen ya cargada en el grid si existe — sin recargar
   items.forEach(c=>{
-    const ciEl = document.getElementById(`ci-${c.product.sku}`);
-    if(!ciEl) return;
-    const cached = imgCache[c.product.sku];
-    if(cached){
-      ciEl.src=cached;
-      ciEl.onload=()=>{ ciEl.classList.add('visible'); document.getElementById(`cp-${c.product.sku}`)?.remove(); };
+    const el=document.getElementById(`ci-${c.product.sku}`); if(!el) return;
+    const cached=imgCache[c.product.sku];
+    if(cached&&cached!=='error'){
+      el.src=cached; el.onload=()=>{ el.classList.add('visible'); document.getElementById(`cp-${c.product.sku}`)?.remove(); };
     } else {
-      tryLoadImg(ciEl, c.product.sku);
+      tryLoadImg(el, c.product.sku);
     }
   });
-
-  // Totales
   let sub=0, ivaTot=0;
   items.forEach(c=>{ sub+=c.product.price*c.qty; ivaTot+=Math.round(c.product.price*c.qty*c.product.iva/100); });
   const total=includeIVA?sub+ivaTot:sub;
