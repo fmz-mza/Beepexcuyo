@@ -559,7 +559,10 @@ function loadCart(){
     if(data.clientObs)  document.getElementById('clientObs').value=data.clientObs;
     if(data.includeIVA) syncIVA(true);
     const n=Object.values(cart).reduce((a,c)=>a+c.qty,0);
-    if(n>0) showToast(`🛒 Pedido restaurado (${n} productos)`);
+    if(n>0){
+      updateCount();
+      showToast(`🛒 Pedido restaurado (${n} productos)`);
+    }
   } catch(e){ localStorage.removeItem('beepex_cart'); }
 }
 
