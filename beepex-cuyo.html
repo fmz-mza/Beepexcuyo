@@ -1007,7 +1007,7 @@ function sendWhatsApp(){
     transaction_id: Date.now().toString(),
     items: items.map(c=>({item_id:c.product.sku, item_name:c.product.name, item_brand:c.product.brand, price:mayorista(c.product), quantity:c.qty}))
   });
-  window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`,'_blank');
+  window.location.href=`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`;
 }
 
 // ── Exportar PDF del pedido ──────────────────────────────────────────────────
