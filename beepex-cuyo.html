@@ -2,8 +2,14 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="theme-color" content="#0e0f14">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Beepex Cuyo — Catálogo Mayorista</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#0e0f14;--surface:#16181f;--card:#1c1f2a;--border:#2a2d3a;--accent:#4a7cff;--accent2:#f5a623;--green:#22c55e;--red:#ef4444;--preventa:#a78bfa;--text:#f0f2ff;--muted:#8b90a8;--tag-bg:#1e2130;}
@@ -28,6 +34,10 @@
   .cart-btn:hover{background:#3a6cf0;}
   .cart-count{background:var(--accent2);color:#000;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;min-width:20px;}
   .toolbar{max-width:960px;margin:0 auto;padding:14px 16px 0;display:flex;flex-direction:column;gap:10px;}
+  .search-wrap{position:relative;width:100%;}
+  .search-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px 6px;display:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;line-height:1;}
+  .search-clear.visible{display:block;}
+  .search-clear:active{color:var(--text);}
   .search-input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:16px;color:var(--text);font-family:inherit;outline:none;transition:border .2s;}
   .search-input::placeholder{color:var(--muted);}
   .search-input:focus{border-color:var(--accent);}
@@ -51,6 +61,8 @@
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s;}
   .card.hidden{display:none;}
   .card:hover{transform:translateY(-2px);border-color:#3a3f55;}
+  .card.pop{animation:cardPop .3s ease;}
+  @keyframes cardPop{0%{transform:scale(1)}50%{transform:scale(1.03)}100%{transform:scale(1)}}
   .card.in-cart{border-color:var(--accent);}
   .card.is-preventa{border-color:rgba(167,139,250,.3);}
   .card.is-preventa.in-cart{border-color:var(--preventa);}
@@ -59,7 +71,8 @@
   .info-chip{position:absolute;bottom:6px;right:6px;background:rgba(14,15,20,.75);backdrop-filter:blur(6px);color:var(--text);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:.3px;pointer-events:none;border:1px solid rgba(255,255,255,.1);}
   .card-img img{width:100%;height:100%;object-fit:cover;display:none;}
   .card-img img.visible{display:block;}
-  .card-img .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--border);}
+  .card-img .ph{position:absolute;inset:0;background:linear-gradient(90deg,var(--card) 25%,var(--border) 50%,var(--card) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   .preventa-banner{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(109,40,217,.85),transparent);color:#fff;font-size:10px;font-weight:700;padding:16px 8px 6px;text-align:center;letter-spacing:.5px;}
   .card-body{padding:10px;flex:1;display:flex;flex-direction:column;gap:4px;}
   .tags{display:flex;gap:4px;flex-wrap:wrap;}
@@ -168,7 +181,7 @@
   .desc-modal-close:active{transform:scale(.95);}
 </style>
 <!-- jsPDF para exportar pedido -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- jsPDF carga lazy al primer uso -->
 <!-- Google Analytics 4 -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-8SNQ2GERGG"></script>
 <script>
@@ -203,7 +216,10 @@
   </div>
 </header>
 <div class="toolbar">
-  <input class="search-input" id="searchInput" placeholder="🔍  Buscar producto, SKU, marca..." oninput="scheduleRender()">
+  <div class="search-wrap">
+    <input class="search-input" id="searchInput" placeholder="🔍  Buscar producto, SKU, marca..." oninput="scheduleRender()">
+    <button class="search-clear" id="searchClear" onclick="clearSearch()" aria-label="Limpiar búsqueda">✕</button>
+  </div>
   <div class="filters" id="brandFilters"></div>
   <div class="product-count" id="productCount"></div>
 </div>
@@ -522,7 +538,7 @@ const mayorista = p => includeIVA ? Math.round(p.price*(1+p.iva/100)) : p.price;
 // ── Persistencia ──────────────────────────────────────────────────────────────
 function saveCart(){
   try {
-    sessionStorage.setItem('beepex_cart', JSON.stringify({
+    localStorage.setItem('beepex_cart', JSON.stringify({
       cart, includeIVA,
       clientName: document.getElementById('clientName').value,
       clientObs:  document.getElementById('clientObs').value
@@ -531,7 +547,7 @@ function saveCart(){
 }
 function loadCart(){
   try {
-    const raw = sessionStorage.getItem('beepex_cart');
+    const raw = localStorage.getItem('beepex_cart');
     if(!raw) return;
     const data = JSON.parse(raw);
     cart = data.cart || {};
@@ -544,7 +560,7 @@ function loadCart(){
     if(data.includeIVA) syncIVA(true);
     const n=Object.values(cart).reduce((a,c)=>a+c.qty,0);
     if(n>0) showToast(`🛒 Pedido restaurado (${n} productos)`);
-  } catch(e){ sessionStorage.removeItem('beepex_cart'); }
+  } catch(e){ localStorage.removeItem('beepex_cart'); }
 }
 
 function showToast(msg){
@@ -573,7 +589,7 @@ function patchPrices(){
     const p=productMap[sku]; if(!p) return;
     const priceEl=document.querySelector(`#card-${sku} .price`);
     const noteEl=document.querySelector(`#card-${sku} .price-note`);
-    if(priceEl) priceEl.textContent=fmt(mayorista(p));
+    if(priceEl) priceEl.textContent=p.price===0?'Consultar':fmt(mayorista(p));
     if(noteEl) noteEl.textContent=includeIVA?'Precio c/IVA incluido':'Precio s/IVA';
   });
   document.getElementById('productCount').textContent=
@@ -616,13 +632,19 @@ function setBrand(b){
 function setStock(s){ activeStock=activeStock===s?'ALL':s; renderBrands(); renderGrid(); }
 
 // ── Debounce para el buscador ─────────────────────────────────────────────────
+function clearSearch(){
+  document.getElementById('searchInput').value='';
+  document.getElementById('searchClear').classList.remove('visible');
+  renderGrid();
+}
 function scheduleRender(){
   clearTimeout(renderTimer);
+  const q=document.getElementById('searchInput').value;
+  document.getElementById('searchClear').classList.toggle('visible', q.length>0);
   renderTimer=setTimeout(()=>{
     renderGrid();
     // GA4: búsqueda (solo si hay texto)
-    const q=document.getElementById('searchInput').value.trim();
-    if(q.length>2 && typeof gtag!=='undefined') gtag('event','search',{search_term:q});
+    if(q.trim().length>2 && typeof gtag!=='undefined') gtag('event','search',{search_term:q.trim()});
   }, 200);
 }
 
@@ -802,6 +824,9 @@ function add(sku){
   if(!p||stockType(p.stock)==='NOSTOCK') return;
   cart[sku]={product:p, qty:(cart[sku]?.qty||0)+1};
   syncCart(sku);
+  // Micro-animación en la card
+  const cardEl=document.getElementById(`card-${sku}`);
+  if(cardEl){ cardEl.classList.add('pop'); setTimeout(()=>cardEl.classList.remove('pop'),300); }
   // GA4: agregar al carrito
   if(typeof gtag!=='undefined') gtag('event','add_to_cart',{
     currency: 'ARS',
@@ -850,8 +875,16 @@ function openCart(){
   document.getElementById('cartOverlay').classList.add('open');
   document.getElementById('cartDrawer').classList.add('open');
   renderCart();
+  // Restaurar posición de scroll del carrito
+  requestAnimationFrame(()=>{
+    const ci=document.getElementById('cartItems');
+    if(ci && window._cartScrollPos) ci.scrollTop=window._cartScrollPos;
+  });
 }
 function closeCart(){
+  // Guardar posición de scroll del carrito
+  const ci=document.getElementById('cartItems');
+  if(ci) window._cartScrollPos=ci.scrollTop;
   document.getElementById('cartOverlay').classList.remove('open');
   document.getElementById('cartDrawer').classList.remove('open');
   // Restaurar scroll del body
@@ -924,7 +957,16 @@ function renderCart(){
 
 // ── WhatsApp ──────────────────────────────────────────────────────────────────
 function sendWhatsApp(){
-  const name=document.getElementById('clientName').value.trim()||'Sin nombre';
+  const nameRaw=document.getElementById('clientName').value.trim();
+  if(!nameRaw){
+    const inp=document.getElementById('clientName');
+    inp.style.borderColor='var(--red)';
+    inp.focus();
+    inp.placeholder='⚠️ Ingresá tu nombre para continuar';
+    setTimeout(()=>{ inp.style.borderColor=''; inp.placeholder='👤 Tu nombre'; },3000);
+    return;
+  }
+  const name=nameRaw;
   const obs=document.getElementById('clientObs').value.trim();
   const today=new Date().toLocaleDateString('es-AR');
   const items=Object.values(cart).filter(c=>c.qty>0);
@@ -978,6 +1020,15 @@ async function imgToBase64(url){
 }
 
 async function exportPDF(){
+  // Lazy load jsPDF solo cuando se necesita
+  if(!window.jspdf){
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload=res; s.onerror=rej;
+      document.head.appendChild(s);
+    });
+  }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'mm', format:'a4' });
   const items = Object.values(cart).filter(c=>c.qty>0);
@@ -1268,7 +1319,30 @@ function closeDescBtn(){
   document.getElementById('descOverlay').classList.remove('open');
 }
 
+// ── Swipe para cerrar carrito (mobile) ───────────────────────────────────────
+(function(){
+  let startX=0, startY=0;
+  const drawer=document.getElementById('cartDrawer');
+  drawer.addEventListener('touchstart', e=>{
+    startX=e.touches[0].clientX;
+    startY=e.touches[0].clientY;
+  },{passive:true});
+  drawer.addEventListener('touchend', e=>{
+    const dx=e.changedTouches[0].clientX - startX;
+    const dy=Math.abs(e.changedTouches[0].clientY - startY);
+    // Swipe derecha > 80px y más horizontal que vertical
+    if(dx>80 && dy<60) closeCart();
+  },{passive:true});
+})();
+
 // ── Botón volver arriba ──────────────────────────────────────────────────────
+// ── PWA Service Worker ────────────────────────────────────────────────────────
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+
 window.addEventListener('scroll', ()=>{
   document.getElementById('backTop').classList.toggle('visible', window.scrollY > 400);
 }, {passive:true});
