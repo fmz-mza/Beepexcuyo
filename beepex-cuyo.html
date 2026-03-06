@@ -840,8 +840,27 @@ function updateCount(){
   totalEl.textContent=`Total: ${fmt(total)}`;
   if(count>0) totalEl.classList.add('visible'); else totalEl.classList.remove('visible');
 }
-function openCart(){ document.getElementById('cartOverlay').classList.add('open'); document.getElementById('cartDrawer').classList.add('open'); renderCart(); }
-function closeCart(){ document.getElementById('cartOverlay').classList.remove('open'); document.getElementById('cartDrawer').classList.remove('open'); }
+function openCart(){
+  // Bloquear scroll del body (iOS requiere position:fixed)
+  const scrollY = window.scrollY;
+  document.body.style.position='fixed';
+  document.body.style.top=`-${scrollY}px`;
+  document.body.style.width='100%';
+  document.body.dataset.scrollY = scrollY;
+  document.getElementById('cartOverlay').classList.add('open');
+  document.getElementById('cartDrawer').classList.add('open');
+  renderCart();
+}
+function closeCart(){
+  document.getElementById('cartOverlay').classList.remove('open');
+  document.getElementById('cartDrawer').classList.remove('open');
+  // Restaurar scroll del body
+  const scrollY = parseInt(document.body.dataset.scrollY||'0');
+  document.body.style.position='';
+  document.body.style.top='';
+  document.body.style.width='';
+  window.scrollTo(0, scrollY);
+}
 
 function renderCart(){
   const items=Object.values(cart).filter(c=>c.qty>0);
@@ -945,11 +964,35 @@ function sendWhatsApp(){
 }
 
 // ── Exportar PDF del pedido ──────────────────────────────────────────────────
+// Convierte una URL de imagen a base64 para jsPDF
+async function imgToBase64(url){
+  try {
+    const resp = await fetch(url);
+    const blob = await resp.blob();
+    return await new Promise(res=>{
+      const r = new FileReader();
+      r.onload = ()=>res(r.result);
+      r.readAsDataURL(blob);
+    });
+  } catch(e){ return null; }
+}
+
 async function exportPDF(){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'mm', format:'a4' });
   const items = Object.values(cart).filter(c=>c.qty>0);
   if(!items.length) return;
+
+  // Precargar imágenes de productos en cache base64
+  const imgB64 = {};
+  await Promise.all(items.map(async c=>{
+    const sku = c.product.sku;
+    const cached = imgCache[sku];
+    if(cached && cached!=='error'){
+      const b64 = await imgToBase64(cached);
+      if(b64) imgB64[sku] = b64;
+    }
+  }));
 
   const name = document.getElementById('clientName').value.trim()||'Sin nombre';
   const obs  = document.getElementById('clientObs').value.trim();
@@ -1068,7 +1111,7 @@ async function exportPDF(){
     // Filas
     list.forEach((c, idx)=>{
       if(y > 270){ doc.addPage(); doc.setFillColor(...BG); doc.rect(0,0,W,297,'F'); y=16; }
-      const rowH = 9;
+      const rowH = 12;
       const rowBg = idx%2===0 ? CARD : SURFACE;
       doc.setFillColor(...rowBg);
       doc.rect(margin, y, col, rowH, 'F');
@@ -1077,13 +1120,27 @@ async function exportPDF(){
       const subtotal = precio * c.qty;
       const isPrev = stockType(c.product.stock)==='PREVENTA';
 
-      // Nombre (truncado)
-      const maxNom = 52;
+      // Imagen del producto
+      const b64 = imgB64[c.product.sku];
+      if(b64){
+        try{
+          doc.addImage(b64, 'JPEG', margin+2, y+1, 10, 10, undefined, 'FAST');
+        }catch(e){}
+      } else {
+        doc.setFillColor(...BORDER);
+        doc.roundedRect(margin+2, y+1, 10, 10, 1, 1, 'F');
+        doc.setTextColor(...MUTED);
+        doc.setFontSize(7);
+        doc.text('📷', margin+7, y+7.5, {align:'center'});
+      }
+
+      // Nombre (truncado) — offset por imagen
+      const maxNom = 48;
       const nom = c.product.name.length > maxNom ? c.product.name.slice(0,maxNom)+'…' : c.product.name;
       doc.setTextColor(...WHITE);
       doc.setFont('helvetica', isPrev?'bolditalic':'normal');
       doc.setFontSize(7.5);
-      doc.text(nom, margin+3, y+6);
+      doc.text(nom, margin+15, y+6);
 
       doc.setFont('helvetica','normal');
       doc.setTextColor(...MUTED);
@@ -1100,7 +1157,7 @@ async function exportPDF(){
       if(isPrev){
         doc.setTextColor(...[167,139,250]);
         doc.setFontSize(6);
-        doc.text('PREVENTA', margin+3, y+8.5);
+        doc.text('PREVENTA', margin+15, y+10);
       }
       y += rowH;
     });
