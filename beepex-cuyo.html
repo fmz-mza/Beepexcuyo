@@ -163,6 +163,17 @@
   .desc-modal-close{align-self:flex-end;background:var(--card);border:none;border-radius:8px;color:var(--text);font-size:13px;font-weight:600;padding:10px 20px;cursor:pointer;margin-top:4px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px;}
   .desc-modal-close:active{transform:scale(.95);}
 </style>
+<!-- Google Analytics 4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-8SNQ2GERGG"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-8SNQ2GERGG', {
+    page_title: 'Catálogo Mayorista Beepex Cuyo',
+    page_location: window.location.href
+  });
+</script>
 </head>
 <body>
 <header class="header">
@@ -588,13 +599,21 @@ function renderBrands(){
   html+=`<button class="filter-btn f-nostock ${activeStock==='NOSTOCK'?'active':''}" onclick="setStock('NOSTOCK')">❌ Sin stock</button>`;
   document.getElementById('brandFilters').innerHTML=html;
 }
-function setBrand(b){ activeBrand=b; renderBrands(); renderGrid(); }
+function setBrand(b){
+  activeBrand=b; renderBrands(); renderGrid();
+  if(typeof gtag!=='undefined'&&b!=='ALL') gtag('event','select_item',{item_list_name:'filtro_marca',item_list_id:b});
+}
 function setStock(s){ activeStock=activeStock===s?'ALL':s; renderBrands(); renderGrid(); }
 
 // ── Debounce para el buscador ─────────────────────────────────────────────────
 function scheduleRender(){
   clearTimeout(renderTimer);
-  renderTimer=setTimeout(renderGrid, 200);
+  renderTimer=setTimeout(()=>{
+    renderGrid();
+    // GA4: búsqueda (solo si hay texto)
+    const q=document.getElementById('searchInput').value.trim();
+    if(q.length>2 && typeof gtag!=='undefined') gtag('event','search',{search_term:q});
+  }, 200);
 }
 
 // ── Grid: DOM diferencial — show/hide + CSS order, nunca destruye nodos ────
@@ -773,6 +792,12 @@ function add(sku){
   if(!p||stockType(p.stock)==='NOSTOCK') return;
   cart[sku]={product:p, qty:(cart[sku]?.qty||0)+1};
   syncCart(sku);
+  // GA4: agregar al carrito
+  if(typeof gtag!=='undefined') gtag('event','add_to_cart',{
+    currency: 'ARS',
+    value: p.price,
+    items:[{item_id:sku, item_name:p.name, item_brand:p.brand, price:p.price, quantity:1}]
+  });
 }
 function chg(sku,d){
   const p=productMap[sku]; if(!p) return;
@@ -897,6 +922,13 @@ function sendWhatsApp(){
   msg+=`✅ *TOTAL (${totalU} productos):* *${fmt(total)}*`;
   if(hasPrev) msg+=`\n🕐 *Incluye productos en preventa*`;
   if(obs) msg+=`\n\n💬 *Obs:* ${obs}`;
+  // GA4: pedido enviado
+  if(typeof gtag!=='undefined') gtag('event','purchase',{
+    currency:'ARS',
+    value: total,
+    transaction_id: Date.now().toString(),
+    items: items.map(c=>({item_id:c.product.sku, item_name:c.product.name, item_brand:c.product.brand, price:mayorista(c.product), quantity:c.qty}))
+  });
   window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`,'_blank');
 }
 
@@ -904,6 +936,13 @@ function sendWhatsApp(){
 function openDesc(sku){
   const p=productMap[sku]; if(!p) return;
   const meta=productMeta[sku];
+  // GA4: vista de producto
+  if(typeof gtag!=='undefined') gtag('event','view_item',{
+    item_id: sku,
+    item_name: p.name,
+    item_brand: p.brand,
+    price: p.price
+  });
   const desc=meta&&meta.desc?meta.desc:'Sin descripción disponible.';
   document.getElementById('descModalName').textContent=p.name;
   document.getElementById('descModalSku').textContent=`SKU: ${sku} · IVA ${p.iva}%`;
