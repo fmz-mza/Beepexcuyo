@@ -10,8 +10,9 @@
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
   .header{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;padding:10px 16px;box-shadow:0 4px 24px rgba(0,0,0,.35);}
-  .header-total{font-size:12px;font-weight:700;color:var(--accent2);white-space:nowrap;opacity:0;transition:opacity .25s;pointer-events:none;}
-  .header-total.visible{opacity:1;pointer-events:auto;}
+  .iva-toggle-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;}
+  .header-total{font-size:11px;font-weight:700;color:var(--accent2);white-space:nowrap;opacity:0;transition:opacity .25s;pointer-events:none;padding-left:2px;}
+  .header-total.visible{opacity:1;}
   .header-inner{display:flex;align-items:center;gap:12px;max-width:960px;margin:0 auto;}
   .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,#7c6af7,#4a7cff);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
   .logo-text h1{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;line-height:1.1;}
@@ -157,10 +158,12 @@
       <p>Catálogo Mayorista · Marzo 2026</p>
     </div>
     <div class="header-actions">
-      <div class="iva-toggle" id="ivaToggleHeader" onclick="toggleIVA()">
-        <div class="dot"></div><span id="ivaLabel">Sin IVA</span>
+      <div class="iva-toggle-wrap">
+        <div class="iva-toggle" id="ivaToggleHeader" onclick="toggleIVA()">
+          <div class="dot"></div><span id="ivaLabel">Sin IVA</span>
+        </div>
+        <span class="header-total" id="headerTotal"></span>
       </div>
-      <span class="header-total" id="headerTotal">Total: $0</span>
       <button class="cart-btn" onclick="openCart()">
         🛒 <span class="cart-count" id="cartCount">0</span>
       </button>
