@@ -1864,7 +1864,7 @@ async function shareProductImage(){
     const meta=productMeta[descActiveSku];
 
     // ── Dimensiones del canvas ────────────────────────────────────────────
-    const W=800, PAD=40;
+    const W=1080, PAD=48;
     let y=PAD;
 
     // ── Cargar imagen del producto (si existe) ────────────────────────────
@@ -1883,7 +1883,7 @@ async function shareProductImage(){
     }
 
     // ── Calcular altura total del canvas ──────────────────────────────────
-    const IMG_H=productImg?400:0;
+    const IMG_H=productImg?560:0;
     // Texto wrapeado para descripcion
     const tempC=document.createElement('canvas');
     tempC.width=W; const tempCtx=tempC.getContext('2d');
@@ -1949,7 +1949,7 @@ async function shareProductImage(){
     ctx.fillRect(0,y,W,1); y+=20;
     ctx.font='24px system-ui,sans-serif';
     ctx.fillStyle='#4a4b55'; ctx.textAlign='center';
-    ctx.fillText('Beepex Cuyo · beepex-cuyo.github.io',W/2,y+24);
+    ctx.fillText('🐾 Beepex Cuyo',W/2,y+24);
 
     // ── Convertir a blob y compartir ──────────────────────────────────────
     const blob=await new Promise(res=>canvas.toBlob(res,'image/png',0.95));
@@ -1957,7 +1957,7 @@ async function shareProductImage(){
     const file=new File([blob],fileName,{type:'image/png'});
 
     if(navigator.canShare&&navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:p.name});
+      await navigator.share({files:[file], title:p.name, text:'Consultanos para más información'});
     } else {
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
