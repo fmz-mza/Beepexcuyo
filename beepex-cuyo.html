@@ -199,7 +199,9 @@
   /* Modal regreso */
   .return-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:600;align-items:center;justify-content:center;padding:24px;}
   .return-overlay.open{display:flex;}
-  .return-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 24px;max-width:340px;width:100%;animation:slideUp .25s ease;display:flex;flex-direction:column;gap:14px;text-align:center;}
+  .return-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;overflow:hidden;max-width:340px;width:100%;animation:slideUp .25s ease;display:flex;flex-direction:column;gap:0;text-align:center;}
+  .return-hero{width:100%;height:140px;object-fit:cover;object-position:center top;display:block;}
+  .return-body{padding:22px 24px;display:flex;flex-direction:column;gap:12px;}
   .return-emoji{font-size:44px;line-height:1;}
   .return-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;line-height:1.2;}
   .return-phrase{font-size:13px;color:var(--muted);line-height:1.6;min-height:40px;}
@@ -216,8 +218,10 @@
   /* Modal bienvenida */
   .welcome-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;align-items:center;justify-content:center;padding:24px;}
   .welcome-overlay.open{display:flex;}
-  .welcome-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 24px;max-width:360px;width:100%;animation:slideUp .25s ease;display:flex;flex-direction:column;gap:16px;}
-  .welcome-icon{font-size:40px;text-align:center;line-height:1;}
+  .welcome-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;overflow:hidden;max-width:360px;width:100%;animation:slideUp .25s ease;display:flex;flex-direction:column;gap:0;}
+  .welcome-hero{width:100%;height:160px;object-fit:cover;object-position:center top;display:block;}
+  .welcome-body{padding:24px;display:flex;flex-direction:column;gap:14px;}
+  .welcome-icon{font-size:36px;text-align:center;line-height:1;}
   .welcome-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;text-align:center;line-height:1.2;}
   .welcome-sub{font-size:13px;color:var(--muted);text-align:center;line-height:1.5;}
   .welcome-input{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;font-size:16px;color:var(--text);font-family:inherit;outline:none;transition:border .2s;width:100%;}
@@ -409,24 +413,28 @@
 </div>
 <div class="return-overlay" id="returnOverlay">
   <div class="return-modal">
-    <div class="return-emoji">🐾</div>
-    <div class="return-title" id="returnTitle">¡Hola de nuevo!</div>
-    <div class="return-phrase" id="returnPhrase"></div>
-    <div class="return-history" id="returnHistory" style="display:none"></div>
-    <div class="return-actions">
-      <button class="return-btn-main" id="returnBtnMain" onclick="closeReturn(true)">¡Armar pedido!</button>
-      <button class="return-btn-sec" id="returnBtnSec" onclick="closeReturn(false)">Solo explorar el catálogo</button>
+    <img class="return-hero" src="images/Foto-Beepex.jpeg" alt="Beepex" onerror="this.style.display='none'">
+    <div class="return-body">
+      <div class="return-title" id="returnTitle">¡Hola de nuevo!</div>
+      <div class="return-phrase" id="returnPhrase"></div>
+      <div class="return-history" id="returnHistory" style="display:none"></div>
+      <div class="return-actions">
+        <button class="return-btn-main" id="returnBtnMain" onclick="closeReturn(true)">¡Armar pedido!</button>
+        <button class="return-btn-sec" id="returnBtnSec" onclick="closeReturn(false)">Solo explorar el catálogo</button>
+      </div>
     </div>
   </div>
 </div>
 <div class="welcome-overlay" id="welcomeOverlay">
   <div class="welcome-modal">
-    <div class="welcome-icon">🐾</div>
-    <div class="welcome-title">¡Bienvenido al catálogo!</div>
-    <div class="welcome-sub">Ingresá tu nombre para identificar tu pedido</div>
-    <input class="welcome-input" id="welcomeName" placeholder="Tu nombre o negocio" maxlength="50"
-      onkeydown="if(event.key==='Enter') confirmWelcome()">
-    <button class="welcome-btn" onclick="confirmWelcome()">Ingresar al pedido →</button>
+    <img class="welcome-hero" src="images/Foto-Beepex.jpeg" alt="Beepex" onerror="this.style.display='none'">
+    <div class="welcome-body">
+      <div class="welcome-title">¡Bienvenido al catálogo!</div>
+      <div class="welcome-sub">Ingresá tu nombre para identificar tu pedido</div>
+      <input class="welcome-input" id="welcomeName" placeholder="Tu nombre o negocio" maxlength="50"
+        onkeydown="if(event.key==='Enter') confirmWelcome()">
+      <button class="welcome-btn" onclick="confirmWelcome()">Ingresar al pedido →</button>
+    </div>
   </div>
 </div>
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
@@ -1905,14 +1913,17 @@ async function shareProductImage(){
     // ── Imagen del producto ───────────────────────────────────────────────
     if(productImg){
       // Recuadro redondeado para la imagen
-      roundRect(ctx,PAD,y,W-PAD*2,IMG_H,20);
-      ctx.save(); ctx.clip();
-      // Centrar y cubrir
-      const scale=Math.max((W-PAD*2)/productImg.width,IMG_H/productImg.height);
+      // Contain: escalar para que quepa completa
+      const maxW=W-PAD*2;
+      const scale=Math.min(maxW/productImg.width, IMG_H/productImg.height);
       const iw=productImg.width*scale, ih=productImg.height*scale;
-      ctx.drawImage(productImg,PAD+(W-PAD*2-iw)/2,y+(IMG_H-ih)/2,iw,ih);
+      const actualH=Math.ceil(ih);
+      // Fondo redondeado del tamaño real de la imagen
+      roundRect(ctx,PAD+(maxW-iw)/2,y,iw,actualH,16);
+      ctx.save(); ctx.clip();
+      ctx.drawImage(productImg,PAD+(maxW-iw)/2,y,iw,actualH);
       ctx.restore();
-      y+=IMG_H+24;
+      y+=actualH+24;
     }
 
     // ── Marca ─────────────────────────────────────────────────────────────
