@@ -323,7 +323,17 @@
 <script>
 const SUPABASE_URL='https://mmerrzniuxbrjryhcsda.supabase.co';
 const SUPABASE_ANON='sb_publishable_oJzr70DjfOZsK4mjFX5rRw_5hc03thM';
-const _supabase=window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const _supabase=window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'implicit'
+  },
+  global: {
+    headers: { 'apikey': SUPABASE_ANON }
+  }
+});
 let currentUser=null;
 let userApproved=false;
 </script>
