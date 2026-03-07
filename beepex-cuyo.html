@@ -183,6 +183,19 @@
   .float-summary-btn:active{transform:scale(.96);}
   /* Empujar el grid para que no quede detrás del float */
   .grid{padding-bottom:90px;}
+  /* Modal bienvenida */
+  .welcome-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;align-items:center;justify-content:center;padding:24px;}
+  .welcome-overlay.open{display:flex;}
+  .welcome-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 24px;max-width:360px;width:100%;animation:slideUp .25s ease;display:flex;flex-direction:column;gap:16px;}
+  .welcome-icon{font-size:40px;text-align:center;line-height:1;}
+  .welcome-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;text-align:center;line-height:1.2;}
+  .welcome-sub{font-size:13px;color:var(--muted);text-align:center;line-height:1.5;}
+  .welcome-input{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;font-size:16px;color:var(--text);font-family:inherit;outline:none;transition:border .2s;width:100%;}
+  .welcome-input:focus{border-color:var(--accent);}
+  .welcome-input.error{border-color:var(--red);}
+  .welcome-btn{background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;padding:13px;cursor:pointer;font-family:inherit;transition:background .2s;touch-action:manipulation;}
+  .welcome-btn:hover{background:#3a6cf0;}
+  .welcome-btn:active{transform:scale(.97);}
   /* Lightbox */
   .lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:500;align-items:center;justify-content:center;cursor:zoom-out;}
   .lightbox.open{display:flex;}
@@ -322,6 +335,16 @@
       </div>
       <button class="desc-modal-close" onclick="closeDescBtn()">Cerrar</button>
     </div>
+  </div>
+</div>
+<div class="welcome-overlay" id="welcomeOverlay">
+  <div class="welcome-modal">
+    <div class="welcome-icon">🐾</div>
+    <div class="welcome-title">¡Bienvenido al catálogo!</div>
+    <div class="welcome-sub">Ingresá tu nombre para identificar tu pedido</div>
+    <input class="welcome-input" id="welcomeName" placeholder="Tu nombre o negocio" maxlength="50"
+      onkeydown="if(event.key==='Enter') confirmWelcome()">
+    <button class="welcome-btn" onclick="confirmWelcome()">Ingresar al pedido →</button>
   </div>
 </div>
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
@@ -991,7 +1014,46 @@ function updateCount(){
     if(count>0) fs.classList.add('visible'); else fs.classList.remove('visible');
   }
 }
+function openWelcome(){
+  // Bloquear scroll body
+  const sy=window.scrollY;
+  document.body.style.position='fixed';
+  document.body.style.top=`-${sy}px`;
+  document.body.style.width='100%';
+  document.body.dataset.welcomeScrollY=sy;
+  document.getElementById('welcomeOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('welcomeName').focus(), 100);
+}
+function confirmWelcome(){
+  const inp=document.getElementById('welcomeName');
+  const name=inp.value.trim();
+  if(!name){
+    inp.classList.add('error');
+    inp.placeholder='⚠️ Ingresá tu nombre';
+    setTimeout(()=>{ inp.classList.remove('error'); inp.placeholder='Tu nombre o negocio'; },2000);
+    return;
+  }
+  // Guardar nombre en el input del carrito
+  document.getElementById('clientName').value=name;
+  saveCart();
+  // Cerrar welcome y abrir carrito
+  document.getElementById('welcomeOverlay').classList.remove('open');
+  if(document.body.style.position==='fixed'){
+    const sy=parseInt(document.body.dataset.welcomeScrollY||'0');
+    document.body.style.position='';
+    document.body.style.top='';
+    document.body.style.width='';
+    window.scrollTo(0,sy);
+  }
+  openCart();
+}
 function openCart(){
+  // Si no hay nombre guardado, mostrar modal de bienvenida primero
+  const name=document.getElementById('clientName').value.trim();
+  if(!name){
+    openWelcome();
+    return;
+  }
   // Bloquear scroll del body (iOS requiere position:fixed)
   const scrollY = window.scrollY;
   document.body.style.position='fixed';
@@ -1545,7 +1607,14 @@ function closeDescBtn(){
 // ── Tecla Escape cierra modales ──────────────────────────────────────────────
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){
-    if(document.getElementById('lightbox').classList.contains('open')) closeLightbox();
+    if(document.getElementById('welcomeOverlay').classList.contains('open')){
+      document.getElementById('welcomeOverlay').classList.remove('open');
+      if(document.body.style.position==='fixed'){
+        const sy=parseInt(document.body.dataset.welcomeScrollY||'0');
+        document.body.style.position=''; document.body.style.top=''; document.body.style.width='';
+        window.scrollTo(0,sy);
+      }
+    } else if(document.getElementById('lightbox').classList.contains('open')) closeLightbox();
     else if(document.getElementById('descOverlay').classList.contains('open')) closeDescBtn();
     else if(document.getElementById('cartDrawer').classList.contains('open')) closeCart();
   }
