@@ -26,6 +26,8 @@
   .logo-text{flex-shrink:1;min-width:0;}
   .logo-text h1{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .logo-text p{font-size:9px;color:var(--muted);white-space:nowrap;line-height:1.3;overflow:hidden;text-overflow:ellipsis;}
+  .logo-text .user-badge{display:none;font-size:10px;font-weight:700;color:var(--accent2);white-space:nowrap;cursor:pointer;padding:2px 7px;border-radius:6px;background:var(--card);border:1px solid var(--border);margin-top:3px;width:fit-content;}
+  .logo-text .user-badge:hover{border-color:var(--accent);}
   .header-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0;}
   .iva-toggle{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:600;transition:all .2s;white-space:nowrap;user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .iva-toggle:active{transform:scale(.95);}
@@ -347,6 +349,7 @@ let userApproved=false;
       <h1>Beepex Cuyo</h1>
       <p>Catálogo</p>
       <p>Marzo 2026</p>
+      <button class="user-badge" id="userBadge" onclick="openAuth()" style="display:none"></button>
     </div>
     <div class="header-actions">
       <div class="iva-toggle-wrap">
@@ -355,7 +358,6 @@ let userApproved=false;
         </div>
         <span class="header-total" id="headerTotal"></span>
       </div>
-      <button class="user-badge" id="userBadge" onclick="openAuth()" style="display:none"></button>
       <button class="cart-btn" onclick="openCart()">
         🛒 <span class="cart-count" id="cartCount">0</span>
       </button>
@@ -1841,21 +1843,34 @@ function openDesc(sku){
   document.getElementById('descModalName').textContent=p.name;
   document.getElementById('descModalSku').textContent=`SKU: ${sku} · IVA ${p.iva}%`;
   document.getElementById('descModalDesc').textContent=desc;
-  // Precio
+  // Precio según auth
   const precio=mayorista(p);
-  document.getElementById('descModalPrice').textContent=p.price===0?'Consultar':fmt(precio);
+  const priceModalEl=document.getElementById('descModalPrice');
   const pvpTextEl=document.getElementById('descModalPvpText');
   const margenEl=document.getElementById('descModalMargen');
-  if(p.pvp>0){
-    pvpTextEl.textContent=`PVP sugerido ${fmt(p.pvp)}`;
-    const ganancia=p.pvp-p.price;
-    const mg=Math.round((ganancia/p.pvp)*100);
-    if(mg>0){
-      margenEl.textContent=`▲ ${mg}% margen`;
-      margenEl.className='desc-modal-margen'+(mg>=40?' high':'');
-      margenEl.style.display='';
-    } else { margenEl.style.display='none'; }
-  } else { pvpTextEl.textContent=''; margenEl.style.display='none'; }
+  const descActionsEl=document.querySelector('.desc-modal-actions');
+  const descShareRowEl=document.querySelector('.desc-share-row');
+  if(!userApproved){
+    // No registrado: ocultar precio real, mostrar invitación
+    priceModalEl.innerHTML='<span class="price-locked" onclick="closeDescBtn();openAuth()" style="font-size:16px">🔒 Registrate para ver el precio</span>';
+    pvpTextEl.textContent=''; margenEl.style.display='none';
+    if(descActionsEl) descActionsEl.style.display='none';
+    if(descShareRowEl) descShareRowEl.style.display='none';
+  } else {
+    priceModalEl.textContent=p.price===0?'Consultar':fmt(precio);
+    if(p.pvp>0){
+      pvpTextEl.textContent=`PVP sugerido ${fmt(p.pvp)}`;
+      const ganancia=p.pvp-p.price;
+      const mg=Math.round((ganancia/p.pvp)*100);
+      if(mg>0){
+        margenEl.textContent=`▲ ${mg}% margen`;
+        margenEl.className='desc-modal-margen'+(mg>=40?' high':'');
+        margenEl.style.display='';
+      } else { margenEl.style.display='none'; }
+    } else { pvpTextEl.textContent=''; margenEl.style.display='none'; }
+    if(descActionsEl) descActionsEl.style.display='';
+    if(descShareRowEl) descShareRowEl.style.display=userApproved?'':'none';
+  }
   // Qty actual en carrito
   updateDescQty();
   // Imagen: usar cache si existe
@@ -2271,7 +2286,7 @@ async function submitAuth(){
     }
   } else {
     // Registro
-    const {data,error}=await _supabase.auth.signUp({email, password:pass});
+    const {data,error}=await _supabase.auth.signUp({email, password:pass, options:{data:{nombre:nombre}}});
     if(error){
       msg.className='auth-msg error';
       msg.textContent=error.message==='User already registered'?'Este email ya está registrado':error.message;
