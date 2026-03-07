@@ -2291,12 +2291,7 @@ async function submitAuth(){
       msg.className='auth-msg error';
       msg.textContent=error.message==='User already registered'?'Este email ya está registrado':error.message;
     } else {
-      // Crear perfil
-      await _supabase.from('profiles').insert({
-        id: data.user.id,
-        nombre: nombre,
-        approved: false
-      });
+      // El trigger handle_new_user crea el perfil automáticamente
       msg.className='auth-msg success';
       msg.textContent='✅ Cuenta creada. Un administrador aprobará tu acceso pronto.';
       setTimeout(()=>{ closeAuth(); showToast('📬 Tu cuenta está pendiente de aprobación'); }, 2000);
