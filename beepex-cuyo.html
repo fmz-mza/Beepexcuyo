@@ -2195,13 +2195,14 @@ async function initAuth(){
 
 async function loadProfile(){
   if(!currentUser) return;
-  const {data}=await _supabase
+  const {data,error}=await _supabase
     .from('profiles')
     .select('approved, nombre')
     .eq('id', currentUser.id)
     .single();
   const wasApproved=userApproved;
   userApproved=data?.approved||false;
+  if(error){ console.warn('loadProfile error:', error.message); }
   if(data?.nombre){
     document.getElementById('clientName').value=data.nombre;
     localStorage.setItem('beepex_client_name', data.nombre);
@@ -2280,6 +2281,7 @@ async function submitAuth(){
       msg.className='auth-msg error';
       msg.textContent=error.message==='Invalid login credentials'?'Email o contraseña incorrectos':error.message;
     } else {
+      currentUser=data.user; // setear currentUser antes de loadProfile
       await loadProfile();
       updateAuthUI();
       closeAuth();
