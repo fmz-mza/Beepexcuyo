@@ -187,6 +187,34 @@
   .wa-btn:hover{background:#1db954;}
   .wa-btn:disabled{background:var(--tag-bg);color:var(--muted);cursor:not-allowed;}
   /* Toast de persistencia */
+  /* Auth modal */
+  .auth-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:700;align-items:center;justify-content:center;padding:24px;}
+  .auth-overlay.open{display:flex;}
+  .auth-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;overflow:hidden;max-width:380px;width:100%;animation:slideUp .25s ease;display:flex;flex-direction:column;}
+  .auth-hero{width:100%;height:auto;max-height:160px;object-fit:contain;background:#d8cec0;display:block;}
+  .auth-body{padding:24px;display:flex;flex-direction:column;gap:14px;}
+  .auth-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;text-align:center;}
+  .auth-sub{font-size:13px;color:var(--muted);text-align:center;line-height:1.5;}
+  .auth-tabs{display:flex;gap:0;background:var(--card);border-radius:10px;padding:3px;}
+  .auth-tab{flex:1;background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;padding:8px;border-radius:8px;cursor:pointer;font-family:inherit;transition:all .15s;}
+  .auth-tab.active{background:var(--accent);color:#fff;}
+  .auth-input{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;color:var(--text);font-family:inherit;outline:none;transition:border .2s;width:100%;}
+  .auth-input:focus{border-color:var(--accent);}
+  .auth-btn{background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;padding:13px;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:background .2s;}
+  .auth-btn:hover{background:#3a6cf0;}
+  .auth-btn:active{transform:scale(.97);}
+  .auth-btn:disabled{opacity:.6;cursor:not-allowed;}
+  .auth-msg{font-size:12px;text-align:center;min-height:18px;padding:2px;}
+  .auth-msg.error{color:var(--red);}
+  .auth-msg.success{color:var(--green);}
+  .auth-skip{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:4px;font-family:inherit;text-align:center;}
+  .auth-skip:hover{color:var(--text);}
+  /* Precio oculto para no registrados */
+  .price-locked{font-size:14px;font-weight:700;color:var(--muted);background:var(--card);border-radius:6px;padding:4px 10px;letter-spacing:2px;cursor:pointer;border:1px dashed var(--border);display:inline-block;margin-top:4px;}
+  .price-locked:hover{border-color:var(--accent);color:var(--accent);}
+  /* Badge usuario en header */
+  .user-badge{font-size:11px;font-weight:700;color:var(--accent2);white-space:nowrap;cursor:pointer;padding:4px 8px;border-radius:8px;background:var(--card);border:1px solid var(--border);flex-shrink:0;}
+  .user-badge:hover{border-color:var(--accent);}
   /* Resumen flotante */
   .float-summary{position:fixed;bottom:0;left:0;right:0;z-index:150;padding:0 12px 12px;pointer-events:none;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.56,.64,1);will-change:transform;}
   .float-summary.visible{transform:translateY(0);pointer-events:auto;}
@@ -288,6 +316,15 @@
   .share-send-btn:disabled{opacity:.6;cursor:not-allowed;}
   .desc-modal-close:active{transform:scale(.95);}
 </style>
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL='https://mmerrzniuxbrjryhcsda.supabase.co';
+const SUPABASE_ANON='sb_publishable_oJzr70DjfOZsK4mjFX5rRw_5hc03thM';
+const _supabase=window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+let currentUser=null;
+let userApproved=false;
+</script>
 <!-- jsPDF para exportar pedido -->
 <!-- jsPDF carga lazy al primer uso -->
 <!-- Google Analytics 4 -->
@@ -318,6 +355,7 @@
         </div>
         <span class="header-total" id="headerTotal"></span>
       </div>
+      <button class="user-badge" id="userBadge" onclick="openAuth()" style="display:none"></button>
       <button class="cart-btn" onclick="openCart()">
         🛒 <span class="cart-count" id="cartCount">0</span>
       </button>
@@ -410,6 +448,25 @@
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-modal">
+    <img class="auth-hero" src="images/Foto-Beepex.jpeg" alt="Beepex" onerror="this.style.display='none'">
+    <div class="auth-body">
+      <div class="auth-title" id="authTitle">Accedé al catálogo</div>
+      <div class="auth-sub" id="authSub">Registrate para ver precios y realizar pedidos</div>
+      <div class="auth-tabs" id="authTabs">
+        <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Ingresar</button>
+        <button class="auth-tab" id="tabRegister" onclick="switchTab('register')">Registrarse</button>
+      </div>
+      <input class="auth-input" id="authEmail" type="email" placeholder="📧 Tu email" onkeydown="if(event.key==='Enter') submitAuth()">
+      <input class="auth-input" id="authPass" type="password" placeholder="🔑 Contraseña" style="display:none" onkeydown="if(event.key==='Enter') submitAuth()">
+      <input class="auth-input" id="authNombre" type="text" placeholder="👤 Tu nombre o negocio" style="display:none">
+      <div class="auth-msg" id="authMsg"></div>
+      <button class="auth-btn" id="authSubmit" onclick="submitAuth()">Ingresar</button>
+      <button class="auth-skip" onclick="closeAuth()">Seguir explorando sin registrarme</button>
     </div>
   </div>
 </div>
@@ -1077,9 +1134,9 @@ function createCard(p){
       <div class="iva-label">IVA ${p.iva}%</div>
       <div class="prod-name">${p.name}</div>
       <div class="sku">SKU: ${p.sku}</div>
-      <div class="price">${fmt(precio)}</div>
-      <div class="price-note">${includeIVA?'Precio c/IVA incluido':'Precio s/IVA'}</div>
-      ${p.pvp>0?`<div class="pvp">PVP sugerido <span>${fmt(p.pvp)}</span></div>`:''}
+      ${priceDisplay(p)}
+      ${priceNoteDisplay()}
+      ${pvpDisplay(p)}
 
       <div class="qty-row">
         <button class="qty-btn" onclick="chg('${p.sku}',-1)">−</button>
@@ -1140,6 +1197,7 @@ function patchCard(cardEl, p){
 
 // ── Operaciones de carrito ────────────────────────────────────────────────────
 function add(sku){
+  if(!userApproved){ openAuth(()=>add(sku)); return; }
   const p=productMap[sku];
   if(!p||stockType(p.stock)==='NOSTOCK') return;
   cart[sku]={product:p, qty:(cart[sku]?.qty||0)+1};
@@ -1234,6 +1292,7 @@ function updateCartTitle(){
   if(el) el.textContent=name?`Hola ${name} 👋`:'🛒 Tu pedido';
 }
 function openCart(){
+  if(!userApproved){ openAuth(()=>openCart()); return; }
   // Si no hay nombre guardado, mostrar modal de bienvenida primero
   const name=document.getElementById('clientName').value.trim();
   if(!name){
@@ -1827,6 +1886,7 @@ function descChg(delta){
   saveCart(); updateCount(); syncCart(descActiveSku); updateDescQty();
 }
 function descAdd(){
+  if(!userApproved){ openAuth(()=>descAdd()); return; }
   if(!descActiveSku) return;
   const p=productMap[descActiveSku]; if(!p) return;
   if(cart[descActiveSku]?.qty>0){ closeDescBtn(); openCart(); return; }
@@ -1865,6 +1925,7 @@ function useSharePvp(){
   if(p&&p.pvp>0) document.getElementById('sharePriceInput').value=p.pvp;
 }
 async function shareProductImage(){
+  if(!userApproved){ openAuth(); return; }
   const capBtn=document.getElementById('shareCapBtn');
   if(capBtn){ capBtn.disabled=true; capBtn.textContent='Generando...'; }
   try{
@@ -2036,7 +2097,8 @@ document.addEventListener('keydown', e=>{
         document.body.style.position=''; document.body.style.top=''; document.body.style.width='';
         window.scrollTo(0,sy);
       }
-    } else if(document.getElementById('lightbox').classList.contains('open')) closeLightbox();
+    } else if(document.getElementById('authOverlay').classList.contains('open')) closeAuth();
+    else if(document.getElementById('lightbox').classList.contains('open')) closeLightbox();
     else if(document.getElementById('descOverlay').classList.contains('open')) closeDescBtn();
     else if(document.getElementById('cartDrawer').classList.contains('open')) closeCart();
   }
@@ -2070,8 +2132,168 @@ window.addEventListener('scroll', ()=>{
   document.getElementById('backTop').classList.toggle('visible', window.scrollY > 400);
 }, {passive:true});
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTH — Supabase
+// ══════════════════════════════════════════════════════════════════════════════
+let authTab='login'; // 'login' | 'register'
+let authPending=null; // función a ejecutar tras login exitoso
+
+async function initAuth(){
+  // Escuchar cambios de sesión
+  _supabase.auth.onAuthStateChange(async (event, session)=>{
+    if(session?.user){
+      currentUser=session.user;
+      await loadProfile();
+    } else {
+      currentUser=null; userApproved=false;
+    }
+    updateAuthUI();
+    renderGrid(); // re-renderiza con/sin precios
+  });
+  // Verificar sesión existente
+  const {data:{session}}=await _supabase.auth.getSession();
+  if(session?.user){
+    currentUser=session.user;
+    await loadProfile();
+  }
+  updateAuthUI();
+}
+
+async function loadProfile(){
+  if(!currentUser) return;
+  const {data}=await _supabase
+    .from('profiles')
+    .select('approved, nombre')
+    .eq('id', currentUser.id)
+    .single();
+  userApproved=data?.approved||false;
+  if(data?.nombre) {
+    // Sincronizar nombre con el sistema local
+    document.getElementById('clientName').value=data.nombre;
+    localStorage.setItem('beepex_client_name', data.nombre);
+  }
+}
+
+function updateAuthUI(){
+  const badge=document.getElementById('userBadge');
+  if(currentUser){
+    const nombre=document.getElementById('clientName').value||currentUser.email.split('@')[0];
+    badge.style.display='flex';
+    badge.textContent=userApproved?`✓ ${nombre}`:`⏳ Pendiente`;
+    badge.title=userApproved?'Acceso completo — Click para cerrar sesión':'Cuenta pendiente de aprobación';
+    badge.onclick=()=>{
+      if(confirm(`Cerrar sesión de ${nombre}?`)) signOut();
+    };
+  } else {
+    badge.style.display='none';
+  }
+  // Actualizar precios visibles
+  patchPrices();
+}
+
+function openAuth(pending){
+  if(pending) authPending=pending;
+  document.getElementById('authOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+  setTimeout(()=>document.getElementById('authEmail').focus(),200);
+}
+
+function closeAuth(){
+  document.getElementById('authOverlay').classList.remove('open');
+  document.body.style.overflow='';
+  authPending=null;
+  document.getElementById('authMsg').textContent='';
+}
+
+function switchTab(tab){
+  authTab=tab;
+  document.getElementById('tabLogin').classList.toggle('active', tab==='login');
+  document.getElementById('tabRegister').classList.toggle('active', tab==='register');
+  document.getElementById('authPass').style.display='';
+  document.getElementById('authNombre').style.display=tab==='register'?'':'none';
+  document.getElementById('authSubmit').textContent=tab==='login'?'Ingresar':'Crear cuenta';
+  document.getElementById('authTitle').textContent=tab==='login'?'¡Bienvenido de nuevo!':'Crear cuenta';
+  document.getElementById('authSub').textContent=tab==='login'?'Ingresá para ver precios y hacer pedidos':'Registrate para acceder al catálogo mayorista';
+  document.getElementById('authMsg').textContent='';
+}
+
+async function submitAuth(){
+  const email=document.getElementById('authEmail').value.trim();
+  const pass=document.getElementById('authPass').value;
+  const nombre=document.getElementById('authNombre').value.trim();
+  const btn=document.getElementById('authSubmit');
+  const msg=document.getElementById('authMsg');
+
+  if(!email){ msg.className='auth-msg error'; msg.textContent='Ingresá tu email'; return; }
+  if(!pass||pass.length<6){ msg.className='auth-msg error'; msg.textContent='La contraseña debe tener al menos 6 caracteres'; return; }
+  if(authTab==='register'&&!nombre){ msg.className='auth-msg error'; msg.textContent='Ingresá tu nombre o negocio'; return; }
+
+  btn.disabled=true;
+  btn.textContent='...';
+  msg.textContent='';
+
+  if(authTab==='login'){
+    const {data,error}=await _supabase.auth.signInWithPassword({email, password:pass});
+    if(error){
+      msg.className='auth-msg error';
+      msg.textContent=error.message==='Invalid login credentials'?'Email o contraseña incorrectos':error.message;
+    } else {
+      await loadProfile();
+      updateAuthUI();
+      closeAuth();
+      showToast(userApproved?'✅ ¡Bienvenido! Acceso completo habilitado':'⏳ Cuenta pendiente de aprobación');
+      if(userApproved && authPending) authPending();
+    }
+  } else {
+    // Registro
+    const {data,error}=await _supabase.auth.signUp({email, password:pass});
+    if(error){
+      msg.className='auth-msg error';
+      msg.textContent=error.message==='User already registered'?'Este email ya está registrado':error.message;
+    } else {
+      // Crear perfil
+      await _supabase.from('profiles').insert({
+        id: data.user.id,
+        nombre: nombre,
+        approved: false
+      });
+      msg.className='auth-msg success';
+      msg.textContent='✅ Cuenta creada. Un administrador aprobará tu acceso pronto.';
+      setTimeout(()=>{ closeAuth(); showToast('📬 Tu cuenta está pendiente de aprobación'); }, 2000);
+    }
+  }
+
+  btn.disabled=false;
+  btn.textContent=authTab==='login'?'Ingresar':'Crear cuenta';
+}
+
+async function signOut(){
+  await _supabase.auth.signOut();
+  currentUser=null; userApproved=false;
+  updateAuthUI();
+  renderGrid();
+  showToast('👋 Sesión cerrada');
+}
+
+// ── Precio según estado de auth ───────────────────────────────────────────────
+function priceDisplay(p){
+  if(p.price===0) return '<span class="price">Consultar</span>';
+  if(userApproved) return `<span class="price">${fmt(mayorista(p))}</span>`;
+  return `<span class="price-locked" onclick="openAuth()" title="Registrate para ver el precio">●●●●</span>`;
+}
+function pvpDisplay(p){
+  if(!userApproved) return '';
+  return p.pvp>0?`<div class="pvp">PVP sugerido <span>${fmt(p.pvp)}</span></div>`:'';
+}
+function priceNoteDisplay(){
+  if(!userApproved) return '<div class="price-note" style="font-size:10px;color:var(--accent);cursor:pointer" onclick="openAuth()">Ver precio →</div>';
+  return `<div class="price-note">${includeIVA?'Precio c/IVA incluido':'Precio s/IVA'}</div>`;
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadCart();
+initAuth();
 // Calcular productos nuevos desde la última visita
 (function(){
   try{
