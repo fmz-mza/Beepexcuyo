@@ -1451,6 +1451,7 @@ function addFreq(sku, prevQty){
 
 // ── WhatsApp ──────────────────────────────────────────────────────────────────
 function sendWhatsApp(){
+  if(!userApproved) return;
   const nameRaw=document.getElementById('clientName').value.trim();
   if(!nameRaw){
     const inp=document.getElementById('clientName');
@@ -1538,6 +1539,7 @@ async function imgToBase64(url){
 }
 
 async function exportPDF(){
+  if(!userApproved) return;
   // Lazy load jsPDF solo cuando se necesita
   if(!window.jspdf){
     await new Promise((res,rej)=>{
