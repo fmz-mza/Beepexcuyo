@@ -207,7 +207,10 @@
   .desc-modal-sku{font-size:11px;color:var(--muted);}
   .desc-modal-desc{font-size:13px;color:var(--muted);line-height:1.6;max-height:180px;overflow-y:auto;}
   .desc-modal-price{font-size:22px;font-weight:800;margin-top:2px;}
-  .desc-modal-pvp{font-size:11px;color:var(--accent2);}
+  .desc-modal-pvp{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .desc-modal-pvp-text{font-size:11px;color:var(--accent2);}
+  .desc-modal-margen{font-size:11px;font-weight:800;color:var(--green);background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);padding:2px 8px;border-radius:20px;}
+  .desc-modal-margen.high{background:rgba(34,197,94,.2);border-color:rgba(34,197,94,.4);}
   .desc-modal-actions{display:flex;align-items:center;gap:8px;margin-top:4px;}
   .desc-qty-btn{background:var(--tag-bg);border:none;border-radius:8px;width:40px;height:40px;color:var(--text);font-size:20px;cursor:pointer;flex-shrink:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .desc-qty-btn:active{background:var(--accent);transform:scale(.92);}
@@ -306,7 +309,10 @@
       <div class="desc-modal-name" id="descModalName"></div>
       <div class="desc-modal-sku" id="descModalSku"></div>
       <div class="desc-modal-price" id="descModalPrice"></div>
-      <div class="desc-modal-pvp" id="descModalPvp"></div>
+      <div class="desc-modal-pvp" id="descModalPvp">
+        <span class="desc-modal-pvp-text" id="descModalPvpText"></span>
+        <span class="desc-modal-margen" id="descModalMargen" style="display:none"></span>
+      </div>
       <div class="desc-modal-desc" id="descModalDesc"></div>
       <div class="desc-modal-actions">
         <button class="desc-qty-btn" onclick="descChg(-1)">−</button>
@@ -675,13 +681,7 @@ function patchPrices(){
     const noteEl=document.querySelector(`#card-${sku} .price-note`);
     if(priceEl) priceEl.textContent=p.price===0?'Consultar':fmt(mayorista(p));
     if(noteEl) noteEl.textContent=includeIVA?'Precio c/IVA incluido':'Precio s/IVA';
-    // Actualizar margen
-    const margenEl=document.querySelector(`#card-${sku} .margen`);
-    if(margenEl&&p.pvp>0){
-      const ganancia=p.pvp-p.price;
-      const mg=Math.round((ganancia/p.pvp)*100);
-      margenEl.textContent=`▲ ${mg}% margen`;
-    }
+
   });
   document.getElementById('productCount').textContent=
     `${lastRenderedSkus.length} producto${lastRenderedSkus.length!==1?'s':''} · Precio mayorista ${includeIVA?'con':'sin'} IVA`;
@@ -877,14 +877,7 @@ function createCard(p){
       <div class="price">${fmt(precio)}</div>
       <div class="price-note">${includeIVA?'Precio c/IVA incluido':'Precio s/IVA'}</div>
       ${p.pvp>0?`<div class="pvp">PVP sugerido <span>${fmt(p.pvp)}</span></div>`:''}
-      ${(()=>{
-        if(!p.pvp||p.pvp<=0) return '';
-        const ganancia=p.pvp-p.price;
-        const margen=Math.round((ganancia/p.pvp)*100);
-        if(margen<=0) return '';
-        const cls=margen>=40?'margen margen-high':'margen';
-        return `<div class="${cls}">▲ ${margen}% margen</div>`;
-      })()}
+
       <div class="qty-row">
         <button class="qty-btn" onclick="chg('${p.sku}',-1)">−</button>
         <span class="qty-val">${qty}</span>
@@ -1475,7 +1468,18 @@ function openDesc(sku){
   // Precio
   const precio=mayorista(p);
   document.getElementById('descModalPrice').textContent=p.price===0?'Consultar':fmt(precio);
-  document.getElementById('descModalPvp').textContent=p.pvp>0?`PVP sugerido ${fmt(p.pvp)}`:'';
+  const pvpTextEl=document.getElementById('descModalPvpText');
+  const margenEl=document.getElementById('descModalMargen');
+  if(p.pvp>0){
+    pvpTextEl.textContent=`PVP sugerido ${fmt(p.pvp)}`;
+    const ganancia=p.pvp-p.price;
+    const mg=Math.round((ganancia/p.pvp)*100);
+    if(mg>0){
+      margenEl.textContent=`▲ ${mg}% margen`;
+      margenEl.className='desc-modal-margen'+(mg>=40?' high':'');
+      margenEl.style.display='';
+    } else { margenEl.style.display='none'; }
+  } else { pvpTextEl.textContent=''; margenEl.style.display='none'; }
   // Qty actual en carrito
   updateDescQty();
   // Imagen: usar cache si existe
