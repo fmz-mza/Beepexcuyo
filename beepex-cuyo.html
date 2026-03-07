@@ -462,7 +462,7 @@ let userApproved=false;
         <button class="auth-tab" id="tabRegister" onclick="switchTab('register')">Registrarse</button>
       </div>
       <input class="auth-input" id="authEmail" type="email" placeholder="📧 Tu email" onkeydown="if(event.key==='Enter') submitAuth()">
-      <input class="auth-input" id="authPass" type="password" placeholder="🔑 Contraseña" style="display:none" onkeydown="if(event.key==='Enter') submitAuth()">
+      <input class="auth-input" id="authPass" type="password" placeholder="🔑 Contraseña" onkeydown="if(event.key==='Enter') submitAuth()">
       <input class="auth-input" id="authNombre" type="text" placeholder="👤 Tu nombre o negocio" style="display:none">
       <div class="auth-msg" id="authMsg"></div>
       <button class="auth-btn" id="authSubmit" onclick="submitAuth()">Ingresar</button>
@@ -2140,22 +2140,32 @@ let authTab='login'; // 'login' | 'register'
 let authPending=null; // función a ejecutar tras login exitoso
 
 async function initAuth(){
-  // Escuchar cambios de sesión
+  // Escuchar cambios de sesión (incluye EMAIL_CONFIRMED)
   _supabase.auth.onAuthStateChange(async (event, session)=>{
     if(session?.user){
       currentUser=session.user;
       await loadProfile();
+      if(event==='SIGNED_IN'||event==='TOKEN_REFRESHED'||event==='USER_UPDATED'){
+        updateAuthUI();
+        renderGrid();
+        if(event==='SIGNED_IN') showToast(userApproved?'✅ ¡Bienvenido!':'⏳ Cuenta pendiente de aprobación');
+      }
     } else {
       currentUser=null; userApproved=false;
     }
     updateAuthUI();
-    renderGrid(); // re-renderiza con/sin precios
+    renderGrid();
   });
-  // Verificar sesión existente
+  // Verificar sesión existente o token en URL
   const {data:{session}}=await _supabase.auth.getSession();
   if(session?.user){
     currentUser=session.user;
     await loadProfile();
+  }
+  // Limpiar hash de la URL si viene del link de confirmación
+  if(window.location.hash&&window.location.hash.includes('access_token')){
+    history.replaceState(null,'',window.location.pathname);
+    showToast('✅ Email confirmado. ¡Ya podés ingresar!');
   }
   updateAuthUI();
 }
@@ -2210,8 +2220,9 @@ function switchTab(tab){
   authTab=tab;
   document.getElementById('tabLogin').classList.toggle('active', tab==='login');
   document.getElementById('tabRegister').classList.toggle('active', tab==='register');
-  document.getElementById('authPass').style.display='';
-  document.getElementById('authNombre').style.display=tab==='register'?'':'none';
+  // Contraseña siempre visible
+  document.getElementById('authPass').style.display='block';
+  document.getElementById('authNombre').style.display=tab==='register'?'block':'none';
   document.getElementById('authSubmit').textContent=tab==='login'?'Ingresar':'Crear cuenta';
   document.getElementById('authTitle').textContent=tab==='login'?'¡Bienvenido de nuevo!':'Crear cuenta';
   document.getElementById('authSub').textContent=tab==='login'?'Ingresá para ver precios y hacer pedidos':'Registrate para acceder al catálogo mayorista';
