@@ -262,17 +262,9 @@
   .desc-add-btn.in-cart{background:transparent;border:1.5px solid var(--accent);color:var(--accent);}
   .desc-modal-close{align-self:flex-end;background:var(--card);border:none;border-radius:8px;color:var(--text);font-size:13px;font-weight:600;padding:10px 20px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px;}
   .desc-share-row{display:flex;gap:8px;margin-top:2px;}
-  .desc-share-btn{flex:1;background:none;border:1.5px solid #25D366;color:#25D366;border-radius:8px;font-size:12px;font-weight:700;padding:8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;touch-action:manipulation;}
-  .desc-share-btn:active{background:rgba(37,211,102,.1);}
-  .share-price-panel{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;margin-top:2px;}
-  .share-price-panel label{font-size:11px;font-weight:700;color:var(--muted);}
-  .share-price-input{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:15px;font-weight:700;color:var(--text);font-family:inherit;outline:none;width:100%;transition:border .2s;}
-  .share-price-input:focus{border-color:#25D366;}
-  .share-price-btns{display:flex;gap:6px;}
-  .share-pvp-tag{background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.3);color:#25D366;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;}
-  .share-pvp-tag:active{background:rgba(37,211,102,.25);}
-  .share-send-btn{flex:1;background:#25D366;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;padding:9px;cursor:pointer;font-family:inherit;touch-action:manipulation;}
-  .share-send-btn:active{transform:scale(.97);}
+  .desc-share-btn{flex:1;background:#25D366;border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:700;padding:10px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+  .desc-share-btn:active{background:#1ebe5d;transform:scale(.97);}
+  .desc-share-btn:disabled{opacity:.6;cursor:not-allowed;}
   .desc-modal-close:active{transform:scale(.95);}
 </style>
 <!-- jsPDF para exportar pedido -->
@@ -378,18 +370,10 @@
         <button class="desc-add-btn" id="descAddBtn" onclick="descAdd()">Agregar al pedido</button>
       </div>
       <div class="desc-share-row">
-        <button class="desc-share-btn" onclick="toggleSharePanel()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-          Compartir producto
+        <button class="desc-share-btn" id="descShareBtn" onclick="shareProductImage()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Compartir
         </button>
-      </div>
-      <div class="share-price-panel" id="sharePricePanel" style="display:none">
-        <label>Precio a mostrar al comprador final</label>
-        <input class="share-price-input" id="sharePriceInput" type="number" placeholder="Ingresá un precio">
-        <div class="share-price-btns">
-          <button class="share-pvp-tag" id="sharePvpTag" onclick="useSharePvp()">Usar PVP sugerido</button>
-          <button class="share-send-btn" onclick="shareProductWA()">Enviar por WhatsApp</button>
-        </div>
       </div>
 
     </div>
@@ -1819,58 +1803,74 @@ function closeDesc(e){
     closeDescBtn();
   }
 }
-function toggleSharePanel(){
-  const panel=document.getElementById('sharePricePanel');
-  const isOpen=panel.style.display!=='none';
-  panel.style.display=isOpen?'none':'';
-  if(!isOpen){
-    // Pre-cargar con PVP si existe
-    const p=productMap[descActiveSku];
-    const inp=document.getElementById('sharePriceInput');
-    if(p&&p.pvp>0){
-      inp.value=p.pvp;
-      const tag=document.getElementById('sharePvpTag');
-      if(tag) tag.textContent=`PVP sugerido: ${fmt(p.pvp)}`;
-    } else {
-      inp.value='';
+async function shareProductImage(){
+  const btn=document.getElementById('descShareBtn');
+  btn.disabled=true;
+  btn.textContent='Generando imagen...';
+  try{
+    // Lazy load html2canvas
+    if(!window.html2canvas){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        s.onload=res; s.onerror=rej;
+        document.head.appendChild(s);
+      });
     }
-    inp.focus();
+    const modal=document.getElementById('descModal');
+    // Ocultar botones antes de capturar
+    const shareRow=modal.querySelector('.desc-share-row');
+    const actions=modal.querySelector('.desc-modal-actions');
+    const closeTop=modal.querySelector('.desc-modal-close-top');
+    const margenEl=modal.querySelector('.desc-modal-margen');
+    if(shareRow) shareRow.style.visibility='hidden';
+    if(actions) actions.style.visibility='hidden';
+    if(closeTop) closeTop.style.visibility='hidden';
+    if(margenEl) margenEl.style.visibility='hidden';
+
+    const canvas=await html2canvas(modal,{
+      backgroundColor:'#1a1b22',
+      scale:2,
+      useCORS:true,
+      allowTaint:true,
+      logging:false
+    });
+
+    // Restaurar visibilidad
+    if(shareRow) shareRow.style.visibility='';
+    if(actions) actions.style.visibility='';
+    if(closeTop) closeTop.style.visibility='';
+    if(margenEl) margenEl.style.visibility='';
+
+    // Convertir a blob PNG
+    const blob=await new Promise(res=>canvas.toBlob(res,'image/png',0.95));
+    const p=productMap[descActiveSku];
+    const fileName=`${p?p.name.replace(/[^a-z0-9]/gi,'_'):'producto'}.png`;
+    const file=new File([blob], fileName, {type:'image/png'});
+
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({
+        files:[file],
+        title: p?p.name:'Producto Beepex',
+      });
+    } else {
+      // Fallback: descarga directa
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download=fileName; a.click();
+      URL.revokeObjectURL(url);
+      showToast('📥 Imagen descargada');
+    }
+  } catch(e){
+    if(e.name!=='AbortError') showToast('❌ No se pudo compartir');
+  } finally{
+    btn.disabled=false;
+    btn.innerHTML=`<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg> Compartir`;
   }
-}
-function useSharePvp(){
-  const p=productMap[descActiveSku];
-  if(p&&p.pvp>0) document.getElementById('sharePriceInput').value=p.pvp;
-}
-function shareProductWA(){
-  const p=productMap[descActiveSku]; if(!p) return;
-  const priceRaw=document.getElementById('sharePriceInput').value;
-  const precio=priceRaw?parseInt(priceRaw):null;
-  const img=imgCache[descActiveSku]&&imgCache[descActiveSku]!=='error'?imgCache[descActiveSku]:null;
-  let msg=`🐾 *${p.name}*
-`;
-  if(p.brand) msg+=`_${p.brand}_
-`;
-  msg+=`
-`;
-  const meta=productMeta[descActiveSku];
-  if(meta&&meta.desc&&meta.desc!=='Sin descripción disponible.') msg+=`${meta.desc}
-
-`;
-  if(precio) msg+=`💰 *Precio: ${fmt(precio)}*
-`;
-  // URL de imagen pública si existe en caché
-  const imgUrl=imgCache[descActiveSku]&&imgCache[descActiveSku]!=='error'?imgCache[descActiveSku]:null;
-  if(imgUrl) msg+=`
-🖼 ${imgUrl}`;
-  msg+=`
-
-📲 Consultanos para más información`;
-  window.location.href=`https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 function closeDescBtn(){
   document.getElementById('descOverlay').classList.remove('open');
-  const sp=document.getElementById('sharePricePanel');
-  if(sp) sp.style.display='none';
+
   // Restaurar scroll body
   if(document.body.style.position==='fixed'){
     const sy=parseInt(document.body.dataset.descScrollY||'0');
