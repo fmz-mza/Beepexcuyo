@@ -72,7 +72,7 @@
   .card.is-preventa.in-cart{border-color:var(--preventa);}
   .card.is-nostock{opacity:.55;}
   .card-img{width:100%;aspect-ratio:1;background:var(--tag-bg);position:relative;overflow:hidden;contain:layout style;cursor:zoom-in;}
-  .info-chip{position:absolute;bottom:6px;right:6px;background:rgba(14,15,20,.75);backdrop-filter:blur(6px);color:var(--text);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:.3px;pointer-events:none;border:1px solid rgba(255,255,255,.1);}
+  .info-chip{position:absolute;bottom:6px;right:6px;background:rgba(14,15,20,.75);backdrop-filter:blur(6px);color:var(--text);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:.3px;pointer-events:auto;border:1px solid rgba(255,255,255,.1);cursor:pointer;z-index:2;}
   .card-img img{width:100%;height:100%;object-fit:cover;display:none;}
   .card-img img.visible{display:block;}
   .card-img .ph{position:absolute;inset:0;background:linear-gradient(90deg,var(--card) 25%,var(--border) 50%,var(--card) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
@@ -225,7 +225,7 @@
     <div class="logo-icon">🐾</div>
     <div class="logo-text">
       <h1>Beepex Cuyo</h1>
-      <p>Catálogo Mayorista</p>
+      <p>Catálogo</p>
       <p>Marzo 2026</p>
     </div>
     <div class="header-actions">
@@ -529,8 +529,8 @@ const products=[
   {"sku":"11331","name":"BOTELLA DISPENSADORA DE AGUA Y COMIDA PLEGABLE (CELESTE)","brand":"GENÉRICOS","price":13048,"pvp":0,"iva":21.0,"stock":"STOCK"},
   {"sku":"11332","name":"BOTELLA DISPENSADORA DE AGUA Y COMIDA PLEGABLE (ROSA)","brand":"GENÉRICOS","price":13048,"pvp":0,"iva":21.0,"stock":"STOCK"},
   {"sku":"11333","name":"BOTELLA DISPENSADORA DE AGUA Y COMIDA PLEGABLE (BLANCA)","brand":"GENÉRICOS","price":13048,"pvp":0,"iva":21.0,"stock":"STOCK"},
-  {"sku":"11334","name":"BOTELLA DISPENSADORA DE AGUA Y COMIDA (ROSA)","brand":"GENÉRICOS","price":11046,"pvp":0,"iva":21.0,"stock":"STOCK"},
-  {"sku":"11335","name":"BOTELLA DISPENSADORA DE AGUA Y COMIDA (ROSA)","brand":"GENÉRICOS","price":11942,"pvp":0,"iva":21.0,"stock":"STOCK"},
+  {"sku":"11334","name":"BOTELLA DISPENSADORA DE AGUA Y COMIDA 350ML (ROSA)","brand":"GENÉRICOS","price":11046,"pvp":0,"iva":21.0,"stock":"STOCK"},
+  {"sku":"11335","name":"BOTELLA DISPENSADORA DE AGUA Y COMIDA 550ML (ROSA)","brand":"GENÉRICOS","price":11942,"pvp":0,"iva":21.0,"stock":"STOCK"},
   {"sku":"11199","name":"BOTELLA DISPENSADORA AGUA Y COMIDA CELESTE","brand":"GENÉRICOS","price":20664,"pvp":0,"iva":21.0,"stock":"STOCK"},
   {"sku":"11200","name":"BOTELLA DISPENSADORA AGUA Y COMIDA ROSA","brand":"GENÉRICOS","price":20664,"pvp":0,"iva":21.0,"stock":"STOCK"},
   {"sku":"11252","name":"COLLAR ANTI LADRIDO DE VIBRACION (SIN SHOCK ELECTRICO","brand":"GENÉRICOS","price":25059,"pvp":0,"iva":10.5,"stock":"NOSTOCK"},
@@ -617,6 +617,9 @@ function loadCart(){
     const n=Object.values(cart).reduce((a,c)=>a+c.qty,0);
     if(n>0){
       updateCount();
+      // Mostrar botón vaciar
+      const cb=document.getElementById('clearCartBtn');
+      if(cb) cb.classList.add('visible');
       showToast(`🛒 Pedido restaurado (${n} productos)`);
     }
   } catch(e){ localStorage.removeItem('beepex_cart'); }
