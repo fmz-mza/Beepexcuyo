@@ -932,15 +932,12 @@ function syncIVA(v){
   renderCart();
 }
 
-// ── Patch de precios: actualiza solo texto de precio sin recrear DOM ──────────
+// ── Patch de precios: actualiza precio en todas las cards según auth ─────────
 function patchPrices(){
   lastRenderedSkus.forEach(sku=>{
     const p=productMap[sku]; if(!p) return;
-    const priceEl=document.querySelector(`#card-${sku} .price`);
-    const noteEl=document.querySelector(`#card-${sku} .price-note`);
-    if(priceEl) priceEl.textContent=p.price===0?'Consultar':fmt(mayorista(p));
-    if(noteEl) noteEl.textContent=includeIVA?'Precio c/IVA incluido':'Precio s/IVA';
-
+    const cardEl=document.getElementById('card-'+sku);
+    if(cardEl) patchCard(cardEl, p);
   });
   document.getElementById('productCount').textContent=
     `${lastRenderedSkus.length} producto${lastRenderedSkus.length!==1?'s':''} · Precios ${includeIVA?'con':'sin'} IVA`;
@@ -1175,14 +1172,23 @@ function patchCard(cardEl, p){
   const qtyVal=cardEl.querySelector('.qty-val');
   if(qtyVal && qtyVal.textContent!=qty) qtyVal.textContent=qty;
 
-  // Precio
-  const priceEl=cardEl.querySelector('.price');
-  if(priceEl && priceEl.textContent!==precio) priceEl.textContent=precio;
-
+  // Precio — actualizar según estado auth
+  const priceEl=cardEl.querySelector('.price, .price-locked');
+  if(priceEl){
+    const tmp=document.createElement('div');
+    tmp.innerHTML=priceDisplay(p);
+    const newEl=tmp.firstElementChild;
+    if(newEl && priceEl.className!==newEl.className) priceEl.replaceWith(newEl);
+    else if(priceEl.textContent!==newEl.textContent) priceEl.textContent=newEl.textContent;
+  }
   // Nota precio
-  const nota=includeIVA?'Precio c/IVA incluido':'Precio s/IVA';
   const noteEl=cardEl.querySelector('.price-note');
-  if(noteEl && noteEl.textContent!==nota) noteEl.textContent=nota;
+  if(noteEl){
+    const tmp2=document.createElement('div');
+    tmp2.innerHTML=priceNoteDisplay();
+    const newNote=tmp2.firstElementChild;
+    if(newNote && noteEl.outerHTML!==newNote.outerHTML) noteEl.replaceWith(newNote);
+  }
 
   // Botón: calcular nuevo estado
   const badge=cardEl.querySelector('.in-cart-badge');
@@ -2185,9 +2191,8 @@ async function loadProfile(){
   }
   // Si el estado de aprobación cambió, forzar re-render completo del grid
   if(userApproved!==wasApproved){
-    // Limpiar grid para forzar recreación de todas las tarjetas con precios
-    const grid=document.getElementById('grid');
-    if(grid){ grid.innerHTML=''; grid._lastFilter=''; }
+    // Parchear precio en todas las cards y re-renderizar
+    patchPrices();
     renderGrid();
   }
 }
@@ -2195,7 +2200,8 @@ async function loadProfile(){
 function updateAuthUI(){
   const badge=document.getElementById('userBadge');
   if(currentUser){
-    const nombre=document.getElementById('clientName').value||currentUser.email.split('@')[0];
+    const inputNombre=document.getElementById('clientName').value;
+    const nombre=inputNombre&&inputNombre.trim()?inputNombre.trim():currentUser.email.split('@')[0];
     badge.style.display='flex';
     badge.textContent=userApproved?`✓ ${nombre}`:`⏳ Pendiente`;
     badge.title=userApproved?'Acceso completo — Click para cerrar sesión':'Cuenta pendiente de aprobación';
