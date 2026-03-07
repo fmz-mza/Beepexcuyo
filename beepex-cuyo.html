@@ -244,7 +244,7 @@
   .desc-modal{background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:420px;width:100%;overflow:hidden;animation:slideUp .2s ease;max-height:90vh;display:flex;flex-direction:column;}
   .desc-modal-body{overflow-y:auto;}
   @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
-  .desc-modal-img{width:100%;height:42vw;max-height:200px;object-fit:cover;background:var(--tag-bg);}
+  .desc-modal-img{width:100%;height:52vw;max-height:220px;min-height:140px;object-fit:contain;background:var(--card);}
   .desc-modal-body{padding:16px;display:flex;flex-direction:column;gap:8px;}
   .desc-modal-sku{font-size:11px;color:var(--muted);}
   .desc-modal-desc{font-size:13px;color:var(--muted);line-height:1.6;max-height:180px;overflow-y:auto;}
@@ -260,7 +260,10 @@
   .desc-add-btn{flex:1;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;padding:10px;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .desc-add-btn:active{transform:scale(.97);background:#3a6cf0;}
   .desc-add-btn.in-cart{background:transparent;border:1.5px solid var(--accent);color:var(--accent);}
-  .desc-modal-close{align-self:flex-end;background:var(--card);border:none;border-radius:8px;color:var(--text);font-size:13px;font-weight:600;padding:10px 20px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px;}
+  .desc-modal-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .desc-modal-name{flex:1;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;line-height:1.2;}
+  .desc-modal-close-top{background:var(--tag-bg);border:none;border-radius:8px;color:var(--muted);font-size:13px;font-weight:700;width:30px;height:30px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;margin-top:1px;}
+  .desc-modal-close-top:active{background:var(--border);transform:scale(.92);}
   .desc-share-row{display:flex;gap:8px;margin-top:2px;}
   .desc-share-btn{flex:1;background:#25D366;border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:700;padding:10px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .desc-share-btn:active{background:#1ebe5d;transform:scale(.97);}
