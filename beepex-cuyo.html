@@ -678,8 +678,8 @@ function patchPrices(){
     // Actualizar margen
     const margenEl=document.querySelector(`#card-${sku} .margen`);
     if(margenEl&&p.pvp>0){
-      const pf=Math.round(p.price*(1+p.iva/100));
-      const mg=Math.round((p.pvp-pf)/p.pvp*100);
+      const ganancia=p.pvp-p.price;
+      const mg=Math.round((ganancia/p.pvp)*100);
       margenEl.textContent=`▲ ${mg}% margen`;
     }
   });
@@ -879,8 +879,8 @@ function createCard(p){
       ${p.pvp>0?`<div class="pvp">PVP sugerido <span>${fmt(p.pvp)}</span></div>`:''}
       ${(()=>{
         if(!p.pvp||p.pvp<=0) return '';
-        const precioFinal=Math.round(p.price*(1+p.iva/100));
-        const margen=Math.round((p.pvp-precioFinal)/p.pvp*100);
+        const ganancia=p.pvp-p.price;
+        const margen=Math.round((ganancia/p.pvp)*100);
         if(margen<=0) return '';
         const cls=margen>=40?'margen margen-high':'margen';
         return `<div class="${cls}">▲ ${margen}% margen</div>`;
