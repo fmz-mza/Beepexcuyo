@@ -122,7 +122,7 @@
   .cart-drawer{position:fixed;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
   .cart-drawer.open{transform:translateX(0);}
   .cart-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;}
-  .cart-header h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;flex:1;}
+  .cart-header h2{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;flex:1;line-height:1.2;}
   .close-btn{background:var(--card);border:none;border-radius:8px;width:44px;height:44px;color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .clear-cart-btn{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:8px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;border-radius:8px;transition:color .15s,background .15s;display:none;}
   .clear-cart-btn.visible{display:flex;align-items:center;justify-content:center;}
@@ -183,6 +183,19 @@
   .float-summary-btn:active{transform:scale(.96);}
   /* Empujar el grid para que no quede detrás del float */
   .grid{padding-bottom:90px;}
+  /* Modal regreso */
+  .return-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:600;align-items:center;justify-content:center;padding:24px;}
+  .return-overlay.open{display:flex;}
+  .return-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 24px;max-width:340px;width:100%;animation:slideUp .25s ease;display:flex;flex-direction:column;gap:14px;text-align:center;}
+  .return-emoji{font-size:44px;line-height:1;}
+  .return-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;line-height:1.2;}
+  .return-phrase{font-size:13px;color:var(--muted);line-height:1.6;min-height:40px;}
+  .return-actions{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+  .return-btn-main{background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;padding:13px;cursor:pointer;font-family:inherit;transition:background .2s;touch-action:manipulation;}
+  .return-btn-main:hover{background:#3a6cf0;}
+  .return-btn-main:active{transform:scale(.97);}
+  .return-btn-sec{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:6px;font-family:inherit;touch-action:manipulation;}
+  .return-btn-sec:hover{color:var(--text);}
   /* Modal bienvenida */
   .welcome-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;align-items:center;justify-content:center;padding:24px;}
   .welcome-overlay.open{display:flex;}
@@ -289,7 +302,7 @@
 <div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
 <div class="cart-drawer" id="cartDrawer">
   <div class="cart-header">
-    <h2>🛒 Tu pedido</h2>
+    <h2 id="cartTitle">🛒 Tu pedido</h2>
     <button class="clear-cart-btn" id="clearCartBtn" onclick="clearCart()" title="Vaciar pedido">🗑</button>
     <button class="close-btn" onclick="closeCart()">✕</button>
   </div>
@@ -334,6 +347,17 @@
         <button class="desc-add-btn" id="descAddBtn" onclick="descAdd()">Agregar al pedido</button>
       </div>
       <button class="desc-modal-close" onclick="closeDescBtn()">Cerrar</button>
+    </div>
+  </div>
+</div>
+<div class="return-overlay" id="returnOverlay">
+  <div class="return-modal">
+    <div class="return-emoji">🐾</div>
+    <div class="return-title" id="returnTitle">¡Hola de nuevo!</div>
+    <div class="return-phrase" id="returnPhrase"></div>
+    <div class="return-actions">
+      <button class="return-btn-main" id="returnBtnMain" onclick="closeReturn(true)">¡Armar pedido!</button>
+      <button class="return-btn-sec" id="returnBtnSec" onclick="closeReturn(false)">Solo explorar el catálogo</button>
     </div>
   </div>
 </div>
@@ -668,12 +692,84 @@ function loadCart(){
     const n=Object.values(cart).reduce((a,c)=>a+c.qty,0);
     if(n>0){
       updateCount();
-      // Mostrar botón vaciar
       const cb=document.getElementById('clearCartBtn');
       if(cb) cb.classList.add('visible');
-      showToast(`🛒 Pedido restaurado (${n} productos)`);
+    }
+    // Modal de regreso si hay nombre guardado
+    if(data.clientName){
+      updateCartTitle();
+      setTimeout(()=>openReturn(data.clientName), 600);
     }
   } catch(e){ localStorage.removeItem('beepex_cart'); }
+}
+
+// ── Frases motivadoras ───────────────────────────────────────────────────────
+const FRASES = [
+  "Los mejores productos para mascotas te esperan. ¡Es un buen momento para reabastecerte!",
+  "Tenemos novedades en el catálogo. ¡No te pierdas los últimos ingresos!",
+  "Tu pedido anterior fue un éxito. ¿Repetimos y sumamos algo nuevo?",
+  "Productos en stock listos para despachar. ¡Aprovechá antes de que se agoten!",
+  "Nuevas preventas disponibles. ¡Reservá con tiempo y asegurá tu mercadería!",
+  "El catálogo se actualiza cada mes. ¡Revisá las novedades de Marzo 2026!",
+];
+function openReturn(name){
+  const first=name.split(' ')[0];
+  document.getElementById('returnTitle').textContent=`¡Hola de nuevo, ${first}! 👋`;
+
+  const itemCount=Object.values(cart).reduce((a,c)=>a+c.qty,0);
+  const btnMain=document.getElementById('returnBtnMain');
+  const btnSec=document.getElementById('returnBtnSec');
+
+  if(itemCount>0){
+    // Tiene pedido pendiente
+    const total=Object.values(cart).filter(c=>c.qty>0).reduce((a,c)=>{
+      return a+(includeIVA?Math.round(c.product.price*(1+c.product.iva/100))*c.qty:c.product.price*c.qty);
+    },0);
+    document.getElementById('returnPhrase').textContent=
+      `Tenés ${itemCount} producto${itemCount!==1?'s':''} en tu pedido por ${fmt(total)}. ¿Lo continuamos?`;
+    btnMain.textContent='Ver mi pedido →';
+    btnMain.onclick=()=>closeReturn(true);
+    btnSec.style.display='';
+    btnSec.textContent='Seguir explorando';
+  } else {
+    // Carrito vacío — frase motivadora
+    const frase=FRASES[Math.floor(Math.random()*FRASES.length)];
+    document.getElementById('returnPhrase').textContent=frase;
+    btnMain.textContent='¡Explorar catálogo!';
+    btnMain.onclick=()=>closeReturn(false);
+    btnSec.style.display='none';
+  }
+
+  // Bloquear scroll
+  const sy=window.scrollY;
+  document.body.style.position='fixed';
+  document.body.style.top=`-${sy}px`;
+  document.body.style.width='100%';
+  document.body.dataset.returnScrollY=sy;
+  document.getElementById('returnOverlay').classList.add('open');
+}
+function closeReturn(goToCart){
+  document.getElementById('returnOverlay').classList.remove('open');
+  if(goToCart){
+    // Pasar el scrollY directo a openCart sin restaurar — evita flash
+    document.body.dataset.scrollY = document.body.dataset.returnScrollY||'0';
+    // Abrir carrito sin volver a bloquear scroll (ya está bloqueado)
+    document.getElementById('cartOverlay').classList.add('open');
+    document.getElementById('cartDrawer').classList.add('open');
+    updateCartTitle();
+    renderCart();
+    requestAnimationFrame(()=>{
+      const ci=document.getElementById('cartItems');
+      if(ci && window._cartScrollPos) ci.scrollTop=window._cartScrollPos;
+    });
+  } else {
+    // Solo explorar: restaurar scroll normal
+    if(document.body.style.position==='fixed'){
+      const sy=parseInt(document.body.dataset.returnScrollY||'0');
+      document.body.style.position=''; document.body.style.top=''; document.body.style.width='';
+      window.scrollTo(0,sy);
+    }
+  }
 }
 
 function showToast(msg){
@@ -1036,6 +1132,7 @@ function confirmWelcome(){
   // Guardar nombre en el input del carrito
   document.getElementById('clientName').value=name;
   saveCart();
+  updateCartTitle();
   // Cerrar welcome y abrir carrito
   document.getElementById('welcomeOverlay').classList.remove('open');
   if(document.body.style.position==='fixed'){
@@ -1047,6 +1144,11 @@ function confirmWelcome(){
   }
   openCart();
 }
+function updateCartTitle(){
+  const name=document.getElementById('clientName').value.trim();
+  const el=document.getElementById('cartTitle');
+  if(el) el.textContent=name?`Hola ${name} 👋`:'🛒 Tu pedido';
+}
 function openCart(){
   // Si no hay nombre guardado, mostrar modal de bienvenida primero
   const name=document.getElementById('clientName').value.trim();
@@ -1054,6 +1156,7 @@ function openCart(){
     openWelcome();
     return;
   }
+  updateCartTitle();
   // Bloquear scroll del body (iOS requiere position:fixed)
   const scrollY = window.scrollY;
   document.body.style.position='fixed';
@@ -1607,7 +1710,9 @@ function closeDescBtn(){
 // ── Tecla Escape cierra modales ──────────────────────────────────────────────
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){
-    if(document.getElementById('welcomeOverlay').classList.contains('open')){
+    if(document.getElementById('returnOverlay').classList.contains('open')){
+      closeReturn(false);
+    } else if(document.getElementById('welcomeOverlay').classList.contains('open')){
       document.getElementById('welcomeOverlay').classList.remove('open');
       if(document.body.style.position==='fixed'){
         const sy=parseInt(document.body.dataset.welcomeScrollY||'0');
