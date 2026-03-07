@@ -244,9 +244,8 @@
   .desc-modal{background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:420px;width:100%;overflow:hidden;animation:slideUp .2s ease;max-height:90vh;display:flex;flex-direction:column;}
   .desc-modal-body{overflow-y:auto;}
   @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
-  .desc-modal-img{width:100%;aspect-ratio:1;object-fit:cover;background:var(--tag-bg);}
+  .desc-modal-img{width:100%;height:42vw;max-height:200px;object-fit:cover;background:var(--tag-bg);}
   .desc-modal-body{padding:16px;display:flex;flex-direction:column;gap:8px;}
-  .desc-modal-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;line-height:1.2;}
   .desc-modal-sku{font-size:11px;color:var(--muted);}
   .desc-modal-desc{font-size:13px;color:var(--muted);line-height:1.6;max-height:180px;overflow-y:auto;}
   .desc-modal-price{font-size:22px;font-weight:800;margin-top:2px;}
@@ -361,7 +360,10 @@
   <div class="desc-modal" id="descModal">
     <img class="desc-modal-img" id="descModalImg" alt="">
     <div class="desc-modal-body">
-      <div class="desc-modal-name" id="descModalName"></div>
+      <div class="desc-modal-header-row">
+        <div class="desc-modal-name" id="descModalName"></div>
+        <button class="desc-modal-close-top" onclick="closeDescBtn()" aria-label="Cerrar">✕</button>
+      </div>
       <div class="desc-modal-sku" id="descModalSku"></div>
       <div class="desc-modal-price" id="descModalPrice"></div>
       <div class="desc-modal-pvp" id="descModalPvp">
@@ -389,7 +391,7 @@
           <button class="share-send-btn" onclick="shareProductWA()">Enviar por WhatsApp</button>
         </div>
       </div>
-      <button class="desc-modal-close" onclick="closeDescBtn()">Cerrar</button>
+
     </div>
   </div>
 </div>
@@ -1856,9 +1858,14 @@ function shareProductWA(){
 `;
   if(precio) msg+=`💰 *Precio: ${fmt(precio)}*
 `;
+  // URL de imagen pública si existe en caché
+  const imgUrl=imgCache[descActiveSku]&&imgCache[descActiveSku]!=='error'?imgCache[descActiveSku]:null;
+  if(imgUrl) msg+=`
+🖼 ${imgUrl}`;
   msg+=`
+
 📲 Consultanos para más información`;
-  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  window.location.href=`https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 function closeDescBtn(){
   document.getElementById('descOverlay').classList.remove('open');
