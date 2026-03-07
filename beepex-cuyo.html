@@ -96,7 +96,7 @@
   .qty-btn:hover{background:var(--accent);}
   .card.is-preventa .qty-btn:hover{background:var(--preventa);}
   .qty-val{font-size:14px;font-weight:600;min-width:22px;text-align:center;}
-  .in-cart-badge{font-size:11px;font-weight:700;color:var(--green);white-space:nowrap;padding:0 2px;opacity:0;transition:opacity .2s;}
+  .in-cart-badge{font-size:12px;font-weight:800;color:var(--green);padding:0 2px;opacity:0;transition:opacity .2s;flex-shrink:0;}
   .in-cart-badge.visible{opacity:1;}
   .card.is-preventa .in-cart-badge{color:var(--preventa);}
   .add-btn{flex:1;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;padding:7px 4px;cursor:pointer;transition:all .15s;font-family:inherit;}
@@ -770,7 +770,7 @@ function createCard(p){
         <button class="qty-btn" onclick="chg('${p.sku}',-1)">−</button>
         <span class="qty-val">${qty}</span>
         <button class="qty-btn" onclick="chg('${p.sku}',1)">+</button>
-        <span class="in-cart-badge${qty>0?' visible':''}">✓ ${qty} en pedido</span>
+        <span class="in-cart-badge${qty>0?' visible':''}">✓ ${qty}</span>
       </div>
     </div>`;
   // Cargar imagen: directo si hay cache, lazy si no
@@ -815,7 +815,7 @@ function patchCard(cardEl, p){
   // Botón: calcular nuevo estado
   const badge=cardEl.querySelector('.in-cart-badge');
   if(badge){
-    const newText=`✓ ${qty} en pedido`;
+    const newText=`✓ ${qty}`;
     if(badge.textContent!==newText) badge.textContent=newText;
     if(qty>0) badge.classList.add('visible'); else badge.classList.remove('visible');
   }
