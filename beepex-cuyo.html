@@ -123,6 +123,16 @@
   /* Cart */
   .cart-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;}
   .history-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;}
+  .pwd-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:center;justify-content:center;padding:20px;}
+  .pwd-overlay.open{display:flex;}
+  .pwd-modal{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px 24px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px;}
+  .pwd-title{font-size:17px;font-weight:800;text-align:center;}
+  .pwd-input{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;transition:border-color .2s;}
+  .pwd-input:focus{border-color:var(--accent);}
+  .pwd-btn{width:100%;padding:13px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:opacity .2s;}
+  .pwd-btn:hover{opacity:.85;}
+  .pwd-btn-cancel{background:none;border:1px solid var(--border);color:var(--muted);}
+  .pwd-msg{font-size:12px;text-align:center;min-height:16px;}
   .history-overlay.open{display:block;}
   .history-drawer{position:fixed;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
   .history-drawer.open{transform:translateX(0);}
@@ -434,6 +444,17 @@ let isAdmin=false;
 </div>
 <div class="grid" id="grid"></div>
 <div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
+<div class="pwd-overlay" id="pwdOverlay">
+  <div class="pwd-modal">
+    <div class="pwd-title">🔑 Cambiar contraseña</div>
+    <input class="pwd-input" id="pwdCurrent" type="password" placeholder="Contraseña actual" autocomplete="current-password">
+    <input class="pwd-input" id="pwdNew" type="password" placeholder="Nueva contraseña" autocomplete="new-password">
+    <input class="pwd-input" id="pwdConfirm" type="password" placeholder="Confirmar nueva contraseña" autocomplete="new-password">
+    <div class="pwd-msg" id="pwdMsg"></div>
+    <button class="pwd-btn" onclick="submitChangePassword()">Guardar contraseña</button>
+    <button class="pwd-btn pwd-btn-cancel" onclick="closeChangePassword()">Cancelar</button>
+  </div>
+</div>
 <div class="history-overlay" id="historyOverlay" onclick="closeOrderHistory()"></div>
 <div class="history-drawer" id="historyDrawer">
   <div class="history-header">
@@ -2574,7 +2595,71 @@ function reloadOrder(items){
 }
 
 function openChangePassword(){
-  showToast('🔑 Cambiar contraseña — próximamente');
+  document.getElementById('pwdCurrent').value='';
+  document.getElementById('pwdNew').value='';
+  document.getElementById('pwdConfirm').value='';
+  document.getElementById('pwdMsg').textContent='';
+  document.getElementById('pwdMsg').style.color='';
+  document.getElementById('pwdOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('pwdCurrent').focus(), 150);
+}
+
+function closeChangePassword(){
+  document.getElementById('pwdOverlay').classList.remove('open');
+}
+
+async function submitChangePassword(){
+  const current=document.getElementById('pwdCurrent').value.trim();
+  const newPwd=document.getElementById('pwdNew').value.trim();
+  const confirm=document.getElementById('pwdConfirm').value.trim();
+  const msg=document.getElementById('pwdMsg');
+
+  if(!current||!newPwd||!confirm){
+    msg.textContent='Completá todos los campos'; msg.style.color='var(--red)'; return;
+  }
+  if(newPwd.length<6){
+    msg.textContent='La nueva contraseña debe tener al menos 6 caracteres'; msg.style.color='var(--red)'; return;
+  }
+  if(newPwd!==confirm){
+    msg.textContent='Las contraseñas no coinciden'; msg.style.color='var(--red)'; return;
+  }
+
+  msg.textContent='Verificando...'; msg.style.color='var(--muted)';
+
+  try{
+    // 1. Verificar contraseña actual haciendo login
+    const verifyRes=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},
+      body:JSON.stringify({email:currentUser.email, password:current})
+    });
+    if(!verifyRes.ok){
+      msg.textContent='La contraseña actual es incorrecta'; msg.style.color='var(--red)'; return;
+    }
+
+    // 2. Cambiar contraseña con el token actual
+    msg.textContent='Guardando...'; 
+    const token=sessionStorage.getItem('sb_access_token');
+    const updateRes=await fetch(`${SUPABASE_URL}/auth/v1/user`,{
+      method:'PUT',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':SUPABASE_ANON,
+        'Authorization':`Bearer ${token}`
+      },
+      body:JSON.stringify({password:newPwd})
+    });
+
+    if(!updateRes.ok){
+      const err=await updateRes.json().catch(()=>({}));
+      msg.textContent=err.message||'Error al cambiar contraseña'; msg.style.color='var(--red)'; return;
+    }
+
+    msg.textContent='✅ Contraseña actualizada'; msg.style.color='var(--green)';
+    setTimeout(()=>closeChangePassword(), 1500);
+  } catch(e){
+    msg.textContent='Error de conexión'; msg.style.color='var(--red)';
+  }
 }
 
 function openAuth(pending){
