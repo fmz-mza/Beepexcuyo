@@ -2209,7 +2209,7 @@ function closeFloatSearch(){
   if(inp.value){
     inp.value='';
     document.getElementById('searchInput').value='';
-    doSearch('');
+    scheduleRender();
   }
 }
 
@@ -2218,7 +2218,17 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('floatSearchInput').addEventListener('input', e=>{
     const v=e.target.value;
     document.getElementById('searchInput').value=v;
-    doSearch(v);
+    scheduleRender();
+    // Scroll al primer resultado después de que renderice
+    if(v.trim()){
+      setTimeout(()=>{
+        const firstCard=document.querySelector('.grid .card:not(.hidden)');
+        if(firstCard){
+          const top=firstCard.getBoundingClientRect().top+window.scrollY-80;
+          window.scrollTo({top, behavior:'smooth'});
+        }
+      }, 120);
+    }
   });
 });
 
