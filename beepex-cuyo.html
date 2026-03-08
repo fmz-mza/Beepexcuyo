@@ -2189,11 +2189,19 @@ async function initAuth(){
     updateAuthUI();
     renderGrid();
   });
-  // Verificar sesión existente o token en URL
-  const {data:{session}}=await _supabase.auth.getSession();
-  if(session?.user){
-    currentUser=session.user;
-    await loadProfile();
+  // Restaurar sesión desde sessionStorage si existe
+  const savedToken=sessionStorage.getItem('sb_access_token');
+  if(savedToken){
+    try{
+      const payload=JSON.parse(atob(savedToken.split('.')[1]));
+      if(payload.exp*1000>Date.now()){
+        currentUser={id:payload.sub, email:payload.email};
+        await loadProfile();
+      } else {
+        sessionStorage.removeItem('sb_access_token');
+        sessionStorage.removeItem('sb_refresh_token');
+      }
+    } catch(e){ sessionStorage.removeItem('sb_access_token'); }
   }
   // Limpiar hash de la URL si viene del link de confirmación
   if(window.location.hash&&window.location.hash.includes('access_token')){
@@ -2205,13 +2213,12 @@ async function initAuth(){
 
 async function loadProfile(){
   if(!currentUser) return;
-  // Usar fetch directo para evitar problemas del SDK con nuevas keys
-  const session=await _supabase.auth.getSession();
-  const token=session?.data?.session?.access_token;
+  // Usar fetch directo — token desde sessionStorage
+  const token=sessionStorage.getItem('sb_access_token')||SUPABASE_ANON;
   const res=await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}&select=approved,nombre`,{
     headers:{
       'apikey':SUPABASE_ANON,
-      'Authorization':`Bearer ${token||SUPABASE_ANON}`,
+      'Authorization':`Bearer ${token}`,
       'Content-Type':'application/json'
     }
   });
@@ -2304,8 +2311,9 @@ async function submitAuth(){
       msg.textContent=loginData.error_description||loginData.message||'Error al ingresar';
       if(loginData.error_description==='Invalid login credentials') msg.textContent='Email o contraseña incorrectos';
     } else {
-      // Setear sesión manualmente en el SDK
-      await _supabase.auth.setSession({access_token:loginData.access_token, refresh_token:loginData.refresh_token});
+      // Guardar token en sessionStorage para loadProfile
+      sessionStorage.setItem('sb_access_token', loginData.access_token);
+      sessionStorage.setItem('sb_refresh_token', loginData.refresh_token);
       currentUser=loginData.user;
       await loadProfile();
       updateAuthUI();
@@ -2332,7 +2340,8 @@ async function submitAuth(){
 }
 
 async function signOut(){
-  await _supabase.auth.signOut();
+  sessionStorage.removeItem('sb_access_token');
+  sessionStorage.removeItem('sb_refresh_token');
   currentUser=null; userApproved=false;
   updateAuthUI();
   renderGrid();
