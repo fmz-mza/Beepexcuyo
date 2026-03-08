@@ -1546,6 +1546,7 @@ function sendWhatsApp(){
   });
   // Guardar en historial de pedidos
   saveOrderHistory(name, total, totalU);
+  saveOrderSupabase('whatsapp');
   window.location.href=`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`;
 }
 
@@ -1569,6 +1570,43 @@ function getOrderHistory(){
     const raw=localStorage.getItem('beepex_history');
     return raw?JSON.parse(raw):[];
   } catch(e){ return []; }
+}
+
+async function saveOrderSupabase(via){
+  if(!currentUser) return;
+  try{
+    const items=Object.values(cart).filter(c=>c.qty>0);
+    if(!items.length) return;
+    const nombre=document.getElementById('clientName').value.trim()||currentUser.email.split('@')[0];
+    let sub=0, ivaTot=0;
+    items.forEach(c=>{ sub+=c.product.price*c.qty; ivaTot+=Math.round(c.product.price*c.qty*c.product.iva/100); });
+    const total=includeIVA?sub+ivaTot:sub;
+    const orderItems=items.map(c=>({
+      sku:c.product.sku,
+      name:c.product.name,
+      brand:c.product.brand,
+      qty:c.qty,
+      price:mayorista(c.product),
+      subtotal:mayorista(c.product)*c.qty
+    }));
+    const token=sessionStorage.getItem('sb_access_token');
+    await fetch(`${SUPABASE_URL}/rest/v1/orders`,{
+      method:'POST',
+      headers:{
+        'apikey':SUPABASE_ANON,
+        'Authorization':`Bearer ${token}`,
+        'Content-Type':'application/json',
+        'Prefer':'return=minimal'
+      },
+      body:JSON.stringify({
+        user_id:currentUser.id,
+        nombre_cliente:nombre,
+        items:orderItems,
+        total,
+        via
+      })
+    });
+  } catch(e){ console.warn('Error guardando pedido:', e.message); }
 }
 
 // ── Exportar PDF del pedido ──────────────────────────────────────────────────
@@ -1851,6 +1889,7 @@ async function exportPDF(){
 
   // GA4
   if(typeof gtag!=='undefined') gtag('event','share',{method:'pdf', content_type:'order', item_id:name});
+  saveOrderSupabase('pdf');
 }
 
 // ── Modal descripción ────────────────────────────────────────────────────────
