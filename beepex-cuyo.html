@@ -534,7 +534,7 @@ let userApproved=false;
 <div class="float-search" id="floatSearch">
   <div class="float-search-inner">
     <span style="font-size:16px;color:var(--muted)">🔍</span>
-    <input class="float-search-input" id="floatSearchInput" type="search" placeholder="Buscar producto, SKU, marca..." autocomplete="off">
+    <input class="float-search-input" id="floatSearchInput" type="search" placeholder="Buscar producto, SKU, marca..." autocomplete="off" enterkeyhint="search" inputmode="search" onkeydown="if(event.key==='Enter'){this.blur();}">
     <button class="float-search-close" onclick="closeFloatSearch()" aria-label="Cerrar">✕</button>
   </div>
 </div>
