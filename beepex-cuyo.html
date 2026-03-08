@@ -2205,14 +2205,20 @@ async function initAuth(){
 
 async function loadProfile(){
   if(!currentUser) return;
-  const {data,error}=await _supabase
-    .from('profiles')
-    .select('approved, nombre')
-    .eq('id', currentUser.id)
-    .single();
+  // Usar fetch directo para evitar problemas del SDK con nuevas keys
+  const session=await _supabase.auth.getSession();
+  const token=session?.data?.session?.access_token;
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}&select=approved,nombre`,{
+    headers:{
+      'apikey':SUPABASE_ANON,
+      'Authorization':`Bearer ${token||SUPABASE_ANON}`,
+      'Content-Type':'application/json'
+    }
+  });
+  const rows=await res.json();
+  const data=Array.isArray(rows)?rows[0]:null;
   const wasApproved=userApproved;
   userApproved=data?.approved||false;
-  if(error){ console.warn('loadProfile error:', error.message); }
   if(data?.nombre){
     document.getElementById('clientName').value=data.nombre;
     localStorage.setItem('beepex_client_name', data.nombre);
@@ -2286,12 +2292,21 @@ async function submitAuth(){
   msg.textContent='';
 
   if(authTab==='login'){
-    const {data,error}=await _supabase.auth.signInWithPassword({email, password:pass});
-    if(error){
+    // Usar fetch directo porque el SDK no maneja bien las nuevas keys sb_publishable_
+    const loginRes=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},
+      body:JSON.stringify({email,password:pass})
+    });
+    const loginData=await loginRes.json();
+    if(!loginRes.ok||loginData.error){
       msg.className='auth-msg error';
-      msg.textContent=error.message==='Invalid login credentials'?'Email o contraseña incorrectos':error.message;
+      msg.textContent=loginData.error_description||loginData.message||'Error al ingresar';
+      if(loginData.error_description==='Invalid login credentials') msg.textContent='Email o contraseña incorrectos';
     } else {
-      currentUser=data.user; // setear currentUser antes de loadProfile
+      // Setear sesión manualmente en el SDK
+      await _supabase.auth.setSession({access_token:loginData.access_token, refresh_token:loginData.refresh_token});
+      currentUser=loginData.user;
       await loadProfile();
       updateAuthUI();
       closeAuth();
