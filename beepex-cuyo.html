@@ -217,6 +217,16 @@
   /* Badge usuario en header */
   .user-badge{font-size:11px;font-weight:700;color:var(--accent2);white-space:nowrap;cursor:pointer;padding:4px 8px;border-radius:8px;background:var(--card);border:1px solid var(--border);flex-shrink:0;}
   .user-badge:hover{border-color:var(--accent);}
+  .user-menu-overlay{display:none;position:fixed;inset:0;z-index:499;}
+  .user-menu-overlay.open{display:block;}
+  .user-menu{position:absolute;top:calc(100% + 6px);left:0;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:180px;z-index:500;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none;flex-direction:column;gap:2px;}
+  .user-menu.open{display:flex;}
+  .user-menu-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:background .15s;border:none;background:none;width:100%;text-align:left;font-family:inherit;}
+  .user-menu-item:hover{background:var(--surface);}
+  .user-menu-item.danger{color:var(--red);}
+  .user-menu-item.danger:hover{background:rgba(239,68,68,.1);}
+  .user-menu-sep{height:1px;background:var(--border);margin:4px 0;}
+  .logo-text{position:relative;}
   /* Resumen flotante */
   .float-summary{position:fixed;bottom:0;left:0;right:0;z-index:150;padding:0 12px 12px;pointer-events:none;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.56,.64,1);will-change:transform;}
   .float-summary.visible{transform:translateY(0);pointer-events:auto;}
@@ -346,6 +356,7 @@ const _supabase=window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
 });
 let currentUser=null;
 let userApproved=false;
+let isAdmin=false;
 </script>
 <!-- jsPDF para exportar pedido -->
 <!-- jsPDF carga lazy al primer uso -->
@@ -369,7 +380,11 @@ let userApproved=false;
       <h1>Beepex Cuyo</h1>
       <p>Catálogo</p>
       <p>Marzo 2026</p>
-      <button class="user-badge" id="userBadge" onclick="openAuth()" style="display:none"></button>
+      <div style="position:relative;">
+        <button class="user-badge" id="userBadge" onclick="toggleUserMenu()" style="display:none"></button>
+        <div class="user-menu" id="userMenu"></div>
+      </div>
+      <div class="user-menu-overlay" id="userMenuOverlay" onclick="closeUserMenu()"></div>
     </div>
     <div class="header-actions">
       <div class="iva-toggle-wrap">
@@ -2274,7 +2289,7 @@ async function checkAndRefreshToken(){
         // Token expirado y no se pudo refrescar — limpiar sesión
         sessionStorage.removeItem('sb_access_token');
         sessionStorage.removeItem('sb_refresh_token');
-        currentUser=null; userApproved=false;
+        currentUser=null; userApproved=false; isAdmin=false;
         updateAuthUI();
         renderGrid();
         showToast('⏱ Sesión expirada, por favor ingresá de nuevo');
@@ -2328,7 +2343,7 @@ async function loadProfile(){
   if(!currentUser) return;
   // Usar fetch directo — token desde sessionStorage
   const token=sessionStorage.getItem('sb_access_token')||SUPABASE_ANON;
-  const res=await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}&select=approved,nombre`,{
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}&select=approved,nombre,is_admin`,{
     headers:{
       'apikey':SUPABASE_ANON,
       'Authorization':`Bearer ${token}`,
@@ -2339,6 +2354,7 @@ async function loadProfile(){
   const data=Array.isArray(rows)?rows[0]:null;
   const wasApproved=userApproved;
   userApproved=data?.approved||false;
+  isAdmin=data?.is_admin||false;
   if(data?.nombre){
     document.getElementById('clientName').value=data.nombre;
     localStorage.setItem('beepex_client_name', data.nombre);
@@ -2357,16 +2373,57 @@ function updateAuthUI(){
     const inputNombre=document.getElementById('clientName').value;
     const nombre=inputNombre&&inputNombre.trim()?inputNombre.trim():currentUser.email.split('@')[0];
     badge.style.display='flex';
-    badge.textContent=userApproved?`✓ ${nombre}`:`⏳ Pendiente`;
-    badge.title=userApproved?'Acceso completo — Click para cerrar sesión':'Cuenta pendiente de aprobación';
-    badge.onclick=()=>{
-      if(confirm(`Cerrar sesión de ${nombre}?`)) signOut();
-    };
+    if(isAdmin){
+      badge.textContent=`⚙️ ${nombre}`;
+      badge.title='Panel de administración';
+    } else {
+      badge.textContent=userApproved?`✓ ${nombre}`:`⏳ Pendiente`;
+      badge.title=userApproved?'Mi cuenta':'Cuenta pendiente de aprobación';
+    }
+    // Construir menú
+    const menu=document.getElementById('userMenu');
+    if(isAdmin){
+      menu.innerHTML=`
+        <button class="user-menu-item" onclick="closeUserMenu();window.location.href='beepex-admin.html'">👥 Panel admin</button>
+        <div class="user-menu-sep"></div>
+        <button class="user-menu-item danger" onclick="closeUserMenu();signOut()">👋 Cerrar sesión</button>`;
+    } else {
+      menu.innerHTML=`
+        <div style="padding:8px 12px 4px;font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;">${nombre}</div>
+        <div class="user-menu-sep"></div>
+        ${userApproved?`<button class="user-menu-item" onclick="closeUserMenu();openOrderHistory()">📋 Historial de compras</button>`:''}
+        <button class="user-menu-item" onclick="closeUserMenu();openChangePassword()">🔑 Cambiar contraseña</button>
+        <div class="user-menu-sep"></div>
+        <button class="user-menu-item danger" onclick="closeUserMenu();signOut()">👋 Cerrar sesión</button>`;
+    }
   } else {
     badge.style.display='none';
   }
-  // Actualizar precios visibles
   patchPrices();
+}
+
+function toggleUserMenu(){
+  if(!currentUser){ openAuth(); return; }
+  const menu=document.getElementById('userMenu');
+  const overlay=document.getElementById('userMenuOverlay');
+  const isOpen=menu.classList.contains('open');
+  if(isOpen){ closeUserMenu(); } else {
+    menu.classList.add('open');
+    overlay.classList.add('open');
+  }
+}
+
+function closeUserMenu(){
+  document.getElementById('userMenu').classList.remove('open');
+  document.getElementById('userMenuOverlay').classList.remove('open');
+}
+
+function openOrderHistory(){
+  showToast('📋 Historial de compras — próximamente');
+}
+
+function openChangePassword(){
+  showToast('🔑 Cambiar contraseña — próximamente');
 }
 
 function openAuth(pending){
@@ -2455,7 +2512,7 @@ async function submitAuth(){
 async function signOut(){
   sessionStorage.removeItem('sb_access_token');
   sessionStorage.removeItem('sb_refresh_token');
-  currentUser=null; userApproved=false;
+  currentUser=null; userApproved=false; isAdmin=false;
   updateAuthUI();
   renderGrid();
   showToast('👋 Sesión cerrada');
