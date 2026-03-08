@@ -614,10 +614,14 @@ function renderStats(){
   renderRanking('topUsers', userCount, 5, 'pedidos');
 
   // Carrito abandonado
-  const addedSkus=new Set(cartEvts.filter(e=>e.action==='add').map(e=>e.sku));
-  const orderedSkus=new Set(orders.flatMap(o=>(o.items||[]).map(i=>i.sku)));
+  // Por usuario: SKU agregado al carrito pero ese usuario nunca lo pidió
+  const userOrderedSkus={};
+  orders.forEach(o=>{ (o.items||[]).forEach(i=>{ if(!userOrderedSkus[o.user_id]) userOrderedSkus[o.user_id]=new Set(); userOrderedSkus[o.user_id].add(i.sku); }); });
   const abandoned={};
-  cartEvts.filter(e=>e.action==='add'&&!orderedSkus.has(e.sku)).forEach(e=>{ abandoned[e.sku]=(abandoned[e.sku]||0)+1; });
+  cartEvts.filter(e=>e.action==='add').forEach(e=>{
+    const userOrdered=userOrderedSkus[e.user_id]||new Set();
+    if(!userOrdered.has(e.sku)) abandoned[e.sku]=(abandoned[e.sku]||0)+1;
+  });
   renderRanking('cartAbandoned', abandoned, 5, 'veces');
 
   // Evolución mensual (últimos 6 meses)
