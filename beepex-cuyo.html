@@ -1590,7 +1590,7 @@ async function saveOrderSupabase(via){
       subtotal:mayorista(c.product)*c.qty
     }));
     const token=sessionStorage.getItem('sb_access_token');
-    await fetch(`${SUPABASE_URL}/rest/v1/orders`,{
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/orders`,{
       method:'POST',
       headers:{
         'apikey':SUPABASE_ANON,
@@ -1606,6 +1606,13 @@ async function saveOrderSupabase(via){
         via
       })
     });
+    if(!res.ok){
+      const err=await res.json().catch(()=>({}));
+      console.error('Error orders INSERT:', res.status, JSON.stringify(err));
+      showToast('⚠️ Error al guardar pedido: '+( err.message||err.hint||res.status));
+    } else {
+      console.log('Pedido guardado OK via', via);
+    }
   } catch(e){ console.warn('Error guardando pedido:', e.message); }
 }
 
@@ -1870,6 +1877,9 @@ async function exportPDF(){
   doc.setTextColor(...MUTED);
   doc.text('Beepex Cuyo · Catálogo Mayorista · beepex-cuyo.github.io', W/2, y+3, {align:'center'});
 
+  // ── Guardar pedido en Supabase (antes de compartir, para no perderse el return) ──
+  saveOrderSupabase('pdf');
+
   // ── Compartir o descargar ──
   const pdfBlob = doc.output('blob');
   const fileName = `Pedido_Beepex_${name.replace(/\s+/g,'_')}_${today.replace(/\//g,'-')}.pdf`;
@@ -1889,7 +1899,6 @@ async function exportPDF(){
 
   // GA4
   if(typeof gtag!=='undefined') gtag('event','share',{method:'pdf', content_type:'order', item_id:name});
-  saveOrderSupabase('pdf');
 }
 
 // ── Modal descripción ────────────────────────────────────────────────────────
