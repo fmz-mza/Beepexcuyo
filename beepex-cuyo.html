@@ -2239,22 +2239,7 @@ async function checkAndRefreshToken(){
 setInterval(checkAndRefreshToken, 5*60*1000);
 
 async function initAuth(){
-  // Escuchar cambios de sesión (incluye EMAIL_CONFIRMED)
-  _supabase.auth.onAuthStateChange(async (event, session)=>{
-    if(session?.user){
-      currentUser=session.user;
-      await loadProfile();
-      if(event==='SIGNED_IN'||event==='TOKEN_REFRESHED'||event==='USER_UPDATED'){
-        updateAuthUI();
-        renderGrid();
-        if(event==='SIGNED_IN') showToast(userApproved?'✅ ¡Bienvenido!':'⏳ Cuenta pendiente de aprobación');
-      }
-    } else {
-      currentUser=null; userApproved=false;
-    }
-    updateAuthUI();
-    renderGrid();
-  });
+  // onAuthStateChange eliminado — usamos fetch directo + sessionStorage
   // Restaurar sesión desde sessionStorage si existe
   const savedToken=sessionStorage.getItem('sb_access_token');
   if(savedToken){
