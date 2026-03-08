@@ -122,6 +122,24 @@
   .add-btn.in-cart-btn.btn-preventa:hover{background:var(--preventa);color:#fff;}
   /* Cart */
   .cart-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;}
+  .history-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;}
+  .history-overlay.open{display:block;}
+  .history-drawer{position:fixed;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
+  .history-drawer.open{transform:translateX(0);}
+  .history-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;}
+  .history-items{flex:1;overflow-y:auto;padding:16px;}
+  .history-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;}
+  .history-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+  .history-card-date{font-size:11px;color:var(--muted);}
+  .history-card-via{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--tag-bg);}
+  .history-card-via.whatsapp{color:#25d366;}
+  .history-card-via.pdf{color:var(--accent);}
+  .history-card-total{font-size:16px;font-weight:800;color:var(--accent2);margin-bottom:8px;}
+  .history-card-items{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;}
+  .history-card-actions{display:flex;gap:8px;}
+  .history-btn{flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;}
+  .history-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .history-empty{text-align:center;padding:60px 20px;color:var(--muted);}
   .cart-overlay.open{display:block;}
   .cart-drawer{position:fixed;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
   .cart-drawer.open{transform:translateX(0);}
@@ -416,6 +434,14 @@ let isAdmin=false;
 </div>
 <div class="grid" id="grid"></div>
 <div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
+<div class="history-overlay" id="historyOverlay" onclick="closeOrderHistory()"></div>
+<div class="history-drawer" id="historyDrawer">
+  <div class="history-header">
+    <h2 style="font-size:16px;font-weight:800;">📋 Historial de compras</h2>
+    <button class="close-btn" onclick="closeOrderHistory()">✕</button>
+  </div>
+  <div class="history-items" id="historyItems"></div>
+</div>
 <div class="cart-drawer" id="cartDrawer">
   <div class="cart-header">
     <h2 id="cartTitle">🛒 Tu pedido</h2>
@@ -2488,8 +2514,63 @@ function closeUserMenu(){
   document.getElementById('userMenuOverlay').classList.remove('open');
 }
 
-function openOrderHistory(){
-  showToast('📋 Historial de compras — próximamente');
+async function openOrderHistory(){
+  document.getElementById('historyOverlay').classList.add('open');
+  document.getElementById('historyDrawer').classList.add('open');
+  document.body.style.overflow='hidden';
+  const container=document.getElementById('historyItems');
+  container.innerHTML='<div class="history-empty">⏳ Cargando...</div>';
+  try{
+    const token=sessionStorage.getItem('sb_access_token');
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/orders?user_id=eq.${currentUser.id}&order=created_at.desc&limit=20`,{
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    const orders=await res.json();
+    if(!orders.length){
+      container.innerHTML='<div class="history-empty">🛒<br><br>Todavía no tenés pedidos registrados.<br><span style="font-size:12px">Tus próximos pedidos aparecerán acá.</span></div>';
+      return;
+    }
+    container.innerHTML=orders.map(o=>{
+      const fecha=new Date(o.created_at).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      const items=Array.isArray(o.items)?o.items:[];
+      const itemsStr=items.map(i=>`${i.qty}× ${i.name}`).join(', ');
+      const via=o.via||'whatsapp';
+      return `<div class="history-card">
+        <div class="history-card-header">
+          <span class="history-card-date">📅 ${fecha}</span>
+          <span class="history-card-via ${via}">${via==='pdf'?'📄 PDF':'💬 WhatsApp'}</span>
+        </div>
+        <div class="history-card-total">${fmt(o.total)}</div>
+        <div class="history-card-items">${itemsStr}</div>
+        <div class="history-card-actions">
+          <button class="history-btn" onclick="reloadOrder(${JSON.stringify(items).replace(/"/g,'&quot;')})">🔄 Recargar carrito</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e){
+    container.innerHTML='<div class="history-empty">❌ Error al cargar historial</div>';
+  }
+}
+
+function closeOrderHistory(){
+  document.getElementById('historyOverlay').classList.remove('open');
+  document.getElementById('historyDrawer').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+function reloadOrder(items){
+  if(!confirm('¿Reemplazar el carrito actual con este pedido?')) return;
+  cart={};
+  items.forEach(i=>{
+    const p=productMap[i.sku];
+    if(p && stockType(p.stock)!=='NOSTOCK') cart[i.sku]={product:p, qty:i.qty};
+  });
+  saveCart();
+  renderCart();
+  updateCount();
+  closeOrderHistory();
+  setTimeout(()=>openCart(), 200);
+  showToast('✅ Pedido cargado en el carrito');
 }
 
 function openChangePassword(){
