@@ -230,6 +230,12 @@
   .search-fab:hover{background:rgba(28,31,42,.95);color:#fff;}
   .search-fab.visible{opacity:1;pointer-events:auto;transform:translateY(0);}
   .search-fab:active{transform:scale(.88);}
+  .float-search{position:fixed;bottom:76px;left:12px;right:12px;z-index:152;transform:translateY(12px);opacity:0;pointer-events:none;transition:transform .25s cubic-bezier(.34,1.56,.64,1),opacity .2s;max-width:600px;margin:0 auto;}
+  .float-search.visible{transform:translateY(0);opacity:1;pointer-events:auto;}
+  .float-search-inner{background:var(--card);border:1.5px solid var(--accent);border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);}
+  .float-search-input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:16px;font-family:inherit;}
+  .float-search-input::placeholder{color:var(--muted);}
+  .float-search-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:2px 4px;line-height:1;touch-action:manipulation;}
   /* Empujar el grid para que no quede detrás del float */
   .grid{padding-bottom:90px;}
   /* Modal regreso */
@@ -525,7 +531,14 @@ let userApproved=false;
     <div style="position:absolute;left:50%;transform:translateX(-50%);"><button class="float-summary-btn" onclick="openCart()">🛒</button></div>
   </div>
 </div>
-<button class="search-fab" id="searchFab" onclick="focusSearch()" aria-label="Buscar">🔍</button>
+<div class="float-search" id="floatSearch">
+  <div class="float-search-inner">
+    <span style="font-size:16px;color:var(--muted)">🔍</span>
+    <input class="float-search-input" id="floatSearchInput" type="search" placeholder="Buscar producto, SKU, marca..." autocomplete="off">
+    <button class="float-search-close" onclick="closeFloatSearch()" aria-label="Cerrar">✕</button>
+  </div>
+</div>
+<button class="search-fab" id="searchFab" onclick="toggleFloatSearch()" aria-label="Buscar">🔍</button>
 <button class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba">↑</button>
 <div class="toast" id="toast"></div>
 
@@ -2176,13 +2189,38 @@ window.addEventListener('scroll', ()=>{
   document.getElementById('searchFab').classList.toggle('visible', show);
 }, {passive:true});
 
-function focusSearch(){
-  window.scrollTo({top:0,behavior:'smooth'});
-  setTimeout(()=>{
-    const inp=document.getElementById('searchInput');
-    if(inp){ inp.focus(); inp.select(); }
-  }, 350);
+function toggleFloatSearch(){
+  const fs=document.getElementById('floatSearch');
+  const inp=document.getElementById('floatSearchInput');
+  const isOpen=fs.classList.contains('visible');
+  if(isOpen){
+    closeFloatSearch();
+  } else {
+    fs.classList.add('visible');
+    setTimeout(()=>inp.focus(),100);
+  }
 }
+
+function closeFloatSearch(){
+  const fs=document.getElementById('floatSearch');
+  const inp=document.getElementById('floatSearchInput');
+  fs.classList.remove('visible');
+  // Limpiar búsqueda flotante y sincronizar con buscador principal si está vacío
+  if(inp.value){
+    inp.value='';
+    document.getElementById('searchInput').value='';
+    doSearch('');
+  }
+}
+
+// Sincronizar buscador flotante con el principal
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('floatSearchInput').addEventListener('input', e=>{
+    const v=e.target.value;
+    document.getElementById('searchInput').value=v;
+    doSearch(v);
+  });
+});
 
 
 // ══════════════════════════════════════════════════════════════════════════════
