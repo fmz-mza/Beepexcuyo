@@ -123,6 +123,10 @@
   /* Cart */
   .cart-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;}
   .history-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;}
+  .site-banner{display:none;background:var(--accent);color:#fff;text-align:center;font-size:13px;font-weight:700;padding:10px 16px;position:relative;}
+  .site-banner.visible{display:block;}
+  .site-banner-close{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:#fff;font-size:16px;cursor:pointer;opacity:.7;}
+  .site-banner-close:hover{opacity:1;}
   .pwd-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:center;justify-content:center;padding:20px;}
   .pwd-overlay.open{display:flex;}
   .pwd-modal{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px 24px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px;}
@@ -402,12 +406,16 @@ let isAdmin=false;
 </head>
 <body>
 <header class="header">
+  <div id="siteBanner" class="site-banner">
+    <span id="siteBannerText"></span>
+    <button class="site-banner-close" onclick="document.getElementById('siteBanner').classList.remove('visible')">✕</button>
+  </div>
   <div class="header-inner">
     <div class="logo-icon"><img src="https://favicon.im/beepex.com.ar?larger=true" width="38" height="38" alt="Beepex" style="display:block;width:38px;height:38px;object-fit:contain;" onerror="this.parentElement.textContent='🐾'"></div>
     <div class="logo-text">
       <h1>Beepex Cuyo</h1>
       <p>Catálogo</p>
-      <p>Marzo 2026</p>
+      <p id="catalogMonth">Marzo 2026</p>
       <div style="position:relative;">
         <button class="user-badge" id="userBadge" onclick="toggleUserMenu()" style="display:none"></button>
         <div class="user-menu" id="userMenu"></div>
@@ -1768,7 +1776,7 @@ async function exportPDF(){
   doc.setFont('helvetica','normal');
   doc.setFontSize(8);
   doc.setTextColor(...MUTED);
-  doc.text('Beepex Cuyo · Catálogo Marzo 2026', margin+38, 19);
+  doc.text(`Beepex Cuyo · Catálogo ${document.getElementById('catalogMonth').textContent}`, margin+38, 19);
 
   // Fecha arriba derecha
   doc.setTextColor(...MUTED);
@@ -2769,7 +2777,29 @@ function priceNoteDisplay(){
   return `<div class="price-note">${includeIVA?'Precio c/IVA incluido':'Precio s/IVA'}</div>`;
 }
 
+async function loadSettings(){
+  try{
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/settings?select=key,value`,{
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${SUPABASE_ANON}`}
+    });
+    const rows=await res.json();
+    if(!Array.isArray(rows)) return;
+    const s={};
+    rows.forEach(r=>{ s[r.key]=r.value; });
+    // Mes del catálogo
+    if(s.catalog_month){
+      document.getElementById('catalogMonth').textContent=s.catalog_month;
+    }
+    // Banner temporal
+    if(s.banner_active==='true' && s.banner_text){
+      document.getElementById('siteBannerText').textContent=s.banner_text;
+      document.getElementById('siteBanner').classList.add('visible');
+    }
+  } catch(e){ console.warn('loadSettings error:', e.message); }
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
+loadSettings();
 loadCart();
 initAuth();
 // Calcular productos nuevos desde la última visita
