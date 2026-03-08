@@ -224,8 +224,12 @@
   .float-summary-info{display:flex;flex-direction:column;gap:1px;}
   .float-summary-items{font-size:11px;font-weight:600;color:rgba(255,255,255,.75);}
   .float-summary-total{font-size:18px;font-weight:800;color:#fff;line-height:1;}
-  .float-summary-btn{background:#fff;color:var(--accent);border:none;border-radius:10px;font-size:13px;font-weight:800;padding:9px 16px;cursor:pointer;white-space:nowrap;font-family:inherit;flex-shrink:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+  .float-summary-btn{background:#fff;color:var(--accent);border:none;border-radius:10px;font-size:13px;font-weight:800;padding:9px 16px;cursor:pointer;white-space:nowrap;font-family:inherit;flex-shrink:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;margin-right:52px;}
   .float-summary-btn:active{transform:scale(.96);}
+  .search-fab{position:fixed;bottom:24px;right:64px;width:40px;height:40px;background:rgba(28,31,42,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:50%;color:rgba(240,242,255,.7);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:151;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .25s,transform .25s,color .15s,background .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+  .search-fab:hover{background:rgba(28,31,42,.95);color:#fff;}
+  .search-fab.visible{opacity:1;pointer-events:auto;transform:translateY(0);}
+  .search-fab:active{transform:scale(.88);}
   /* Empujar el grid para que no quede detrás del float */
   .grid{padding-bottom:90px;}
   /* Modal regreso */
@@ -521,6 +525,7 @@ let userApproved=false;
     <button class="float-summary-btn" onclick="openCart()">Ver pedido →</button>
   </div>
 </div>
+<button class="search-fab" id="searchFab" onclick="focusSearch()" aria-label="Buscar">🔍</button>
 <button class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba">↑</button>
 <div class="toast" id="toast"></div>
 
@@ -2162,8 +2167,18 @@ if('serviceWorker' in navigator){
 }
 
 window.addEventListener('scroll', ()=>{
-  document.getElementById('backTop').classList.toggle('visible', window.scrollY > 400);
+  const show=window.scrollY > 400;
+  document.getElementById('backTop').classList.toggle('visible', show);
+  document.getElementById('searchFab').classList.toggle('visible', show);
 }, {passive:true});
+
+function focusSearch(){
+  window.scrollTo({top:0,behavior:'smooth'});
+  setTimeout(()=>{
+    const inp=document.getElementById('searchInput');
+    if(inp){ inp.focus(); inp.select(); }
+  }, 350);
+}
 
 
 // ══════════════════════════════════════════════════════════════════════════════
