@@ -1260,6 +1260,8 @@ function add(sku){
   // Micro-animación en la card
   const cardEl=document.getElementById(`card-${sku}`);
   if(cardEl){ cardEl.classList.add('pop'); setTimeout(()=>cardEl.classList.remove('pop'),300); }
+  // Tracking carrito
+  trackEvent('cart_events',{sku, action:'add'});
   // GA4: agregar al carrito
   if(typeof gtag!=='undefined') gtag('event','add_to_cart',{
     currency: 'ARS',
@@ -1270,7 +1272,8 @@ function add(sku){
 function chg(sku,d){
   const p=productMap[sku]; if(!p) return;
   const q=(cart[sku]?.qty||0)+d;
-  if(q<=0) delete cart[sku]; else cart[sku]={product:p,qty:q};
+  if(q<=0){ delete cart[sku]; trackEvent('cart_events',{sku, action:'remove'}); }
+  else cart[sku]={product:p,qty:q};
   syncCart(sku);
 }
 
@@ -1572,6 +1575,23 @@ function getOrderHistory(){
   } catch(e){ return []; }
 }
 
+
+async function trackEvent(table, data){
+  if(!currentUser) return;
+  try{
+    const token=sessionStorage.getItem('sb_access_token');
+    await fetch(`${SUPABASE_URL}/rest/v1/${table}`,{
+      method:'POST',
+      headers:{
+        'apikey':SUPABASE_ANON,
+        'Authorization':`Bearer ${token}`,
+        'Content-Type':'application/json',
+        'Prefer':'return=minimal'
+      },
+      body:JSON.stringify({user_id:currentUser.id, ...data})
+    });
+  } catch(e){}
+}
 async function saveOrderSupabase(via){
   if(!currentUser) return;
   try{
@@ -1928,6 +1948,8 @@ function closeLightbox(){
 function openDesc(sku){
   const p=productMap[sku]; if(!p) return;
   const meta=productMeta[sku];
+  // Tracking vista producto
+  trackEvent('product_views',{sku});
   // GA4: vista de producto
   if(typeof gtag!=='undefined') gtag('event','view_item',{
     item_id: sku,
