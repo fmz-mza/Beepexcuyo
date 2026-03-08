@@ -1631,7 +1631,7 @@ async function exportPDF(){
   doc.setTextColor(...WHITE);
   doc.setFont('helvetica','bold');
   doc.setFontSize(9);
-  doc.text('🐾 BEEPEX', margin+16, 15.5, {align:'center'});
+  doc.text('BEEPEX', margin+16, 15.5, {align:'center'});
 
   // Título
   doc.setTextColor(...WHITE);
@@ -1695,7 +1695,7 @@ async function exportPDF(){
     doc.setTextColor(...ACCENT);
     doc.setFont('helvetica','bold');
     doc.setFontSize(8);
-    doc.text(`📦 ${brand.toUpperCase()}`, margin+4, y+5.5);
+    doc.text(brand.toUpperCase(), margin+4, y+5.5);
     y += 11;
 
     // Cabecera de tabla
