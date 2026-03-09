@@ -1298,6 +1298,21 @@ function patchCard(cardEl, p){
     if(newNote && noteEl.outerHTML!==newNote.outerHTML) noteEl.replaceWith(newNote);
   }
 
+  // PVP — actualizar según estado auth
+  const pvpEl=cardEl.querySelector('.pvp');
+  const pvpHtml=pvpDisplay(p);
+  if(pvpHtml && !pvpEl){
+    // Insertar después de .price-note
+    const noteEl2=cardEl.querySelector('.price-note');
+    if(noteEl2){ const tmp3=document.createElement('div'); tmp3.innerHTML=pvpHtml; noteEl2.after(tmp3.firstElementChild); }
+  } else if(!pvpHtml && pvpEl){
+    pvpEl.remove();
+  } else if(pvpEl){
+    const tmp3=document.createElement('div'); tmp3.innerHTML=pvpHtml;
+    const newPvp=tmp3.firstElementChild;
+    if(newPvp && pvpEl.outerHTML!==newPvp.outerHTML) pvpEl.replaceWith(newPvp);
+  }
+
   // Botón: calcular nuevo estado
   const badge=cardEl.querySelector('.in-cart-badge');
   if(badge){
@@ -2781,6 +2796,11 @@ async function submitAuth(){
       showToast(userApproved?'✅ ¡Bienvenido! Acceso completo habilitado':'⏳ Cuenta pendiente de aprobación');
       if(userApproved && authPending) authPending();
       updatePresence();
+      // Mostrar bienvenida si no tiene nombre
+      if(userApproved){
+        const savedName=document.getElementById('clientName').value.trim()||localStorage.getItem('beepex_client_name')||'';
+        if(!savedName) setTimeout(openWelcome, 400);
+      }
     }
   } else {
     // Registro
@@ -2854,6 +2874,12 @@ async function loadSettings(){
 loadSettings();
 loadCart();
 initAuth();
+// Mostrar modal bienvenida si no tiene nombre guardado (primera visita o incógnito)
+setTimeout(()=>{
+  if(!currentUser) return; // Solo si está logueado
+  const savedName=document.getElementById('clientName').value.trim()||localStorage.getItem('beepex_client_name')||'';
+  if(!savedName) openWelcome();
+}, 800);
 // Calcular productos nuevos desde la última visita
 (function(){
   try{
