@@ -464,7 +464,9 @@ function switchTab(tab){
 
 // ── Load all ──
 async function loadAll(){
-  await Promise.all([loadUsers(), loadSettings(), loadStats()]);
+  await Promise.all([loadUsers(), loadSettings()]);
+  // loadProducts se llama desde loadSettings — esperar que termine antes de stats
+  await loadStats();
 }
 
 // ── USUARIOS ──
@@ -549,18 +551,18 @@ async function loadSettings(){
   document.getElementById('bannerToggleLabel').textContent=bannerOn?'Activo':'Inactivo';
   // Cargar productos
   try{ window._disabledSkus=new Set(JSON.parse(s.disabled_skus||'[]')); } catch(e){ window._disabledSkus=new Set(); }
-  loadProducts();
+  await loadProducts();
 }
 
 let allProducts=[];
 async function loadProducts(){
-  // Traer productos del catálogo desde el HTML del catálogo
   try{
     const res=await fetch('beepex-cuyo.html');
     const text=await res.text();
-    const match=text.match(/const products=(\[[\s\S]*?\]);/);
+    const match=text.match(/const products=(\[\s\S]*?\]);/);
     if(!match) return;
     allProducts=JSON.parse(match[1]);
+    window.allProducts=allProducts;
     renderProducts(allProducts);
   } catch(e){ document.getElementById('productsList').innerHTML='<div class="empty">Error al cargar productos</div>'; }
 }
@@ -704,7 +706,7 @@ function renderStats(){
   // Top vistos
   // Construir mapa sku→nombre desde allProducts si está disponible
   const skuNames={};
-  (window.allProducts||[]).forEach(p=>{ skuNames[p.sku]=p.name; });
+  (window.allProducts||allProducts||[]).forEach(p=>{ skuNames[p.sku]=p.name; });
   const viewCount={};
   filtViews.forEach(v=>{ const key=skuNames[v.sku]||(v.sku?`SKU ${v.sku}`:'Desconocido'); viewCount[key]=(viewCount[key]||0)+1; });
   renderRanking('topViewed', viewCount, 5, 'vistas');
@@ -751,9 +753,9 @@ function renderAbandoned(containerId, data){
   const el=document.getElementById(containerId);
   const entries=Object.entries(data).sort((a,b)=>b[1].length-a[1].length);
   if(!entries.length){ el.innerHTML=`<div class="empty">Sin productos en carrito pendientes</div>`; return; }
+  const skuNamesMap={}; (window.allProducts||allProducts||[]).forEach(p=>{ skuNamesMap[p.sku]=p.name; });
   el.innerHTML=`<div class="abandoned-list">${entries.map(([sku, users])=>{
-    const skuNames={}; (window.allProducts||[]).forEach(p=>{ skuNames[p.sku]=p.name; });
-    const productName=skuNames[sku]||`SKU ${sku}`;
+    const productName=skuNamesMap[sku]||`SKU ${sku}`;
     const timeAgo=(d)=>{
       const diff=Date.now()-new Date(d).getTime();
       const mins=Math.floor(diff/60000);
