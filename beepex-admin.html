@@ -73,7 +73,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 /* ── Stats cards ── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
 .stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;}
-.stat-value{font-size:24px;font-weight:800;font-family:'Syne',sans-serif;}
+.stat-value{font-size:20px;font-weight:800;font-family:'Syne',sans-serif;word-break:break-all;line-height:1.2;}
 .stat-label{font-size:11px;color:var(--muted);margin-top:4px;font-weight:600;}
 
 /* ── User list ── */
@@ -636,10 +636,26 @@ async function toggleBanner(){
 function periodFilter(created_at){
   const d=new Date(created_at);
   const now=new Date();
-  if(activePeriod==='today'){ return d.toDateString()===now.toDateString(); }
-  if(activePeriod==='week'){ const w=new Date(now); w.setDate(w.getDate()-7); return d>=w; }
-  if(activePeriod==='month'){ return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); }
-  if(activePeriod==='year'){ return d.getFullYear()===now.getFullYear(); }
+  // Comparar en zona local usando timestamps de inicio/fin del día
+  if(activePeriod==='today'){
+    const start=new Date(now.getFullYear(),now.getMonth(),now.getDate(),0,0,0);
+    const end=new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59);
+    return d>=start&&d<=end;
+  }
+  if(activePeriod==='week'){
+    const start=new Date(now); start.setDate(start.getDate()-7); start.setHours(0,0,0,0);
+    return d>=start;
+  }
+  if(activePeriod==='month'){
+    const start=new Date(now.getFullYear(),now.getMonth(),1,0,0,0);
+    const end=new Date(now.getFullYear(),now.getMonth()+1,0,23,59,59);
+    return d>=start&&d<=end;
+  }
+  if(activePeriod==='year'){
+    const start=new Date(now.getFullYear(),0,1,0,0,0);
+    const end=new Date(now.getFullYear(),11,31,23,59,59);
+    return d>=start&&d<=end;
+  }
   return true;
 }
 
@@ -683,8 +699,11 @@ function renderStats(){
   renderRanking('topOrdered', skuCount, 5, 'unidades');
 
   // Top vistos
+  // Construir mapa sku→nombre desde allProducts si está disponible
+  const skuNames={};
+  if(window.allProducts) window.allProducts.forEach(p=>{ skuNames[p.sku]=p.name; });
   const viewCount={};
-  filtViews.forEach(v=>{ viewCount[v.sku]=(viewCount[v.sku]||0)+1; });
+  filtViews.forEach(v=>{ const key=skuNames[v.sku]||`SKU ${v.sku}`; viewCount[key]=(viewCount[key]||0)+1; });
   renderRanking('topViewed', viewCount, 5, 'vistas');
 
   // Top usuarios
