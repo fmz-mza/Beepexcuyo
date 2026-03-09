@@ -1632,7 +1632,17 @@ function getOrderHistory(){
 
 
 async function trackEvent(table, data){
-  if(!currentUser) return;
+  // Obtener user_id desde sessionStorage si currentUser aún no está seteado
+  let userId=currentUser?.id;
+  if(!userId){
+    try{
+      const token=sessionStorage.getItem('sb_access_token');
+      if(!token) return;
+      const payload=JSON.parse(atob(token.split('.')[1]));
+      userId=payload.sub;
+    } catch(e){ return; }
+  }
+  if(!userId) return;
   try{
     const token=sessionStorage.getItem('sb_access_token');
     await fetch(`${SUPABASE_URL}/rest/v1/${table}`,{
@@ -1643,7 +1653,7 @@ async function trackEvent(table, data){
         'Content-Type':'application/json',
         'Prefer':'return=minimal'
       },
-      body:JSON.stringify({user_id:currentUser.id, ...data})
+      body:JSON.stringify({user_id:userId, ...data})
     });
   } catch(e){}
 }
