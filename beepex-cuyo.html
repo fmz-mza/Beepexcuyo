@@ -2481,6 +2481,7 @@ async function initAuth(){
           await refreshSession();
         }
         await loadProfile();
+        updatePresence();
       } else {
         // Token expirado — intentar refrescar con refresh_token
         const refreshed=await refreshSession();
@@ -2530,6 +2531,8 @@ async function loadProfile(){
     patchPrices();
     renderGrid();
   }
+  // Actualizar presencia al cargar perfil
+  if(userApproved) updatePresence();
 }
 
 function updateAuthUI(){
