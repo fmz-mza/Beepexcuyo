@@ -575,12 +575,14 @@ let margenActive=false;
     <div class="welcome-body">
 
       <!-- VISTA: No logueado (primera vez) -->
-      <div id="wvGuest" style="display:none">
+      <div id="wvGuest" style="display:none;text-align:center;">
         <div class="welcome-title">¡Bienvenido al catálogo!</div>
         <div class="welcome-sub">Iniciá sesión para ver precios y hacer pedidos.</div>
-        <button class="welcome-btn" onclick="closeWelcomeOpenAuth('login')">Iniciar sesión</button>
-        <button class="welcome-btn" style="background:var(--surface);border:1px solid var(--accent);color:var(--accent);" onclick="closeWelcomeOpenAuth('register')">Registrarse</button>
-        <button class="welcome-btn-sec" id="welcomeExplorarBtn" onclick="closeWelcomeExplore()">Explorar sin registrarse</button>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:4px;">
+          <button class="welcome-btn" style="flex:1;" onclick="closeWelcomeOpenAuth('login')">Iniciar sesión</button>
+          <button class="welcome-btn" style="flex:1;background:var(--surface);border:1px solid var(--accent);color:var(--accent);" onclick="closeWelcomeOpenAuth('register')">Registrarse</button>
+        </div>
+        <button class="welcome-btn-sec" id="welcomeExplorarBtn" onclick="closeWelcomeExplore()" style="width:100%;margin-top:2px;">Explorar sin registrarse</button>
       </div>
 
       <!-- VISTA: Logueado, carrito con items -->
