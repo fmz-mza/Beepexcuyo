@@ -314,6 +314,10 @@
   .welcome-btn{background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;padding:13px;cursor:pointer;font-family:inherit;transition:background .2s;touch-action:manipulation;}
   .welcome-btn:hover{background:#3a6cf0;}
   .welcome-btn:active{transform:scale(.97);}
+  .welcome-btn-sec{background:transparent;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:13px;font-weight:600;padding:10px;cursor:pointer;font-family:inherit;transition:border .2s,color .2s;touch-action:manipulation;}
+  .welcome-btn-sec:hover{border-color:var(--accent);color:var(--text);}
+  .login-chip{display:none;font-size:11px;font-weight:700;color:var(--accent);white-space:nowrap;cursor:pointer;padding:4px 10px;border-radius:8px;background:var(--card);border:1px solid var(--accent);margin-top:3px;width:fit-content;}
+  .login-chip:hover{background:var(--accent);color:#fff;}
   /* Lightbox */
   .lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:500;align-items:center;justify-content:center;cursor:zoom-out;}
   .lightbox.open{display:flex;}
@@ -420,6 +424,7 @@ let margenActive=false;
       <p id="catalogMonth">Marzo 2026</p>
       <div style="position:relative;">
         <button class="user-badge" id="userBadge" onclick="toggleUserMenu()" style="display:none"></button>
+        <button class="login-chip" id="loginChip" onclick="openWelcomeLogin()">Iniciar sesión →</button>
         <div class="user-menu" id="userMenu"></div>
       </div>
       <div class="user-menu-overlay" id="userMenuOverlay" onclick="closeUserMenu()"></div>
@@ -582,11 +587,22 @@ let margenActive=false;
   <div class="welcome-modal">
     <img class="welcome-hero" src="images/Foto-Beepex.jpeg" alt="Beepex" onerror="this.style.display='none'">
     <div class="welcome-body">
-      <div class="welcome-title">¡Bienvenido al catálogo!</div>
-      <div class="welcome-sub">Ingresá tu nombre para identificar tu pedido</div>
-      <input class="welcome-input" id="welcomeName" placeholder="Tu nombre o negocio" maxlength="50"
-        onkeydown="if(event.key==='Enter') confirmWelcome()">
-      <button class="welcome-btn" onclick="confirmWelcome()">Ingresar al pedido →</button>
+      <!-- Vista no logueado -->
+      <div id="welcomeGuest">
+        <div class="welcome-title">¡Bienvenido al catálogo!</div>
+        <div class="welcome-sub">Iniciá sesión para ver precios y hacer pedidos, o explorá el catálogo sin registrarte.</div>
+        <button class="welcome-btn" onclick="closeWelcomeOpenAuth('login')">Iniciar sesión</button>
+        <button class="welcome-btn" style="background:var(--surface);border:1px solid var(--accent);color:var(--accent);margin-top:-4px;" onclick="closeWelcomeOpenAuth('register')">Registrarse</button>
+        <button class="welcome-btn-sec" id="welcomeExplorarBtn" onclick="closeWelcomeExplore()">Explorar sin registrarse</button>
+      </div>
+      <!-- Vista logueado: pedir nombre -->
+      <div id="welcomeLogged" style="display:none">
+        <div class="welcome-title">¿Cómo te llamás?</div>
+        <div class="welcome-sub">Ingresá tu nombre para identificar tu pedido</div>
+        <input class="welcome-input" id="welcomeName" placeholder="Tu nombre o negocio" maxlength="50"
+          onkeydown="if(event.key==='Enter') confirmWelcome()">
+        <button class="welcome-btn" onclick="confirmWelcome()">Continuar →</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1388,15 +1404,52 @@ function updateCount(){
     if(count>0) fs.classList.add('visible'); else fs.classList.remove('visible');
   }
 }
-function openWelcome(){
-  // Bloquear scroll body
+function openWelcome(forceLogin=false){
+  // Mostrar vista correcta según estado
+  const guestDiv=document.getElementById('welcomeGuest');
+  const loggedDiv=document.getElementById('welcomeLogged');
+  const explorarBtn=document.getElementById('welcomeExplorarBtn');
+  if(currentUser){
+    // Logueado: pedir nombre
+    guestDiv.style.display='none';
+    loggedDiv.style.display='';
+    setTimeout(()=>document.getElementById('welcomeName').focus(), 100);
+  } else {
+    // No logueado
+    guestDiv.style.display='';
+    loggedDiv.style.display='none';
+    // Si viene del chip Login, ocultar "Explorar"
+    if(explorarBtn) explorarBtn.style.display=forceLogin?'none':'';
+  }
   const sy=window.scrollY;
   document.body.style.position='fixed';
   document.body.style.top=`-${sy}px`;
   document.body.style.width='100%';
   document.body.dataset.welcomeScrollY=sy;
   document.getElementById('welcomeOverlay').classList.add('open');
-  setTimeout(()=>document.getElementById('welcomeName').focus(), 100);
+}
+function openWelcomeLogin(){
+  openWelcome(true); // desde chip Login: sin opción explorar
+}
+function closeWelcomeOpenAuth(tab){
+  document.getElementById('welcomeOverlay').classList.remove('open');
+  restoreScrollFromWelcome();
+  openAuth(null, tab);
+}
+function closeWelcomeExplore(){
+  document.getElementById('welcomeOverlay').classList.remove('open');
+  restoreScrollFromWelcome();
+  // Mostrar chip Login
+  document.getElementById('loginChip').style.display='flex';
+}
+function restoreScrollFromWelcome(){
+  if(document.body.style.position==='fixed'){
+    const sy=parseInt(document.body.dataset.welcomeScrollY||'0');
+    document.body.style.position='';
+    document.body.style.top='';
+    document.body.style.width='';
+    window.scrollTo(0,sy);
+  }
 }
 function confirmWelcome(){
   const inp=document.getElementById('welcomeName');
@@ -2584,6 +2637,7 @@ function updateAuthUI(){
     }
   } else {
     badge.style.display='none';
+    // No logueado: no mostrar chip aquí, se maneja desde closeWelcomeExplore
   }
   patchPrices();
 }
@@ -2731,8 +2785,9 @@ async function submitChangePassword(){
   }
 }
 
-function openAuth(pending){
+function openAuth(pending, tab){
   if(pending) authPending=pending;
+  if(tab) switchTab(tab);
   document.getElementById('authOverlay').classList.add('open');
   document.body.style.overflow='hidden';
   setTimeout(()=>document.getElementById('authEmail').focus(),200);
@@ -2793,13 +2848,15 @@ async function submitAuth(){
       await loadProfile();
       updateAuthUI();
       closeAuth();
+      // Ocultar chip login si estaba visible
+      const lc=document.getElementById('loginChip'); if(lc) lc.style.display='none';
       showToast(userApproved?'✅ ¡Bienvenido! Acceso completo habilitado':'⏳ Cuenta pendiente de aprobación');
       if(userApproved && authPending) authPending();
       updatePresence();
-      // Mostrar bienvenida si no tiene nombre
+      // Pedir nombre si no tiene
       if(userApproved){
         const savedName=document.getElementById('clientName').value.trim()||localStorage.getItem('beepex_client_name')||'';
-        if(!savedName) setTimeout(openWelcome, 400);
+        if(!savedName) setTimeout(()=>openWelcome(), 400);
       }
     }
   } else {
@@ -2874,12 +2931,15 @@ async function loadSettings(){
 loadSettings();
 loadCart();
 initAuth();
-// Mostrar modal bienvenida si no tiene nombre guardado (primera visita o incógnito)
+// Mostrar welcome al cargar: siempre para no logueados
 setTimeout(()=>{
-  if(!currentUser) return; // Solo si está logueado
-  const savedName=document.getElementById('clientName').value.trim()||localStorage.getItem('beepex_client_name')||'';
-  if(!savedName) openWelcome();
-}, 800);
+  if(!currentUser) openWelcome();
+  else {
+    // Logueado sin nombre: pedir nombre
+    const savedName=document.getElementById('clientName').value.trim()||localStorage.getItem('beepex_client_name')||'';
+    if(!savedName) openWelcome();
+  }
+}, 600);
 // Calcular productos nuevos desde la última visita
 (function(){
   try{
