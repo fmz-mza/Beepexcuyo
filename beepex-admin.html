@@ -421,12 +421,24 @@ async function restoreSession(){
   if(!token) return;
   try{
     const payload=JSON.parse(atob(token.split('.')[1]));
-    if(payload.exp*1000 < Date.now()){
-      sessionStorage.removeItem('admin_token');
-      return;
+    const expiresIn=(payload.exp*1000)-Date.now();
+    if(expiresIn > 0){
+      currentUser={id:payload.sub, email:payload.email};
+      if(expiresIn < 10*60*1000) await refreshSession();
+      await checkAdminAccess();
+    } else {
+      // Token expirado — intentar refresh
+      const ok=await refreshSession();
+      if(ok){
+        const newToken=sessionStorage.getItem('admin_token');
+        const newPayload=JSON.parse(atob(newToken.split('.')[1]));
+        currentUser={id:newPayload.sub, email:newPayload.email};
+        await checkAdminAccess();
+      } else {
+        sessionStorage.removeItem('admin_token');
+        sessionStorage.removeItem('admin_refresh');
+      }
     }
-    currentUser={id:payload.sub, email:payload.email};
-    await checkAdminAccess();
   } catch(e){ sessionStorage.removeItem('admin_token'); }
 }
 
@@ -851,6 +863,51 @@ function renderAllOrders(orders){
 const mq=window.matchMedia('(max-width:600px)');
 function handleMQ(e){ document.querySelectorAll('.two-col').forEach(el=>{ el.style.gridTemplateColumns=e.matches?'1fr':'1fr 1fr'; }); }
 mq.addListener(handleMQ); handleMQ(mq);
+
+// ── Refresh session ──
+async function refreshSession(){
+  const refreshToken=sessionStorage.getItem('admin_refresh');
+  if(!refreshToken) return false;
+  try{
+    const res=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},
+      body:JSON.stringify({refresh_token:refreshToken})
+    });
+    if(!res.ok) throw new Error('refresh failed');
+    const data=await res.json();
+    sessionStorage.setItem('admin_token', data.access_token);
+    sessionStorage.setItem('admin_refresh', data.refresh_token);
+    if(data.user) currentUser=data.user;
+    return true;
+  } catch(e){
+    console.warn('Admin session refresh failed:', e.message);
+    return false;
+  }
+}
+
+async function checkAndRefreshToken(){
+  const token=sessionStorage.getItem('admin_token');
+  if(!token) return;
+  try{
+    const payload=JSON.parse(atob(token.split('.')[1]));
+    const expiresIn=(payload.exp*1000)-Date.now();
+    if(expiresIn < 10*60*1000){
+      const ok=await refreshSession();
+      if(!ok){
+        sessionStorage.removeItem('admin_token');
+        sessionStorage.removeItem('admin_refresh');
+        currentUser=null; isAdmin=false;
+        document.getElementById('app').classList.remove('visible');
+        document.getElementById('authGate').style.display='flex';
+        showToast('⏱ Sesión expirada, ingresá de nuevo');
+      }
+    }
+  } catch(e){}
+}
+
+// Chequear cada 5 minutos
+setInterval(checkAndRefreshToken, 5*60*1000);
 
 // ── Init ──
 window.addEventListener('scroll',()=>{
