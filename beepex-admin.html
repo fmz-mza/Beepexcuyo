@@ -273,6 +273,17 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
           </div>
         </div>
       </div>
+
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">🔌 Productos activos/inactivos</span>
+          <span id="disabledCount" style="font-size:12px;color:var(--red);font-weight:700;"></span>
+        </div>
+        <div class="section-body">
+          <input class="search-products" id="searchProducts" placeholder="🔍 Buscar por nombre o SKU..." oninput="filterProducts()">
+          <div id="productsList"><div class="loading">Cargando...</div></div>
+        </div>
+      </div>
     </div>
 
     <!-- TAB ESTADÍSTICAS -->
@@ -532,6 +543,66 @@ async function loadSettings(){
   const toggle=document.getElementById('bannerToggle');
   if(bannerOn) toggle.classList.add('on'); else toggle.classList.remove('on');
   document.getElementById('bannerToggleLabel').textContent=bannerOn?'Activo':'Inactivo';
+  // Cargar productos
+  try{ window._disabledSkus=new Set(JSON.parse(s.disabled_skus||'[]')); } catch(e){ window._disabledSkus=new Set(); }
+  loadProducts();
+}
+
+let allProducts=[];
+async function loadProducts(){
+  // Traer productos del catálogo desde el HTML del catálogo
+  try{
+    const res=await fetch('beepex-cuyo.html');
+    const text=await res.text();
+    const match=text.match(/const products=(\[[\s\S]*?\]);/);
+    if(!match) return;
+    allProducts=JSON.parse(match[1]);
+    renderProducts(allProducts);
+  } catch(e){ document.getElementById('productsList').innerHTML='<div class="empty">Error al cargar productos</div>'; }
+}
+
+function filterProducts(){
+  const q=document.getElementById('searchProducts').value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const filtered=allProducts.filter(p=>{
+    const name=(p.name||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    return name.includes(q)||p.sku.includes(q)||(p.brand||'').toLowerCase().includes(q);
+  });
+  renderProducts(filtered);
+}
+
+function renderProducts(list){
+  const disabled=window._disabledSkus||new Set();
+  document.getElementById('disabledCount').textContent=disabled.size>0?`${disabled.size} desactivado${disabled.size!==1?'s':''}`:'' ;
+  if(!list.length){ document.getElementById('productsList').innerHTML='<div class="empty">Sin resultados</div>'; return; }
+  document.getElementById('productsList').innerHTML=`
+    <table class="products-table">
+      <thead><tr><th>SKU</th><th>Nombre</th><th>Marca</th><th>Estado</th></tr></thead>
+      <tbody>${list.map(p=>{
+        const isDisabled=disabled.has(p.sku);
+        return `<tr style="${isDisabled?'opacity:.5':''}">
+          <td style="color:var(--muted)">${p.sku}</td>
+          <td>${p.name}</td>
+          <td style="color:var(--muted)">${p.brand||'-'}</td>
+          <td><button class="product-toggle ${isDisabled?'inactive':'active'}" onclick="toggleProduct('${p.sku}')">${isDisabled?'⚫ Inactivo':'🟢 Activo'}</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+}
+
+async function toggleProduct(sku){
+  const disabled=window._disabledSkus||new Set();
+  if(disabled.has(sku)) disabled.delete(sku); else disabled.add(sku);
+  window._disabledSkus=disabled;
+  const arr=Array.from(disabled);
+  const res=await api('settings?key=eq.disabled_skus',{
+    method:'PATCH',
+    body:JSON.stringify({value:JSON.stringify(arr)}),
+    headers:{'Prefer':'return=minimal'}
+  });
+  if(res.ok||res.status===204){
+    showToast(disabled.has(sku)?'⚫ Producto desactivado':'🟢 Producto activado');
+    filterProducts();
+  } else { showToast('❌ Error al guardar'); }
 }
 
 async function saveSetting(key, inputId){

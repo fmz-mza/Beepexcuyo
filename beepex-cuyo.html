@@ -389,6 +389,7 @@ const _supabase=window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
 let currentUser=null;
 let userApproved=false;
 let isAdmin=false;
+let disabledSkus=new Set();
 </script>
 <!-- jsPDF para exportar pedido -->
 <!-- jsPDF carga lazy al primer uso -->
@@ -1105,7 +1106,9 @@ function renderGrid(){
     const searchStr=normalize(`${p.name} ${p.sku} ${p.brand||''} ${meta?meta.tags:''}`);
     const okQ=!q||matchQuery(searchStr, q);
     const okStock=activeStock==='ALL'||stockType(p.stock)===activeStock;
-    return okBrand&&okQ&&okStock;
+    // Ocultar productos desactivados para usuarios normales
+    const okDisabled=!disabledSkus.has(p.sku)||isAdmin;
+    return okBrand&&okQ&&okStock&&okDisabled;
   });
 
   // Sin stock siempre al final
@@ -2809,6 +2812,9 @@ async function loadSettings(){
       document.getElementById('siteBannerText').textContent=s.banner_text;
       document.getElementById('siteBanner').classList.add('visible');
     }
+    // Productos desactivados
+    try{ disabledSkus=new Set(JSON.parse(s.disabled_skus||'[]')); } catch(e){ disabledSkus=new Set(); }
+    if(disabledSkus.size>0) renderGrid();
   } catch(e){ console.warn('loadSettings error:', e.message); }
 }
 
