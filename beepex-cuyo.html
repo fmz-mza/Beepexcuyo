@@ -2443,6 +2443,29 @@ async function checkAndRefreshToken(){
 // Chequear cada 5 minutos
 setInterval(checkAndRefreshToken, 5*60*1000);
 
+// ── Presencia en tiempo real ──
+async function updatePresence(){
+  if(!currentUser) return;
+  const token=sessionStorage.getItem('sb_access_token');
+  if(!token) return;
+  try{
+    await fetch(`${SUPABASE_URL}/rest/v1/presence`,{
+      method:'POST',
+      headers:{
+        'apikey':SUPABASE_ANON,
+        'Authorization':`Bearer ${token}`,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=merge-duplicates'
+      },
+      body:JSON.stringify({user_id:currentUser.id, last_seen:new Date().toISOString()})
+    });
+  } catch(e){}
+}
+// Heartbeat cada 2 minutos
+setInterval(updatePresence, 2*60*1000);
+// También al cargar y al volver a la pestaña
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) updatePresence(); });
+
 async function initAuth(){
   // onAuthStateChange eliminado — usamos fetch directo + sessionStorage
   // Restaurar sesión desde sessionStorage si existe
@@ -2751,6 +2774,7 @@ async function submitAuth(){
       closeAuth();
       showToast(userApproved?'✅ ¡Bienvenido! Acceso completo habilitado':'⏳ Cuenta pendiente de aprobación');
       if(userApproved && authPending) authPending();
+      updatePresence();
     }
   } else {
     // Registro
