@@ -288,6 +288,13 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
               <span id="bannerToggleLabel" style="font-size:12px;color:var(--muted);">Inactivo</span>
             </div>
           </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Margen de ganancia</div><div class="setting-sub">Mostrar u ocultar el margen en el modal +info</div></div>
+            <div class="toggle-wrap">
+              <button class="toggle" id="margenToggle" onclick="toggleMargen()"></button>
+              <span id="margenToggleLabel" style="font-size:12px;color:var(--muted);">Inactivo</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -618,6 +625,10 @@ async function loadSettings(){
   const toggle=document.getElementById('bannerToggle');
   if(bannerOn) toggle.classList.add('on'); else toggle.classList.remove('on');
   document.getElementById('bannerToggleLabel').textContent=bannerOn?'Activo':'Inactivo';
+  const margenOn=s.margen_active==='true';
+  const margenToggle=document.getElementById('margenToggle');
+  if(margenOn) margenToggle.classList.add('on'); else margenToggle.classList.remove('on');
+  document.getElementById('margenToggleLabel').textContent=margenOn?'Activo':'Inactivo';
   // Cargar productos
   try{ window._disabledSkus=new Set(JSON.parse(s.disabled_skus||'[]')); } catch(e){ window._disabledSkus=new Set(); }
   await loadProducts();
@@ -688,6 +699,22 @@ async function saveSetting(key, inputId){
   });
   if(res.ok||res.status===204) showToast('✅ Guardado');
   else showToast('❌ Error al guardar');
+}
+
+async function toggleMargen(){
+  const toggle=document.getElementById('margenToggle');
+  const isOn=toggle.classList.contains('on');
+  const newVal=isOn?'false':'true';
+  const res=await api('settings?key=eq.margen_active',{
+    method:'PATCH',
+    body:JSON.stringify({value:newVal}),
+    headers:{'Prefer':'return=minimal'}
+  });
+  if(res.ok||res.status===204){
+    if(newVal==='true'){ toggle.classList.add('on'); document.getElementById('margenToggleLabel').textContent='Activo'; }
+    else { toggle.classList.remove('on'); document.getElementById('margenToggleLabel').textContent='Inactivo'; }
+    showToast(newVal==='true'?'📈 Margen visible':'📉 Margen oculto');
+  } else { showToast('❌ Error al guardar'); }
 }
 
 async function toggleBanner(){

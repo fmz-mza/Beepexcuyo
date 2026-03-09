@@ -390,6 +390,7 @@ let currentUser=null;
 let userApproved=false;
 let isAdmin=false;
 let disabledSkus=new Set();
+let margenActive=false;
 </script>
 <!-- jsPDF para exportar pedido -->
 <!-- jsPDF carga lazy al primer uso -->
@@ -2054,9 +2055,11 @@ function openDesc(sku){
       const ganancia=p.pvp-p.price;
       const mg=Math.round((ganancia/p.pvp)*100);
       if(mg>0){
-        margenEl.textContent=`▲ ${mg}% margen`;
-        margenEl.className='desc-modal-margen'+(mg>=40?' high':'');
-        margenEl.style.display='';
+        if(margenActive){
+          margenEl.textContent=`▲ ${mg}% margen`;
+          margenEl.className='desc-modal-margen'+(mg>=40?' high':'');
+          margenEl.style.display='';
+        } else { margenEl.style.display='none'; }
       } else { margenEl.style.display='none'; }
     } else { pvpTextEl.textContent=''; margenEl.style.display='none'; }
     if(descActionsEl) descActionsEl.style.display='';
@@ -2842,6 +2845,8 @@ async function loadSettings(){
     // Productos desactivados
     try{ disabledSkus=new Set(JSON.parse(s.disabled_skus||'[]')); } catch(e){ disabledSkus=new Set(); }
     if(disabledSkus.size>0) renderGrid();
+    // Margen de ganancia
+    margenActive=s.margen_active==='true';
   } catch(e){ console.warn('loadSettings error:', e.message); }
 }
 
