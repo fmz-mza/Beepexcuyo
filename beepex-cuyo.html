@@ -1315,9 +1315,7 @@ function add(sku){
   // Micro-animación en la card
   const cardEl=document.getElementById(`card-${sku}`);
   if(cardEl){ cardEl.classList.add('pop'); setTimeout(()=>cardEl.classList.remove('pop'),300); }
-  // Tracking carrito
-  console.log('[TRACK ADD] sku:', sku, 'currentUser:', currentUser?.id, 'token:', !!sessionStorage.getItem('sb_access_token'));
-  trackEvent('cart_events',{sku, action:'add'}).then(()=>console.log('[TRACK ADD] done')).catch(e=>console.error('[TRACK ADD] error:', e));
+  // Tracking carrito — manejado en chg()
   // GA4: agregar al carrito
   if(typeof gtag!=='undefined') gtag('event','add_to_cart',{
     currency: 'ARS',
@@ -1327,9 +1325,14 @@ function add(sku){
 }
 function chg(sku,d){
   const p=productMap[sku]; if(!p) return;
-  const q=(cart[sku]?.qty||0)+d;
+  if(!userApproved){ openAuth(()=>chg(sku,d)); return; }
+  const prevQty=(cart[sku]?.qty||0);
+  const q=prevQty+d;
   if(q<=0){ delete cart[sku]; trackEvent('cart_events',{sku, action:'remove'}); }
-  else cart[sku]={product:p,qty:q};
+  else{
+    cart[sku]={product:p,qty:q};
+    if(prevQty===0) trackEvent('cart_events',{sku, action:'add'}); // primer add
+  }
   syncCart(sku);
 }
 
