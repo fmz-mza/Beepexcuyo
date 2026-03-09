@@ -559,7 +559,7 @@ async function loadProducts(){
   try{
     const res=await fetch('beepex-cuyo.html');
     const text=await res.text();
-    const match=text.match(/const products=(\[\s\S]*?\]);/);
+    const match=text.match(/const products=(\[[\s\S]*?\]);/);
     if(!match) return;
     allProducts=JSON.parse(match[1]);
     window.allProducts=allProducts;
