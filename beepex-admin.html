@@ -519,7 +519,7 @@ async function loadUsers(){
     <div class="stat-card"><div class="stat-value">${rows.length}</div><div class="stat-label">Total usuarios</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--green)">${approved.length}</div><div class="stat-label">Aprobados</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--accent2)">${pending.length}</div><div class="stat-label">Pendientes</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--green);display:flex;align-items:center;gap:6px;"><span class="online-dot"></span>${onlineUsers.length}</div><div class="stat-label">En línea ahora</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--green);display:flex;align-items:center;gap:6px;"><span class="online-dot"></span><span id="onlineStatValue">${onlineUsers.length}</span></div><div class="stat-label">En línea ahora</div></div>
   `;
 
   renderUserList('pendingList', pending, lastOrder, true);
@@ -529,7 +529,7 @@ async function loadUsers(){
 async function loadOnlineUsers(){
   try{
     // En línea = last_seen en los últimos 5 minutos
-    const since=new Date(Date.now()-5*60*1000).toISOString();
+    const since=new Date(Date.now()-3*60*1000).toISOString();
     const rows=await api(`presence?last_seen=gte.${since}&select=user_id,last_seen`);
     if(!Array.isArray(rows)) return [];
     // Mapear con nombres
@@ -538,6 +538,8 @@ async function loadOnlineUsers(){
     const online=rows.map(r=>({...r, nombre:nameMap[r.user_id]||r.user_id.slice(0,8)}));
     // Renderizar sección
     document.getElementById('onlineCount').textContent=`${online.length} ahora`;
+    const statVal=document.getElementById('onlineStatValue');
+    if(statVal) statVal.textContent=online.length;
     const el=document.getElementById('onlineList');
     if(!online.length){
       el.innerHTML='<div class="empty">Sin usuarios en línea en este momento</div>';
