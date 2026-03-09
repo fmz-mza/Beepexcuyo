@@ -304,7 +304,7 @@
   .welcome-overlay.open{display:flex;}
   .welcome-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;overflow:hidden;max-width:360px;width:100%;animation:slideUp .25s ease;display:flex;flex-direction:column;gap:0;}
   .welcome-hero{width:100%;height:auto;max-height:200px;object-fit:contain;background:#d8cec0;display:block;}
-  .welcome-body{padding:24px;display:flex;flex-direction:column;gap:14px;}
+  .welcome-body{padding:24px;display:flex;flex-direction:column;gap:10px;}
   .welcome-icon{font-size:36px;text-align:center;line-height:1;}
   .welcome-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;text-align:center;line-height:1.2;}
   .welcome-sub{font-size:13px;color:var(--muted);text-align:center;line-height:1.5;}
@@ -569,40 +569,28 @@ let margenActive=false;
     </div>
   </div>
 </div>
-<div class="return-overlay" id="returnOverlay">
-  <div class="return-modal">
-    <img class="return-hero" src="images/Foto-Beepex.jpeg" alt="Beepex" onerror="this.style.display='none'">
-    <div class="return-body">
-      <div class="return-title" id="returnTitle">¡Hola de nuevo!</div>
-      <div class="return-phrase" id="returnPhrase"></div>
-      <div class="return-history" id="returnHistory" style="display:none"></div>
-      <div class="return-actions">
-        <button class="return-btn-main" id="returnBtnMain" onclick="closeReturn(true)">¡Armar pedido!</button>
-        <button class="return-btn-sec" id="returnBtnSec" onclick="closeReturn(false)">Solo explorar el catálogo</button>
-      </div>
-    </div>
-  </div>
-</div>
 <div class="welcome-overlay" id="welcomeOverlay">
   <div class="welcome-modal">
     <img class="welcome-hero" src="images/Foto-Beepex.jpeg" alt="Beepex" onerror="this.style.display='none'">
     <div class="welcome-body">
-      <!-- Vista no logueado -->
-      <div id="welcomeGuest">
+
+      <!-- VISTA: No logueado (primera vez) -->
+      <div id="wvGuest" style="display:none">
         <div class="welcome-title">¡Bienvenido al catálogo!</div>
-        <div class="welcome-sub">Iniciá sesión para ver precios y hacer pedidos, o explorá el catálogo sin registrarte.</div>
+        <div class="welcome-sub">Iniciá sesión para ver precios y hacer pedidos.</div>
         <button class="welcome-btn" onclick="closeWelcomeOpenAuth('login')">Iniciar sesión</button>
-        <button class="welcome-btn" style="background:var(--surface);border:1px solid var(--accent);color:var(--accent);margin-top:-4px;" onclick="closeWelcomeOpenAuth('register')">Registrarse</button>
+        <button class="welcome-btn" style="background:var(--surface);border:1px solid var(--accent);color:var(--accent);" onclick="closeWelcomeOpenAuth('register')">Registrarse</button>
         <button class="welcome-btn-sec" id="welcomeExplorarBtn" onclick="closeWelcomeExplore()">Explorar sin registrarse</button>
       </div>
-      <!-- Vista logueado: pedir nombre -->
-      <div id="welcomeLogged" style="display:none">
-        <div class="welcome-title">¿Cómo te llamás?</div>
-        <div class="welcome-sub">Ingresá tu nombre para identificar tu pedido</div>
-        <input class="welcome-input" id="welcomeName" placeholder="Tu nombre o negocio" maxlength="50"
-          onkeydown="if(event.key==='Enter') confirmWelcome()">
-        <button class="welcome-btn" onclick="confirmWelcome()">Continuar →</button>
+
+      <!-- VISTA: Logueado, carrito con items -->
+      <div id="wvReturn" style="display:none">
+        <div class="welcome-title" id="wvReturnTitle">¡Hola de nuevo! 👋</div>
+        <div class="welcome-sub" id="wvReturnPhrase"></div>
+        <button class="welcome-btn" id="wvReturnMain" onclick="closeWelcome(true)">Ver mi pedido →</button>
+        <button class="welcome-btn-sec" id="wvReturnSec" onclick="closeWelcome(false)" style="display:none">Seguir explorando</button>
       </div>
+
     </div>
   </div>
 </div>
@@ -938,11 +926,8 @@ function loadCart(){
       const cb=document.getElementById('clearCartBtn');
       if(cb) cb.classList.add('visible');
     }
-    // Modal de regreso si hay nombre guardado
-    if(data.clientName){
-      updateCartTitle();
-      setTimeout(()=>openReturn(data.clientName), 600);
-    }
+    // Modal de bienvenida al cargar
+    if(data.clientName) updateCartTitle();
   } catch(e){ localStorage.removeItem('beepex_cart'); }
 }
 
@@ -955,80 +940,8 @@ const FRASES = [
   "Nuevas preventas disponibles. ¡Reservá con tiempo y asegurá tu mercadería!",
   "El catálogo se actualiza cada mes. ¡Revisá las novedades de Marzo 2026!",
 ];
-function openReturn(name){
-  const first=name.split(' ')[0];
-  document.getElementById('returnTitle').textContent=`¡Hola de nuevo, ${first}! 👋`;
-
-  const itemCount=Object.values(cart).reduce((a,c)=>a+c.qty,0);
-  const btnMain=document.getElementById('returnBtnMain');
-  const btnSec=document.getElementById('returnBtnSec');
-
-  if(itemCount>0){
-    // Tiene pedido pendiente
-    const total=Object.values(cart).filter(c=>c.qty>0).reduce((a,c)=>{
-      return a+(includeIVA?Math.round(c.product.price*(1+c.product.iva/100))*c.qty:c.product.price*c.qty);
-    },0);
-    document.getElementById('returnPhrase').textContent=
-      `Tenés ${itemCount} producto${itemCount!==1?'s':''} en tu pedido por ${fmt(total)}. ¿Lo continuamos?`;
-    btnMain.textContent='Ver mi pedido →';
-    btnMain.onclick=()=>closeReturn(true);
-    btnSec.style.display='';
-    btnSec.textContent='Seguir explorando';
-  } else {
-    // Carrito vacío — frase motivadora
-    const frase=FRASES[Math.floor(Math.random()*FRASES.length)];
-    document.getElementById('returnPhrase').textContent=frase;
-    btnMain.textContent='¡Explorar catálogo!';
-    btnMain.onclick=()=>closeReturn(false);
-    btnSec.style.display='none';
-  }
-
-  // Bloquear scroll
-  const sy=window.scrollY;
-  document.body.style.position='fixed';
-  document.body.style.top=`-${sy}px`;
-  document.body.style.width='100%';
-  document.body.dataset.returnScrollY=sy;
-  // Historial de pedidos
-  const hist=getOrderHistory();
-  const histBox=document.getElementById('returnHistory');
-  if(hist.length>0 && histBox){
-    histBox.style.display='';
-    histBox.innerHTML=hist.map(h=>
-      `<div class="return-hist-item">
-        <span class="return-hist-date">📅 ${h.date} · ${h.qty} prod.</span>
-        <span class="return-hist-total">${fmt(h.total)}</span>
-      </div>`
-    ).join('');
-  } else if(histBox){
-    histBox.style.display='none';
-  }
-
-  document.getElementById('returnOverlay').classList.add('open');
-}
-function closeReturn(goToCart){
-  document.getElementById('returnOverlay').classList.remove('open');
-  if(goToCart){
-    // Pasar el scrollY directo a openCart sin restaurar — evita flash
-    document.body.dataset.scrollY = document.body.dataset.returnScrollY||'0';
-    // Abrir carrito sin volver a bloquear scroll (ya está bloqueado)
-    document.getElementById('cartOverlay').classList.add('open');
-    document.getElementById('cartDrawer').classList.add('open');
-    updateCartTitle();
-    renderCart();
-    requestAnimationFrame(()=>{
-      const ci=document.getElementById('cartItems');
-      if(ci && window._cartScrollPos) ci.scrollTop=window._cartScrollPos;
-    });
-  } else {
-    // Solo explorar: restaurar scroll normal
-    if(document.body.style.position==='fixed'){
-      const sy=parseInt(document.body.dataset.returnScrollY||'0');
-      document.body.style.position=''; document.body.style.top=''; document.body.style.width='';
-      window.scrollTo(0,sy);
-    }
-  }
-}
+function openReturn(name){ openWelcome(); } // redirige al modal unificado
+function closeReturn(goToCart){ closeWelcome(goToCart); } // alias
 
 function showToast(msg){
   const t=document.getElementById('toast');
@@ -1404,45 +1317,15 @@ function updateCount(){
     if(count>0) fs.classList.add('visible'); else fs.classList.remove('visible');
   }
 }
-function openWelcome(forceLogin=false){
-  // Mostrar vista correcta según estado
-  const guestDiv=document.getElementById('welcomeGuest');
-  const loggedDiv=document.getElementById('welcomeLogged');
-  const explorarBtn=document.getElementById('welcomeExplorarBtn');
-  if(currentUser){
-    // Logueado: pedir nombre
-    guestDiv.style.display='none';
-    loggedDiv.style.display='';
-    setTimeout(()=>document.getElementById('welcomeName').focus(), 100);
-  } else {
-    // No logueado
-    guestDiv.style.display='';
-    loggedDiv.style.display='none';
-    // Si viene del chip Login, ocultar "Explorar"
-    if(explorarBtn) explorarBtn.style.display=forceLogin?'none':'';
-  }
+// ── Modal bienvenida unificado ────────────────────────────────────────────────
+function _lockScroll(){
   const sy=window.scrollY;
   document.body.style.position='fixed';
   document.body.style.top=`-${sy}px`;
   document.body.style.width='100%';
   document.body.dataset.welcomeScrollY=sy;
-  document.getElementById('welcomeOverlay').classList.add('open');
 }
-function openWelcomeLogin(){
-  openWelcome(true); // desde chip Login: sin opción explorar
-}
-function closeWelcomeOpenAuth(tab){
-  document.getElementById('welcomeOverlay').classList.remove('open');
-  restoreScrollFromWelcome();
-  openAuth(null, tab);
-}
-function closeWelcomeExplore(){
-  document.getElementById('welcomeOverlay').classList.remove('open');
-  restoreScrollFromWelcome();
-  // Mostrar chip Login
-  document.getElementById('loginChip').style.display='flex';
-}
-function restoreScrollFromWelcome(){
+function _unlockScroll(){
   if(document.body.style.position==='fixed'){
     const sy=parseInt(document.body.dataset.welcomeScrollY||'0');
     document.body.style.position='';
@@ -1450,6 +1333,68 @@ function restoreScrollFromWelcome(){
     document.body.style.width='';
     window.scrollTo(0,sy);
   }
+}
+function _showView(id){
+  ['wvGuest','wvReturn'].forEach(v=>{
+    document.getElementById(v).style.display=v===id?'':'none';
+  });
+}
+
+function openWelcome(forceLogin=false){
+  if(!currentUser){
+    // No logueado — siempre mostrar
+    _lockScroll();
+    _showView('wvGuest');
+    const explorarBtn=document.getElementById('welcomeExplorarBtn');
+    if(explorarBtn) explorarBtn.style.display=forceLogin?'none':'';
+    document.getElementById('welcomeOverlay').classList.add('open');
+  } else {
+    // Logueado — solo mostrar si tiene carrito con items
+    const itemCount=Object.values(cart).reduce((a,c)=>a+c.qty,0);
+    if(itemCount===0) return; // carrito vacío → no molestar
+    const savedName=(document.getElementById('clientName').value||'').trim()||localStorage.getItem('beepex_client_name')||'';
+    const first=(savedName||currentUser.email.split('@')[0]).split(' ')[0];
+    document.getElementById('wvReturnTitle').textContent=`¡Hola de nuevo, ${first}! 👋`;
+    const total=Object.values(cart).filter(c=>c.qty>0).reduce((a,c)=>
+      a+(includeIVA?Math.round(c.product.price*(1+c.product.iva/100))*c.qty:c.product.price*c.qty),0);
+    document.getElementById('wvReturnPhrase').textContent=
+      `Tenés ${itemCount} producto${itemCount!==1?'s':''} en tu pedido por ${fmt(total)}. ¿Lo continuamos?`;
+    const mainBtn=document.getElementById('wvReturnMain');
+    const secBtn=document.getElementById('wvReturnSec');
+    mainBtn.textContent='Ver mi pedido →';
+    mainBtn.onclick=()=>closeWelcome(true);
+    secBtn.style.display='';
+    _lockScroll();
+    _showView('wvReturn');
+    document.getElementById('welcomeOverlay').classList.add('open');
+  }
+}
+
+function openWelcomeLogin(){ openWelcome(true); }
+
+function closeWelcome(goToCart=false){
+  document.getElementById('welcomeOverlay').classList.remove('open');
+  if(goToCart){
+    document.body.dataset.scrollY=document.body.dataset.welcomeScrollY||'0';
+    document.getElementById('cartOverlay').classList.add('open');
+    document.getElementById('cartDrawer').classList.add('open');
+    updateCartTitle();
+    renderCart();
+  } else {
+    _unlockScroll();
+  }
+}
+
+function closeWelcomeOpenAuth(tab){
+  document.getElementById('welcomeOverlay').classList.remove('open');
+  _unlockScroll();
+  openAuth(null, tab);
+}
+
+function closeWelcomeExplore(){
+  document.getElementById('welcomeOverlay').classList.remove('open');
+  _unlockScroll();
+  document.getElementById('loginChip').style.display='flex';
 }
 function confirmWelcome(){
   const inp=document.getElementById('welcomeName');
@@ -2371,8 +2316,8 @@ function closeDescBtn(){
 // ── Tecla Escape cierra modales ──────────────────────────────────────────────
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){
-    if(document.getElementById('returnOverlay').classList.contains('open')){
-      closeReturn(false);
+    if(document.getElementById('welcomeOverlay').classList.contains('open')){
+      closeWelcome(false);
     } else if(document.getElementById('welcomeOverlay').classList.contains('open')){
       document.getElementById('welcomeOverlay').classList.remove('open');
       if(document.body.style.position==='fixed'){
@@ -2553,6 +2498,7 @@ async function initAuth(){
         }
         await loadProfile();
         updatePresence();
+        setTimeout(()=>openWelcome(), 600);
       } else {
         // Token expirado — intentar refrescar con refresh_token
         const refreshed=await refreshSession();
@@ -2931,15 +2877,8 @@ async function loadSettings(){
 loadSettings();
 loadCart();
 initAuth();
-// Mostrar welcome al cargar: siempre para no logueados
-setTimeout(()=>{
-  if(!currentUser) openWelcome();
-  else {
-    // Logueado sin nombre: pedir nombre
-    const savedName=document.getElementById('clientName').value.trim()||localStorage.getItem('beepex_client_name')||'';
-    if(!savedName) openWelcome();
-  }
-}, 600);
+// Mostrar welcome al cargar
+setTimeout(()=>{ openWelcome(); }, 600);
 // Calcular productos nuevos desde la última visita
 (function(){
   try{
