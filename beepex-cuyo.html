@@ -352,7 +352,7 @@
   .sale-action-btn.secondary{background:var(--surface);border:1px solid var(--border);color:var(--text);}
   .card.sale-selected{outline:2px solid var(--accent);outline-offset:2px;}
   .sale-check{display:none;position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:6px;background:var(--card);border:2px solid var(--border);cursor:pointer;z-index:10;align-items:center;justify-content:center;font-size:13px;}
-  .sale-mode.selecting .sale-check{display:flex;}
+  .sale-mode .sale-check{display:flex;}
   .card.sale-selected .sale-check{background:var(--accent);border-color:var(--accent);color:#fff;}
   /* Panel precios de venta */
   .sale-prices-table{width:100%;border-collapse:collapse;font-size:12px;}
@@ -363,6 +363,12 @@
   .sale-pct-input{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--text);font-family:inherit;width:55px;text-align:right;}
   .sale-pct-input:focus{outline:none;border-color:var(--accent);}
   .sale-save-row{display:flex;justify-content:flex-end;margin-top:12px;}
+  .sale-mode .desc-modal-margen{display:none!important;}
+  .sale-mode #descModalPvp{display:none!important;}
+  .sale-mode .desc-modal-iva{display:none!important;}
+  .sale-mode #descModalSku{display:none!important;}
+  .sale-mode #descModalPrice{display:none!important;}
+  .sale-mode .desc-modal-price-note{display:none!important;}
   .back-top{position:fixed;bottom:24px;right:16px;width:40px;height:40px;background:rgba(28,31,42,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.07);border-radius:50%;color:rgba(240,242,255,.4);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:150;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .25s,transform .25s,color .15s,background .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .back-top:hover{background:rgba(28,31,42,.8);color:rgba(240,242,255,.9);}
   .back-top.visible{opacity:1;pointer-events:auto;transform:translateY(0);}
@@ -686,6 +692,10 @@ let userSalePrices={}; // {sku: price}
     </div>
     <div style="padding:10px 16px 4px;font-size:12px;color:var(--muted);">
       Ingresá el precio o el % sobre tu precio mayorista. Se guarda automáticamente.
+    </div>
+    <div style="padding:0 16px 8px;">
+      <input style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;" 
+        placeholder="🔍 Buscar producto..." oninput="renderSalePricesPanel(this.value)">
     </div>
     <div style="overflow-y:auto;flex:1;padding:0 16px 24px;">
       <div id="salePricesList"></div>
@@ -2746,6 +2756,7 @@ async function saveSalePrice(sku, price){
 function toggleSaleSelect(sku){
   if(!saleMode) return;
   selectingMode=true;
+  document.body.classList.add('selecting'); // activa .sale-mode.selecting .sale-check
   if(saleSelected.has(sku)) saleSelected.delete(sku);
   else saleSelected.add(sku);
   const card=document.getElementById('card-'+sku);
@@ -2771,6 +2782,8 @@ function clearSaleSelection(){
     if(card) card.classList.remove('sale-selected');
   });
   saleSelected.clear();
+  selectingMode=false;
+  document.body.classList.remove('selecting');
   updateSaleSelectBar();
 }
 
@@ -2851,37 +2864,39 @@ function closeSalePrices(){
   document.body.style.overflow='';
 }
 
-function renderSalePricesPanel(){
+function renderSalePricesPanel(filter=''){
   const cont=document.getElementById('salePricesList');
   const mayorista=(p)=>includeIVA?Math.round(p.price*(1+p.iva/100)):p.price;
+  const q=filter.toLowerCase().trim();
+  const list=q?products.filter(p=>p.name.toLowerCase().includes(q)||p.sku.includes(q)):products;
+  // Renderizar filas
+  const rows=list.map(p=>{
+    const pvp=p.pvp>0?fmt(p.pvp):'-';
+    const current=userSalePrices[p.sku]||'';
+    const may=mayorista(p);
+    const pct=current?Math.round(((current-may)/may)*100):'';
+    return `<tr>
+      <td style="font-weight:600;font-size:11px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</td>
+      <td style="text-align:right;color:var(--muted);font-size:11px;">${pvp}</td>
+      <td style="text-align:right">
+        <input class="sale-price-input" id="sp-${p.sku}" type="number" value="${current}" placeholder="0"
+          oninput="onSalePriceInput('${p.sku}','price')" onblur="autoSavePrice('${p.sku}')">
+      </td>
+      <td style="text-align:right">
+        <input class="sale-pct-input" id="spct-${p.sku}" type="number" value="${pct}" placeholder="%"
+          oninput="onSalePriceInput('${p.sku}','pct')">
+      </td>
+    </tr>`;
+  }).join('');
   cont.innerHTML=`
     <table class="sale-prices-table">
       <thead><tr>
         <th>Producto</th>
         <th style="text-align:right">PVP</th>
         <th style="text-align:right">Mi precio</th>
-        <th style="text-align:right">% sobre mayor.</th>
+        <th style="text-align:right">%</th>
       </tr></thead>
-      <tbody>
-        ${products.map(p=>{
-          const pvp=p.pvp>0?fmt(p.pvp):'-';
-          const current=userSalePrices[p.sku]||'';
-          const may=mayorista(p);
-          const pct=current?Math.round(((current-may)/may)*100):'';
-          return `<tr>
-            <td style="font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</td>
-            <td style="text-align:right;color:var(--muted)">${pvp}</td>
-            <td style="text-align:right">
-              <input class="sale-price-input" id="sp-${p.sku}" type="number" value="${current}" placeholder="0"
-                oninput="onSalePriceInput('${p.sku}','price')" onblur="autoSavePrice('${p.sku}')">
-            </td>
-            <td style="text-align:right">
-              <input class="sale-pct-input" id="spct-${p.sku}" type="number" value="${pct}" placeholder="%"
-                oninput="onSalePriceInput('${p.sku}','pct')">
-            </td>
-          </tr>`;
-        }).join('')}
-      </tbody>
+      <tbody>${rows}</tbody>
     </table>`;
 }
 
