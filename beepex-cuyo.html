@@ -2649,6 +2649,9 @@ function updateAuthUI(){
       menu.innerHTML=`
         <button class="user-menu-item" onclick="closeUserMenu();window.location.href='beepex-admin.html'">👥 Panel admin</button>
         <div class="user-menu-sep"></div>
+        <button class="user-menu-item" onclick="closeUserMenu();openSalePrices()">💰 Mis precios de venta</button>
+        <button class="user-menu-item" id="saleModeMenuItem" onclick="closeUserMenu();toggleSaleMode()">${saleMode?'🛒 Modo Compra':'🏪 Modo Venta'}</button>
+        <div class="user-menu-sep"></div>
         <button class="user-menu-item danger" onclick="closeUserMenu();signOut()">👋 Cerrar sesión</button>`;
     } else {
       menu.innerHTML=`
