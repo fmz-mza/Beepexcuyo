@@ -324,6 +324,45 @@
   .lightbox img{max-width:92vw;max-height:88vh;object-fit:contain;border-radius:12px;box-shadow:0 8px 60px rgba(0,0,0,.8);animation:slideUp .18s ease;}
   .lightbox-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.12);border:none;color:#fff;font-size:22px;width:44px;height:44px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
   .lightbox-close:active{transform:scale(.9);}
+  /* ── Modo Venta ── */
+  .sale-banner{display:none;background:linear-gradient(90deg,#f59e0b,#ef4444);color:#fff;font-size:12px;font-weight:700;text-align:center;padding:7px 12px;letter-spacing:.3px;}
+  .sale-banner.visible{display:block;}
+  .sale-mode .iva-toggle-wrap{display:none!important;}
+  .sale-mode .cart-btn{display:none!important;}
+  .sale-mode .float-summary{display:none!important;}
+  .sale-mode .sku{display:none!important;}
+  .sale-mode .iva-label{display:none!important;}
+  .sale-mode .stock-badge{display:none!important;}
+  .sale-mode .preventa-badge{display:none!important;}
+  .sale-mode .nostock-badge{display:none!important;}
+  .sale-mode .qty-row{display:none!important;}
+  .sale-mode .in-cart-badge{display:none!important;}
+  .sale-mode .margen{display:none!important;}
+  .sale-mode .pvp{display:none!important;}
+  .sale-price{font-size:18px;font-weight:700;margin-top:4px;color:var(--text);}
+  .sale-price.empty{font-size:13px;color:var(--muted);font-weight:400;}
+  /* Selección en modo venta */
+  .sale-select-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);padding:12px 16px;z-index:200;flex-direction:column;gap:8px;}
+  .sale-select-bar.visible{display:flex;}
+  .sale-select-top{display:flex;align-items:center;justify-content:space-between;}
+  .sale-select-count{font-size:13px;font-weight:700;}
+  .sale-select-actions{display:flex;gap:8px;}
+  .sale-action-btn{padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;border:none;cursor:pointer;font-family:inherit;}
+  .sale-action-btn.primary{background:var(--accent);color:#fff;}
+  .sale-action-btn.secondary{background:var(--surface);border:1px solid var(--border);color:var(--text);}
+  .card.sale-selected{outline:2px solid var(--accent);outline-offset:2px;}
+  .sale-check{display:none;position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:6px;background:var(--card);border:2px solid var(--border);cursor:pointer;z-index:10;align-items:center;justify-content:center;font-size:13px;}
+  .sale-mode.selecting .sale-check{display:flex;}
+  .card.sale-selected .sale-check{background:var(--accent);border-color:var(--accent);color:#fff;}
+  /* Panel precios de venta */
+  .sale-prices-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .sale-prices-table th{text-align:left;padding:8px 6px;color:var(--muted);font-weight:600;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);}
+  .sale-prices-table td{padding:8px 6px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  .sale-price-input{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--text);font-family:inherit;width:90px;text-align:right;}
+  .sale-price-input:focus{outline:none;border-color:var(--accent);}
+  .sale-pct-input{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--text);font-family:inherit;width:55px;text-align:right;}
+  .sale-pct-input:focus{outline:none;border-color:var(--accent);}
+  .sale-save-row{display:flex;justify-content:flex-end;margin-top:12px;}
   .back-top{position:fixed;bottom:24px;right:16px;width:40px;height:40px;background:rgba(28,31,42,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.07);border-radius:50%;color:rgba(240,242,255,.4);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:150;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .25s,transform .25s,color .15s,background .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .back-top:hover{background:rgba(28,31,42,.8);color:rgba(240,242,255,.9);}
   .back-top.visible{opacity:1;pointer-events:auto;transform:translateY(0);}
@@ -395,6 +434,8 @@ let userApproved=false;
 let isAdmin=false;
 let disabledSkus=new Set();
 let margenActive=false;
+let saleMode=false;
+let userSalePrices={}; // {sku: price}
 </script>
 <!-- jsPDF para exportar pedido -->
 <!-- jsPDF carga lazy al primer uso -->
@@ -420,6 +461,7 @@ let margenActive=false;
 </head>
 <body>
 <header class="header">
+  <div class="sale-banner" id="saleBanner">🏪 MODO VENTA — Tus clientes ven los precios que configuraste</div>
   <div id="siteBanner" class="site-banner">
     <span id="siteBannerText"></span>
     <button class="site-banner-close" onclick="document.getElementById('siteBanner').classList.remove('visible')">✕</button>
@@ -625,6 +667,31 @@ let margenActive=false;
   </div>
 </div>
 <button class="search-fab" id="searchFab" onclick="toggleFloatSearch()" aria-label="Buscar">🔍</button>
+<div class="sale-select-bar" id="saleSelectBar">
+  <div class="sale-select-top">
+    <span class="sale-select-count" id="saleSelectCount">0 productos seleccionados</span>
+    <button class="sale-action-btn secondary" onclick="clearSaleSelection()">Limpiar</button>
+  </div>
+  <div class="sale-select-actions">
+    <button class="sale-action-btn secondary" onclick="shareSaleWhatsApp()">📱 WhatsApp</button>
+    <button class="sale-action-btn primary" onclick="shareSalePDF()">📄 PDF</button>
+  </div>
+</div>
+<!-- Panel Mis precios de venta -->
+<div class="overlay" id="salePricesOverlay" style="z-index:500;">
+  <div class="drawer" id="salePricesDrawer" style="max-height:90vh;display:flex;flex-direction:column;">
+    <div class="drawer-header">
+      <span class="drawer-title">💰 Mis precios de venta</span>
+      <button class="drawer-close" onclick="closeSalePrices()">✕</button>
+    </div>
+    <div style="padding:10px 16px 4px;font-size:12px;color:var(--muted);">
+      Ingresá el precio o el % sobre tu precio mayorista. Se guarda automáticamente.
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:0 16px 24px;">
+      <div id="salePricesList"></div>
+    </div>
+  </div>
+</div>
 <button class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba">↑</button>
 <div class="toast" id="toast"></div>
 
@@ -1163,6 +1230,7 @@ function createCard(p){
   div.id=`card-${p.sku}`;
   div.className=`card${qty>0?' in-cart':''}${isPrev?' is-preventa':''}${isNoStock?' is-nostock':''}`;
   div.innerHTML=`
+    <div class="sale-check" id="chk-${p.sku}" onclick="event.stopPropagation();toggleSaleSelect('${p.sku}')">✓</div>
     <div class="card-img" onclick="openLightbox('${p.sku}')">
       <img id="img-${p.sku}" data-sku="${p.sku}" alt="${p.name}">
       <div class="ph">📷</div>
@@ -1178,9 +1246,9 @@ function createCard(p){
       <div class="iva-label">IVA ${p.iva}%</div>
       <div class="prod-name">${p.name}</div>
       <div class="sku">SKU: ${p.sku}</div>
-      ${priceDisplay(p)}
-      ${priceNoteDisplay()}
-      ${pvpDisplay(p)}
+      ${saleMode ? salePriceDisplay(p) : priceDisplay(p)}
+      ${saleMode ? '' : priceNoteDisplay()}
+      ${saleMode ? '' : pvpDisplay(p)}
 
       <div class="qty-row">
         <button class="qty-btn" onclick="chg('${p.sku}',-1)">−</button>
@@ -2559,7 +2627,7 @@ async function loadProfile(){
     renderGrid();
   }
   // Actualizar presencia al cargar perfil
-  if(userApproved) updatePresence();
+  if(userApproved){ updatePresence(); loadSalePrices(); }
 }
 
 function updateAuthUI(){
@@ -2587,6 +2655,8 @@ function updateAuthUI(){
         <div style="padding:8px 12px 4px;font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;">${nombre}</div>
         <div class="user-menu-sep"></div>
         ${userApproved?`<button class="user-menu-item" onclick="closeUserMenu();openOrderHistory()">📋 Historial de compras</button>`:''}
+        ${userApproved?`<button class="user-menu-item" onclick="closeUserMenu();openSalePrices()">💰 Mis precios de venta</button>`:''}
+        ${userApproved?`<button class="user-menu-item" id="saleModeMenuItem" onclick="closeUserMenu();toggleSaleMode()">${saleMode?'🛒 Modo Compra':'🏪 Modo Venta'}</button>`:''}
         <button class="user-menu-item" onclick="closeUserMenu();openChangePassword()">🔑 Cambiar contraseña</button>
         <div class="user-menu-sep"></div>
         <button class="user-menu-item danger" onclick="closeUserMenu();signOut()">👋 Cerrar sesión</button>`;
@@ -2607,6 +2677,232 @@ function toggleUserMenu(){
     menu.classList.add('open');
     overlay.classList.add('open');
   }
+}
+
+// ── Modo Venta ──────────────────────────────────────────────────────────────
+let saleSelected=new Set();
+let selectingMode=false;
+
+function toggleSaleMode(){
+  saleMode=!saleMode;
+  localStorage.setItem('beepex_sale_mode', saleMode?'1':'0');
+  applySaleMode();
+  renderGrid();
+  updateAuthUI();
+  showToast(saleMode?'🏪 Modo Venta activado':'🛒 Modo Compra activado');
+}
+
+function applySaleMode(){
+  document.body.classList.toggle('sale-mode', saleMode);
+  document.getElementById('saleBanner').classList.toggle('visible', saleMode);
+  if(!saleMode){
+    saleSelected.clear();
+    selectingMode=false;
+    document.getElementById('saleSelectBar').classList.remove('visible');
+  }
+}
+
+async function loadSalePrices(){
+  if(!currentUser || !userApproved) return;
+  const token=localStorage.getItem('sb_access_token');
+  try{
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/user_prices?user_id=eq.${currentUser.id}&select=sku,price`,{
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    const rows=await res.json();
+    if(Array.isArray(rows)){
+      userSalePrices={};
+      rows.forEach(r=>{ userSalePrices[r.sku]=r.price; });
+    }
+  } catch(e){ console.warn('loadSalePrices error:', e); }
+}
+
+async function saveSalePrice(sku, price){
+  const token=localStorage.getItem('sb_access_token');
+  try{
+    // DELETE + INSERT (evita upsert policy issues)
+    await fetch(`${SUPABASE_URL}/rest/v1/user_prices?user_id=eq.${currentUser.id}&sku=eq.${sku}`,{
+      method:'DELETE',
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    if(price>0){
+      await fetch(`${SUPABASE_URL}/rest/v1/user_prices`,{
+        method:'POST',
+        headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+        body:JSON.stringify({user_id:currentUser.id, sku, price})
+      });
+      userSalePrices[sku]=price;
+    } else {
+      delete userSalePrices[sku];
+    }
+    return true;
+  } catch(e){ return false; }
+}
+
+// Selección en modo venta
+function toggleSaleSelect(sku){
+  if(!saleMode) return;
+  selectingMode=true;
+  if(saleSelected.has(sku)) saleSelected.delete(sku);
+  else saleSelected.add(sku);
+  const card=document.getElementById('card-'+sku);
+  if(card) card.classList.toggle('sale-selected', saleSelected.has(sku));
+  updateSaleSelectBar();
+}
+
+function updateSaleSelectBar(){
+  const bar=document.getElementById('saleSelectBar');
+  const count=document.getElementById('saleSelectCount');
+  if(saleSelected.size>0){
+    bar.classList.add('visible');
+    count.textContent=`${saleSelected.size} producto${saleSelected.size!==1?'s':''} seleccionado${saleSelected.size!==1?'s':''}`;
+  } else {
+    bar.classList.remove('visible');
+    selectingMode=false;
+  }
+}
+
+function clearSaleSelection(){
+  saleSelected.forEach(sku=>{
+    const card=document.getElementById('card-'+sku);
+    if(card) card.classList.remove('sale-selected');
+  });
+  saleSelected.clear();
+  updateSaleSelectBar();
+}
+
+function getSaleItems(){
+  return Array.from(saleSelected).map(sku=>{
+    const p=productMap[sku];
+    if(!p) return null;
+    return { sku, name:p.name, brand:p.brand, price:userSalePrices[sku]||0 };
+  }).filter(Boolean);
+}
+
+function shareSaleWhatsApp(){
+  const items=getSaleItems();
+  if(!items.length){ showToast('Seleccioná al menos un producto'); return; }
+  const nombre=document.getElementById('clientName').value.trim()||'Mi negocio';
+  let msg=`🏪 *${nombre}*
+
+`;
+  items.forEach(i=>{
+    const precio=i.price>0?`$${i.price.toLocaleString('es-AR')}`:'A consultar';
+    msg+=`▪ ${i.name} — *${precio}*
+`;
+  });
+  msg+=`
+_Catálogo de productos_`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
+async function shareSalePDF(){
+  const items=getSaleItems();
+  if(!items.length){ showToast('Seleccioná al menos un producto'); return; }
+  if(typeof jsPDF==='undefined'){ showToast('Cargando PDF...'); return; }
+  const nombre=document.getElementById('clientName').value.trim()||'Mi negocio';
+  const { jsPDF: JSPDF } = window.jspdf;
+  const doc = new JSPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const W=210, margin=15;
+  let y=margin;
+  // Header
+  doc.setFillColor(28,31,42);
+  doc.rect(0,0,W,30,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(16); doc.setFont('helvetica','bold');
+  doc.text(nombre, margin, 18);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.setTextColor(180,180,200);
+  doc.text(`Lista de precios`, margin, 24);
+  y=38;
+  // Tabla
+  doc.setFontSize(10);
+  items.forEach((item,i)=>{
+    if(y>270){ doc.addPage(); y=margin; }
+    if(i%2===0){ doc.setFillColor(240,241,245); doc.rect(margin,y-4,W-margin*2,10,'F'); }
+    doc.setTextColor(30,30,50); doc.setFont('helvetica','bold');
+    doc.text(item.name, margin+2, y+2);
+    doc.setFont('helvetica','normal');
+    const precio=item.price>0?`$${item.price.toLocaleString('es-AR')}`:'A consultar';
+    doc.text(precio, W-margin-2, y+2, {align:'right'});
+    y+=10;
+  });
+  // Footer
+  doc.setFontSize(8); doc.setTextColor(150,150,170);
+  doc.text(new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'}), W/2, 287, {align:'center'});
+  const blob=doc.output('blob');
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url;
+  a.download=`lista-precios-${nombre.replace(/\s+/g,'-').toLowerCase()}.pdf`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ── Panel Mis precios de venta ───────────────────────────────────────────────
+function openSalePrices(){
+  renderSalePricesPanel();
+  document.getElementById('salePricesOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeSalePrices(){
+  document.getElementById('salePricesOverlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+function renderSalePricesPanel(){
+  const cont=document.getElementById('salePricesList');
+  const mayorista=(p)=>includeIVA?Math.round(p.price*(1+p.iva/100)):p.price;
+  cont.innerHTML=`
+    <table class="sale-prices-table">
+      <thead><tr>
+        <th>Producto</th>
+        <th style="text-align:right">PVP</th>
+        <th style="text-align:right">Mi precio</th>
+        <th style="text-align:right">% sobre mayor.</th>
+      </tr></thead>
+      <tbody>
+        ${products.map(p=>{
+          const pvp=p.pvp>0?fmt(p.pvp):'-';
+          const current=userSalePrices[p.sku]||'';
+          const may=mayorista(p);
+          const pct=current?Math.round(((current-may)/may)*100):'';
+          return `<tr>
+            <td style="font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</td>
+            <td style="text-align:right;color:var(--muted)">${pvp}</td>
+            <td style="text-align:right">
+              <input class="sale-price-input" id="sp-${p.sku}" type="number" value="${current}" placeholder="0"
+                oninput="onSalePriceInput('${p.sku}','price')" onblur="autoSavePrice('${p.sku}')">
+            </td>
+            <td style="text-align:right">
+              <input class="sale-pct-input" id="spct-${p.sku}" type="number" value="${pct}" placeholder="%"
+                oninput="onSalePriceInput('${p.sku}','pct')">
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function onSalePriceInput(sku, field){
+  const p=productMap[sku]; if(!p) return;
+  const mayorista=includeIVA?Math.round(p.price*(1+p.iva/100)):p.price;
+  const priceEl=document.getElementById('sp-'+sku);
+  const pctEl=document.getElementById('spct-'+sku);
+  if(field==='price'){
+    const price=parseFloat(priceEl.value)||0;
+    if(price>0 && mayorista>0) pctEl.value=Math.round(((price-mayorista)/mayorista)*100);
+    else pctEl.value='';
+  } else {
+    const pct=parseFloat(pctEl.value);
+    if(!isNaN(pct) && mayorista>0) priceEl.value=Math.round(mayorista*(1+pct/100));
+  }
+}
+
+async function autoSavePrice(sku){
+  const priceEl=document.getElementById('sp-'+sku); if(!priceEl) return;
+  const price=parseFloat(priceEl.value)||0;
+  const ok=await saveSalePrice(sku, price);
+  if(ok) showToast(price>0?'✅ Precio guardado':'🗑 Precio eliminado');
+  if(saleMode) renderGrid();
 }
 
 function closeUserMenu(){
@@ -2843,6 +3139,11 @@ async function signOut(){
 }
 
 // ── Precio según estado de auth ───────────────────────────────────────────────
+function salePriceDisplay(p){
+  const sp=userSalePrices[p.sku];
+  if(sp) return `<div class="sale-price">${fmt(sp)}</div>`;
+  return `<div class="sale-price empty">Sin precio configurado</div>`;
+}
 function priceDisplay(p){
   if(p.price===0) return '<span class="price">Consultar</span>';
   if(userApproved) return `<span class="price">${fmt(mayorista(p))}</span>`;
@@ -2887,6 +3188,8 @@ async function loadSettings(){
 loadSettings();
 loadCart();
 initAuth();
+// Restaurar modo venta
+if(localStorage.getItem('beepex_sale_mode')==='1'){ saleMode=true; applySaleMode(); }
 // Mostrar welcome al cargar
 setTimeout(()=>{ openWelcome(); }, 600);
 // Calcular productos nuevos desde la última visita
