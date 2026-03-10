@@ -410,15 +410,15 @@ async function doLogin(){
     });
     const data=await res.json();
     if(!res.ok){ msg.textContent=data.error_description||'Email o contraseña incorrectos'; msg.style.color='var(--red)'; return; }
-    sessionStorage.setItem('admin_token', data.access_token);
-    sessionStorage.setItem('admin_refresh', data.refresh_token);
+    localStorage.setItem('admin_token', data.access_token);
+    localStorage.setItem('admin_refresh', data.refresh_token);
     currentUser=data.user;
     await checkAdminAccess();
   } catch(e){ msg.textContent='Error de conexión'; msg.style.color='var(--red)'; }
 }
 
 async function checkAdminAccess(){
-  const token=sessionStorage.getItem('admin_token');
+  const token=localStorage.getItem('admin_token');
   if(!token||!currentUser) return;
   const res=await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}&select=is_admin,nombre`,{
     headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
@@ -428,7 +428,7 @@ async function checkAdminAccess(){
   if(!profile?.is_admin){
     document.getElementById('loginMsg').textContent='No tenés acceso al panel admin';
     document.getElementById('loginMsg').style.color='var(--red)';
-    sessionStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_token');
     return;
   }
   isAdmin=true;
@@ -438,7 +438,7 @@ async function checkAdminAccess(){
 }
 
 async function restoreSession(){
-  const token=sessionStorage.getItem('admin_token');
+  const token=localStorage.getItem('admin_token');
   if(!token) return;
   try{
     const payload=JSON.parse(atob(token.split('.')[1]));
@@ -451,21 +451,21 @@ async function restoreSession(){
       // Token expirado — intentar refresh
       const ok=await refreshSession();
       if(ok){
-        const newToken=sessionStorage.getItem('admin_token');
+        const newToken=localStorage.getItem('admin_token');
         const newPayload=JSON.parse(atob(newToken.split('.')[1]));
         currentUser={id:newPayload.sub, email:newPayload.email};
         await checkAdminAccess();
       } else {
-        sessionStorage.removeItem('admin_token');
-        sessionStorage.removeItem('admin_refresh');
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_refresh');
       }
     }
-  } catch(e){ sessionStorage.removeItem('admin_token'); }
+  } catch(e){ localStorage.removeItem('admin_token'); }
 }
 
 function doSignOut(){
-  sessionStorage.removeItem('admin_token');
-  sessionStorage.removeItem('admin_refresh');
+  localStorage.removeItem('admin_token');
+  localStorage.removeItem('admin_refresh');
   currentUser=null; isAdmin=false;
   document.getElementById('app').classList.remove('visible');
   document.getElementById('authGate').style.display='flex';
@@ -473,7 +473,7 @@ function doSignOut(){
 
 // ── API helper ──
 async function api(path, opts={}){
-  const token=sessionStorage.getItem('admin_token');
+  const token=localStorage.getItem('admin_token');
   const res=await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{
     ...opts,
     headers:{
@@ -950,7 +950,7 @@ mq.addListener(handleMQ); handleMQ(mq);
 
 // ── Refresh session ──
 async function refreshSession(){
-  const refreshToken=sessionStorage.getItem('admin_refresh');
+  const refreshToken=localStorage.getItem('admin_refresh');
   if(!refreshToken) return false;
   try{
     const res=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{
@@ -960,8 +960,8 @@ async function refreshSession(){
     });
     if(!res.ok) throw new Error('refresh failed');
     const data=await res.json();
-    sessionStorage.setItem('admin_token', data.access_token);
-    sessionStorage.setItem('admin_refresh', data.refresh_token);
+    localStorage.setItem('admin_token', data.access_token);
+    localStorage.setItem('admin_refresh', data.refresh_token);
     if(data.user) currentUser=data.user;
     return true;
   } catch(e){
@@ -971,7 +971,7 @@ async function refreshSession(){
 }
 
 async function checkAndRefreshToken(){
-  const token=sessionStorage.getItem('admin_token');
+  const token=localStorage.getItem('admin_token');
   if(!token) return;
   try{
     const payload=JSON.parse(atob(token.split('.')[1]));
@@ -979,8 +979,8 @@ async function checkAndRefreshToken(){
     if(expiresIn < 10*60*1000){
       const ok=await refreshSession();
       if(!ok){
-        sessionStorage.removeItem('admin_token');
-        sessionStorage.removeItem('admin_refresh');
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_refresh');
         currentUser=null; isAdmin=false;
         document.getElementById('app').classList.remove('visible');
         document.getElementById('authGate').style.display='flex';
