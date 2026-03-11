@@ -213,6 +213,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
   <div class="admin-tabs" id="adminTabs">
     <button class="admin-tab active" onclick="switchTab('usuarios')">👥 Usuarios</button>
     <button class="admin-tab" onclick="switchTab('catalogo')">📦 Catálogo</button>
+    <button class="admin-tab" onclick="switchTab('productos')">🗂️ Productos</button>
     <button class="admin-tab" onclick="switchTab('estadisticas')">📊 Estadísticas</button>
   </div>
 
@@ -306,6 +307,62 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
         <div class="section-body">
           <input class="search-products" id="searchProducts" placeholder="🔍 Buscar por nombre o SKU..." oninput="filterProducts()">
           <div id="productsList"><div class="loading">Cargando...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB PRODUCTOS -->
+    <div class="tab-panel" id="tab-productos">
+      <div class="section">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+          <h3 style="margin:0;font-size:15px;">🗂️ Gestión de Productos</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-sm" onclick="downloadProductsExcel()">⬇️ Descargar Excel</button>
+            <label class="btn-sm" style="cursor:pointer;">
+              ⬆️ Subir Excel
+              <input type="file" id="excelUploadInput" accept=".xlsx,.xls" style="display:none;" onchange="handleExcelUpload(event)">
+            </label>
+          </div>
+        </div>
+
+        <!-- Stats rápidas -->
+        <div id="prodStats" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>
+
+        <!-- Buscador -->
+        <input type="text" id="prodSearch" placeholder="🔍 Buscar por nombre o SKU..."
+          style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box;margin-bottom:12px;"
+          oninput="filterProdTable()">
+
+        <!-- Tabla -->
+        <div style="overflow-x:auto;">
+          <table id="prodTable" style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="border-bottom:2px solid var(--border);text-align:left;">
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;">SKU</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;">Nombre</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;">Marca</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;text-align:right;">Precio</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;text-align:right;">PVP</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;text-align:center;">IVA%</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;text-align:center;">Stock</th>
+              </tr>
+            </thead>
+            <tbody id="prodTableBody">
+              <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Modal preview de Excel -->
+      <div id="excelPreviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;overflow-y:auto;padding:20px;">
+        <div style="max-width:800px;margin:0 auto;background:var(--surface);border-radius:14px;padding:24px;">
+          <h3 style="margin:0 0 16px;font-size:16px;">📋 Preview de cambios</h3>
+          <div id="excelPreviewContent"></div>
+          <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+            <button class="btn-sm" onclick="document.getElementById('excelPreviewModal').style.display='none'">Cancelar</button>
+            <button class="btn-sm" style="background:var(--accent);color:#fff;" onclick="confirmExcelImport()">✅ Confirmar importación</button>
+          </div>
         </div>
       </div>
     </div>
@@ -493,6 +550,7 @@ function switchTab(tab){
   document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById(`tab-${tab}`).classList.add('active');
   event.target.classList.add('active');
+  if(tab==='productos') loadProdTable();
 }
 
 // ── Load all ──
@@ -989,6 +1047,289 @@ async function checkAndRefreshToken(){
     }
   } catch(e){}
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB PRODUCTOS
+// ══════════════════════════════════════════════════════════════════════════════
+let prodData = [];
+let excelPendingImport = null; // datos preparados para confirmar
+
+async function loadProdTable(){
+  const tbody = document.getElementById('prodTableBody');
+  if(!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr>';
+  try{
+    const token = localStorage.getItem('sb_access_token')||SUPABASE_ANON;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=sku,name,brand,price,pvp,iva,stock&order=brand.asc,name.asc`,{
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    prodData = await res.json();
+    renderProdStats();
+    renderProdTable(prodData);
+  } catch(e){
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--red);">Error al cargar: ${e.message}</td></tr>`;
+  }
+}
+
+function renderProdStats(){
+  const el = document.getElementById('prodStats');
+  if(!el) return;
+  const total = prodData.length;
+  const enStock = prodData.filter(p=>p.stock==='STOCK').length;
+  const sinStock = prodData.filter(p=>p.stock==='NOSTOCK').length;
+  const preventa = prodData.filter(p=>p.stock==='PREVENTA').length;
+  const beepaw = prodData.filter(p=>p.brand==='BEEPAW').length;
+  el.innerHTML = [
+    ['📦 Total', total, ''],
+    ['✅ En stock', enStock, 'color:var(--green)'],
+    ['❌ Sin stock', sinStock, 'color:var(--red)'],
+    ['⏳ Preventa', preventa, 'color:var(--accent)'],
+    ['🐾 BEEPAW', beepaw, ''],
+    ['🔷 Genéricos', total-beepaw, ''],
+  ].map(([label,val,style])=>`
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;min-width:90px;">
+      <div style="font-size:18px;font-weight:700;${style}">${val}</div>
+      <div style="font-size:11px;color:var(--muted);">${label}</div>
+    </div>`).join('');
+}
+
+function renderProdTable(data){
+  const tbody = document.getElementById('prodTableBody');
+  if(!tbody) return;
+  if(!data.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">Sin resultados</td></tr>'; return; }
+  const stockColor = s => s==='STOCK'?'var(--green)':s==='PREVENTA'?'var(--accent)':'var(--red)';
+  tbody.innerHTML = data.map(p=>`
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:7px 6px;color:var(--muted);font-family:monospace;">${p.sku}</td>
+      <td style="padding:7px 6px;">${p.name}</td>
+      <td style="padding:7px 6px;"><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--border);">${p.brand}</span></td>
+      <td style="padding:7px 6px;text-align:right;">$${p.price.toLocaleString('es-AR')}</td>
+      <td style="padding:7px 6px;text-align:right;">${p.pvp?'$'+p.pvp.toLocaleString('es-AR'):'-'}</td>
+      <td style="padding:7px 6px;text-align:center;">${p.iva}%</td>
+      <td style="padding:7px 6px;text-align:center;"><span style="color:${stockColor(p.stock)};font-size:11px;font-weight:600;">${p.stock}</span></td>
+    </tr>`).join('');
+}
+
+function filterProdTable(){
+  const q = document.getElementById('prodSearch').value.toLowerCase();
+  if(!q){ renderProdTable(prodData); return; }
+  renderProdTable(prodData.filter(p=>p.name.toLowerCase().includes(q)||p.sku.includes(q)));
+}
+
+// ── Descargar Excel desde Supabase ────────────────────────────────────────────
+async function downloadProductsExcel(){
+  showToast('⏳ Preparando Excel...');
+  try{
+    // Cargar SheetJS dinámicamente
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res; s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+    const token = localStorage.getItem('sb_access_token')||SUPABASE_ANON;
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/products?select=sku,name,brand,price,pvp,iva,stock,description,ean&order=brand.asc,name.asc`,{
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    const data = await resp.json();
+
+    const wb = XLSX.utils.book_new();
+    // Hoja BEEPAW
+    const beepaw = data.filter(p=>p.brand==='BEEPAW').map(p=>({
+      'CÓDIGO':p.sku,'PRODUCTO':p.name,'DESCRIPCIÓN':p.description,
+      'IVA':p.iva,'PRECIO EN PESOS':p.price,'PRECIO VENTA PUBLICO':p.pvp||'','STOCK':p.stock,'CODIGO EAN':p.ean
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(beepaw), 'BEEPAW');
+    // Hoja GENERICOS
+    const gen = data.filter(p=>p.brand!=='BEEPAW').map(p=>({
+      'CÓDIGO':p.sku,'PRODUCTO':p.name,'DESCRIPCIÓN':p.description,
+      'IVA':p.iva,'PRECIO EN $':p.price,'STOCK':p.stock,'CODIGO EAN':p.ean
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gen), 'GENERICOS');
+    XLSX.writeFile(wb, `BEEPEX_productos_${new Date().toISOString().slice(0,10)}.xlsx`);
+    showToast('✅ Excel descargado');
+  } catch(e){ showToast('❌ Error: '+e.message); }
+}
+
+// ── Upload Excel y preview ────────────────────────────────────────────────────
+async function handleExcelUpload(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  event.target.value='';
+  showToast('⏳ Procesando Excel...');
+  try{
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res; s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const incoming = [];
+
+    function parseIva(val){
+      if(val===null||val===undefined) return 21;
+      if(typeof val==='number') return val<1?Math.round(val*100*10)/10:val;
+      const s=String(val).replace('%','').replace(',','.').trim();
+      const n=parseFloat(s);
+      return isNaN(n)?21:(n<1?Math.round(n*100*10)/10:n);
+    }
+    function parseStock(val){
+      if(!val) return 'NOSTOCK';
+      const s=String(val).toUpperCase();
+      if(s.includes('SIN')||s.includes('NO STOCK')) return 'NOSTOCK';
+      if(s.includes('PREVENTA')) return 'PREVENTA';
+      if(s.includes('STOCK')) return 'STOCK';
+      return 'NOSTOCK';
+    }
+
+    // Leer BEEPAW
+    if(wb.SheetNames.includes('BEEPAW')){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets['BEEPAW'],{defval:null});
+      rows.forEach(r=>{
+        const sku = r['CÓDIGO'];
+        if(!sku||typeof sku!=='number') return;
+        const price = r['PRECIO EN PESOS']||r['PRECIO EN $'];
+        if(!price) return;
+        incoming.push({
+          sku:String(Math.round(sku)),
+          name:(r['PRODUCTO']||'').toString().trim(),
+          brand:'BEEPAW',
+          price:Math.round(price),
+          pvp:Math.round(r['PRECIO VENTA PUBLICO']||0),
+          iva:parseIva(r['IVA']),
+          stock:parseStock(r['STOCK']),
+          description:(r['DESCRIPCIÓN']||'').toString().replace(/\n/g,' ').trim(),
+          ean:(r['CODIGO EAN']?String(Math.round(r['CODIGO EAN'])):'')
+        });
+      });
+    }
+    // Leer GENERICOS
+    if(wb.SheetNames.includes('GENERICOS')){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets['GENERICOS'],{defval:null});
+      rows.forEach(r=>{
+        const sku = r['CÓDIGO'];
+        if(!sku||typeof sku!=='number') return;
+        const price = r['PRECIO EN $']||r['PRECIO EN PESOS'];
+        if(!price) return;
+        incoming.push({
+          sku:String(Math.round(sku)),
+          name:(r['PRODUCTO']||'').toString().replace(/\n/g,' ').trim(),
+          brand:'GENERICO',
+          price:Math.round(price),
+          pvp:0,
+          iva:parseIva(r['IVA']),
+          stock:parseStock(r['STOCK']),
+          description:(r['DESCRIPCIÓN']||'').toString().replace(/\n/g,' ').trim(),
+          ean:(r['CODIGO EAN']?String(Math.round(r['CODIGO EAN'])):'')
+        });
+      });
+    }
+
+    if(!incoming.length){ showToast('❌ No se encontraron productos válidos'); return; }
+
+    // Comparar con actuales
+    const currentMap = Object.fromEntries(prodData.map(p=>[p.sku,p]));
+    const incomingSkus = new Set(incoming.map(p=>p.sku));
+    const nuevos = incoming.filter(p=>!currentMap[p.sku]);
+    const actualizados = incoming.filter(p=>{
+      const c=currentMap[p.sku];
+      if(!c) return false;
+      return c.price!==p.price||c.pvp!==p.pvp||c.stock!==p.stock||c.iva!==p.iva||c.name!==p.name;
+    });
+    const faltantes = prodData.filter(p=>!incomingSkus.has(p.sku)&&p.stock!=='NOSTOCK');
+
+    excelPendingImport = { incoming, faltantes };
+
+    // Mostrar preview
+    const fmt = n => '$'+n.toLocaleString('es-AR');
+    const stockBadge = s => {
+      const c = s==='STOCK'?'var(--green)':s==='PREVENTA'?'var(--accent)':'var(--red)';
+      return `<span style="color:${c};font-size:11px;font-weight:600;">${s}</span>`;
+    };
+
+    let html = `<div style="margin-bottom:12px;font-size:13px;color:var(--muted);">
+      📊 <b>${incoming.length}</b> productos en el Excel · 
+      🟢 <b>${nuevos.length}</b> nuevos · 
+      🟡 <b>${actualizados.length}</b> con cambios · 
+      🔴 <b>${faltantes.length}</b> faltantes → NOSTOCK
+    </div>`;
+
+    if(nuevos.length){
+      html += `<h4 style="color:var(--green);margin:12px 0 6px;">🟢 Nuevos (${nuevos.length})</h4>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <tr style="border-bottom:1px solid var(--border);"><th>SKU</th><th>Nombre</th><th>Marca</th><th>Precio</th><th>Stock</th></tr>
+        ${nuevos.slice(0,30).map(p=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${p.sku}</td><td style="padding:4px 6px;">${p.name}</td><td style="padding:4px 6px;">${p.brand}</td><td style="padding:4px 6px;">${fmt(p.price)}</td><td style="padding:4px 6px;">${stockBadge(p.stock)}</td></tr>`).join('')}
+        ${nuevos.length>30?`<tr><td colspan="5" style="padding:4px 6px;color:var(--muted);">...y ${nuevos.length-30} más</td></tr>`:''}
+      </table></div>`;
+    }
+
+    if(actualizados.length){
+      html += `<h4 style="color:var(--accent);margin:16px 0 6px;">🟡 Con cambios (${actualizados.length})</h4>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <tr style="border-bottom:1px solid var(--border);"><th>SKU</th><th>Nombre</th><th>Precio actual → nuevo</th><th>Stock actual → nuevo</th></tr>
+        ${actualizados.slice(0,30).map(p=>{
+          const c=currentMap[p.sku];
+          const precioChg=c.price!==p.price?`<span style="color:var(--muted);">${fmt(c.price)}</span> → <b>${fmt(p.price)}</b>`:fmt(p.price);
+          const stockChg=c.stock!==p.stock?`${stockBadge(c.stock)} → ${stockBadge(p.stock)}`:stockBadge(p.stock);
+          return `<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${p.sku}</td><td style="padding:4px 6px;">${p.name}</td><td style="padding:4px 6px;">${precioChg}</td><td style="padding:4px 6px;">${stockChg}</td></tr>`;
+        }).join('')}
+        ${actualizados.length>30?`<tr><td colspan="4" style="padding:4px 6px;color:var(--muted);">...y ${actualizados.length-30} más</td></tr>`:''}
+      </table></div>`;
+    }
+
+    if(faltantes.length){
+      html += `<h4 style="color:var(--red);margin:16px 0 6px;">🔴 Faltantes → NOSTOCK (${faltantes.length})</h4>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <tr style="border-bottom:1px solid var(--border);"><th>SKU</th><th>Nombre</th><th>Marca</th></tr>
+        ${faltantes.slice(0,30).map(p=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${p.sku}</td><td style="padding:4px 6px;">${p.name}</td><td style="padding:4px 6px;">${p.brand}</td></tr>`).join('')}
+        ${faltantes.length>30?`<tr><td colspan="3" style="padding:4px 6px;color:var(--muted);">...y ${faltantes.length-30} más</td></tr>`:''}
+      </table></div>`;
+    }
+
+    document.getElementById('excelPreviewContent').innerHTML = html;
+    document.getElementById('excelPreviewModal').style.display = 'block';
+    showToast(`✅ ${incoming.length} productos listos para importar`);
+  } catch(e){ showToast('❌ Error: '+e.message); console.error(e); }
+}
+
+// ── Confirmar importación ─────────────────────────────────────────────────────
+async function confirmExcelImport(){
+  if(!excelPendingImport) return;
+  const {incoming, faltantes} = excelPendingImport;
+  const token = localStorage.getItem('sb_access_token')||SUPABASE_ANON;
+  const headers = {'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};
+  showToast('⏳ Importando...');
+  document.getElementById('excelPreviewModal').style.display = 'none';
+
+  try{
+    // Upsert todos los productos del Excel
+    const CHUNK = 50;
+    for(let i=0;i<incoming.length;i+=CHUNK){
+      const chunk = incoming.slice(i,i+CHUNK);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/products`,{
+        method:'POST', headers, body:JSON.stringify(chunk)
+      });
+      if(!res.ok){ const err=await res.text(); throw new Error(err); }
+    }
+    // Pasar faltantes a NOSTOCK
+    for(const p of faltantes){
+      await fetch(`${SUPABASE_URL}/rest/v1/products?sku=eq.${p.sku}`,{
+        method:'PATCH', headers, body:JSON.stringify({stock:'NOSTOCK'})
+      });
+    }
+    excelPendingImport = null;
+    showToast(`✅ Importación completada — ${incoming.length} productos actualizados`);
+    await loadProdTable();
+  } catch(e){ showToast('❌ Error en importación: '+e.message); console.error(e); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 
 // Chequear cada 5 minutos
 setInterval(checkAndRefreshToken, 5*60*1000);
