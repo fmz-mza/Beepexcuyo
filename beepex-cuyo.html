@@ -342,7 +342,7 @@
   .sale-price{font-size:18px;font-weight:700;margin-top:4px;color:var(--text);}
   .sale-price.empty{font-size:13px;color:var(--muted);font-weight:400;}
   /* Selección en modo venta */
-  .sale-select-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(18,20,30,.88);border-top:1px solid rgba(255,255,255,.08);padding:12px 16px;z-index:200;flex-direction:column;gap:8px;}
+  .sale-select-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(18,20,30,.88);border-top:1px solid rgba(255,255,255,.08);padding:12px 16px 20px;z-index:150;flex-direction:column;gap:8px;}
   .sale-select-bar.visible{display:flex;}
   .sale-select-top{display:flex;align-items:center;justify-content:space-between;}
   .sale-select-count{font-size:13px;font-weight:700;}
@@ -372,6 +372,8 @@
   .back-top{position:fixed;bottom:24px;right:16px;width:40px;height:40px;background:rgba(28,31,42,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.07);border-radius:50%;color:rgba(240,242,255,.4);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:150;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .25s,transform .25s,color .15s,background .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .back-top:hover{background:rgba(28,31,42,.8);color:rgba(240,242,255,.9);}
   .back-top.visible{opacity:1;pointer-events:auto;transform:translateY(0);}
+  .sale-select-bar.visible~.back-top, body:has(.sale-select-bar.visible) .back-top{bottom:130px;}
+  .float-search-btn{z-index:300;}
   .back-top:active{transform:scale(.88);}
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;font-size:13px;font-weight:600;padding:10px 20px;border-radius:20px;z-index:300;transition:opacity .3s ease,visibility .3s ease;pointer-events:none;opacity:0;visibility:hidden;}
   .toast.show{opacity:1;visibility:visible;}
@@ -1292,14 +1294,14 @@ function patchCard(cardEl, p){
   const qtyVal=cardEl.querySelector('.qty-val');
   if(qtyVal && qtyVal.textContent!=qty) qtyVal.textContent=qty;
 
-  // Precio — actualizar según estado auth
-  const priceEl=cardEl.querySelector('.price, .price-locked');
+  // Precio — modo venta o modo compra
+  const priceEl=cardEl.querySelector('.price, .price-locked, .sale-price');
   if(priceEl){
     const tmp=document.createElement('div');
-    tmp.innerHTML=priceDisplay(p);
+    tmp.innerHTML=saleMode ? salePriceDisplay(p) : priceDisplay(p);
     const newEl=tmp.firstElementChild;
     if(newEl && priceEl.className!==newEl.className) priceEl.replaceWith(newEl);
-    else if(priceEl.textContent!==newEl.textContent) priceEl.textContent=newEl.textContent;
+    else if(newEl && priceEl.innerHTML!==newEl.innerHTML) priceEl.replaceWith(newEl);
   }
   // Nota precio
   const noteEl=cardEl.querySelector('.price-note');
@@ -2819,7 +2821,7 @@ function shareSaleWhatsApp(){
   });
   msg+=`
 _Catálogo de productos_`;
-  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,'_blank');
+  window.location.href=`https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 
 async function shareSalePDF(){
