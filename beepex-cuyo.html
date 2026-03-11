@@ -361,8 +361,6 @@
   .sale-prices-table td{padding:8px 6px;border-bottom:1px solid var(--border);vertical-align:middle;}
   .sale-price-input{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--text);font-family:inherit;width:90px;text-align:right;}
   .sale-price-input:focus{outline:none;border-color:var(--accent);}
-  .sale-pct-input{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--text);font-family:inherit;width:55px;text-align:right;}
-  .sale-pct-input:focus{outline:none;border-color:var(--accent);}
   .sale-save-row{display:flex;justify-content:flex-end;margin-top:12px;}
   .sale-mode .desc-modal-margen{display:none!important;}
   .sale-mode #descModalPvp{display:none!important;}
@@ -3134,53 +3132,54 @@ function closeSalePrices(){
 
 function renderSalePricesPanel(filter=''){
   const cont=document.getElementById('salePricesList');
-  const mayorista=(p)=>includeIVA?Math.round(p.price*(1+p.iva/100)):p.price;
+  const costo=(p)=>includeIVA?Math.round(p.price*(1+p.iva/100)):p.price;
   const q=filter.toLowerCase().trim();
-  const list=q?products.filter(p=>p.name.toLowerCase().includes(q)||p.sku.includes(q)):products;
-  // Renderizar filas
-  const rows=list.map(p=>{
-    const pvp=p.pvp>0?fmt(p.pvp):'-';
+  const allList=q?products.filter(p=>p.name.toLowerCase().includes(q)||p.sku.includes(q)):products;
+
+  // Separar BEEPAW (tienen PVP) de genéricos
+  const beepaw=allList.filter(p=>p.brand==='BEEPAW');
+  const genericos=allList.filter(p=>p.brand!=='BEEPAW');
+
+  const makeRow=(p)=>{
     const current=userSalePrices[p.sku]||'';
-    const may=mayorista(p);
-    const pct=current?Math.round(((current-may)/may)*100):'';
     return `<tr>
-      <td style="font-weight:600;font-size:11px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</td>
-      <td style="text-align:right;color:var(--muted);font-size:11px;">${pvp}</td>
+      <td style="font-weight:600;font-size:11px;">${p.name}</td>
+      <td style="text-align:right;color:var(--muted);font-size:11px;white-space:nowrap;">${p.pvp>0?fmt(p.pvp):fmt(costo(p))}</td>
       <td style="text-align:right">
         <input class="sale-price-input" id="sp-${p.sku}" type="number" value="${current}" placeholder="0"
           oninput="onSalePriceInput('${p.sku}','price')" onblur="autoSavePrice('${p.sku}')">
       </td>
-      <td style="text-align:right">
-        <input class="sale-pct-input" id="spct-${p.sku}" type="number" value="${pct}" placeholder="%"
-          oninput="onSalePriceInput('${p.sku}','pct')">
-      </td>
     </tr>`;
-  }).join('');
-  cont.innerHTML=`
-    <table class="sale-prices-table">
-      <thead><tr>
-        <th>Producto</th>
-        <th style="text-align:right">PVP</th>
-        <th style="text-align:right">Mi precio</th>
-        <th style="text-align:right">%</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+  };
+
+  const headerBeepaw=`<thead><tr>
+    <th>Producto</th>
+    <th style="text-align:right">PVP</th>
+    <th style="text-align:right">Mi precio</th>
+  </tr></thead>`;
+
+  const headerGenericos=`<thead><tr>
+    <th>Producto</th>
+    <th style="text-align:right">Costo</th>
+    <th style="text-align:right">Mi precio</th>
+  </tr></thead>`;
+
+  let html='';
+  if(beepaw.length){
+    html+=`<table class="sale-prices-table">${headerBeepaw}<tbody>${beepaw.map(makeRow).join('')}</tbody></table>`;
+  }
+  if(genericos.length){
+    html+=`<div style="height:1px;background:var(--border);margin:16px 0 4px;"></div>`;
+    html+=`<table class="sale-prices-table">${headerGenericos}<tbody>${genericos.map(makeRow).join('')}</tbody></table>`;
+  }
+
+  cont.innerHTML=html;
 }
 
 function onSalePriceInput(sku, field){
+  // field='price' — solo se usa precio directo ahora
   const p=productMap[sku]; if(!p) return;
-  const mayorista=includeIVA?Math.round(p.price*(1+p.iva/100)):p.price;
-  const priceEl=document.getElementById('sp-'+sku);
-  const pctEl=document.getElementById('spct-'+sku);
-  if(field==='price'){
-    const price=parseFloat(priceEl.value)||0;
-    if(price>0 && mayorista>0) pctEl.value=Math.round(((price-mayorista)/mayorista)*100);
-    else pctEl.value='';
-  } else {
-    const pct=parseFloat(pctEl.value);
-    if(!isNaN(pct) && mayorista>0) priceEl.value=Math.round(mayorista*(1+pct/100));
-  }
+  // sin acción adicional — autoSavePrice maneja el guardado en onblur
 }
 
 async function autoSavePrice(sku){
