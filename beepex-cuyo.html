@@ -2634,7 +2634,15 @@ async function loadProfile(){
     renderGrid();
   }
   // Actualizar presencia al cargar perfil
-  if(userApproved){ updatePresence(); loadSalePrices(); }
+  if(userApproved){
+    updatePresence();
+    await loadSalePrices();
+    if(saleMode){
+      // Precios cargados — destruir cards y re-renderizar con precios de venta
+      document.querySelectorAll('#grid .card').forEach(el=>el.remove());
+      renderGrid();
+    }
+  }
 }
 
 function updateAuthUI(){
@@ -2693,10 +2701,13 @@ function toggleUserMenu(){
 let saleSelected=new Set();
 let selectingMode=false;
 
-function toggleSaleMode(){
+async function toggleSaleMode(){
   saleMode=!saleMode;
   localStorage.setItem('beepex_sale_mode', saleMode?'1':'0');
   applySaleMode();
+  if(saleMode) await loadSalePrices();
+  // Destruir cards existentes para forzar recreación con precio correcto
+  document.querySelectorAll('#grid .card').forEach(el=>el.remove());
   renderGrid();
   updateAuthUI();
   showToast(saleMode?'🏪 Modo Venta activado':'🛒 Modo Compra activado');
@@ -2977,7 +2988,12 @@ async function autoSavePrice(sku){
   const ok=await saveSalePrice(sku, price);
   if(ok){
     showToast(price>0?'✅ Precio guardado':'🗑 Precio eliminado');
-    renderGrid(); // siempre actualizar vitrina
+    // Parchar solo esa card si está en modo venta
+    if(saleMode){
+      const p=productMap[sku];
+      const cardEl=document.getElementById('card-'+sku);
+      if(p && cardEl) patchCard(cardEl, p);
+    }
   }
 }
 
