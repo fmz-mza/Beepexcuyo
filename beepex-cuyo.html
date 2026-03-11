@@ -342,7 +342,7 @@
   .sale-price{font-size:18px;font-weight:700;margin-top:4px;color:var(--text);}
   .sale-price.empty{font-size:13px;color:var(--muted);font-weight:400;}
   /* Selección en modo venta */
-  .sale-select-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(18,20,30,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid rgba(255,255,255,.08);padding:12px 16px;z-index:200;flex-direction:column;gap:8px;}
+  .sale-select-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(18,20,30,.88);border-top:1px solid rgba(255,255,255,.08);padding:12px 16px;z-index:200;flex-direction:column;gap:8px;}
   .sale-select-bar.visible{display:flex;}
   .sale-select-top{display:flex;align-items:center;justify-content:space-between;}
   .sale-select-count{font-size:13px;font-weight:700;}
@@ -351,7 +351,7 @@
   .sale-action-btn.primary{background:var(--accent);color:#fff;}
   .sale-action-btn.secondary{background:var(--surface);border:1px solid var(--border);color:var(--text);}
   .card.sale-selected{outline:2px solid var(--accent);outline-offset:2px;}
-  .sale-check{display:none;position:absolute;bottom:54px;right:8px;width:28px;height:28px;border-radius:8px;background:rgba(28,31,42,.7);backdrop-filter:blur(4px);border:2px solid rgba(255,255,255,.15);cursor:pointer;z-index:10;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.6);transition:background .15s,border .15s;}
+  .sale-check{display:none;position:absolute;bottom:54px;left:8px;width:28px;height:28px;border-radius:8px;background:rgba(28,31,42,.7);border:2px solid rgba(255,255,255,.15);cursor:pointer;z-index:10;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.6);transition:background .15s,border .15s;}
   .sale-mode .sale-check{display:flex;}
   .card.sale-selected .sale-check{background:var(--accent);border-color:var(--accent);color:#fff;}
   /* Panel precios de venta */
@@ -1236,7 +1236,7 @@ function createCard(p){
   div.className=`card${qty>0?' in-cart':''}${isPrev?' is-preventa':''}${isNoStock?' is-nostock':''}`;
   div.innerHTML=`
     <div class="sale-check" id="chk-${p.sku}" onclick="event.stopPropagation();toggleSaleSelect('${p.sku}')">✓</div>
-    <div class="card-img" onclick="openLightbox('${p.sku}')">
+    <div class="card-img" onclick="saleMode?toggleSaleSelect('${p.sku}'):openLightbox('${p.sku}')">
       <img id="img-${p.sku}" data-sku="${p.sku}" alt="${p.name}">
       <div class="ph">📷</div>
       ${isPrev?`<div class="preventa-banner">🕐 ${p.stock.toUpperCase()}</div>`:''}
@@ -1249,7 +1249,7 @@ function createCard(p){
         <span class="tag ${tagClass}">${stockLabel(p.stock)}</span>
       </div>
       <div class="iva-label">IVA ${p.iva}%</div>
-      <div class="prod-name">${p.name}</div>
+      <div class="prod-name" onclick="if(saleMode) toggleSaleSelect('${p.sku}')" style="cursor:${saleMode?'pointer':'default'}">${p.name}</div>
       <div class="sku">SKU: ${p.sku}</div>
       ${saleMode ? salePriceDisplay(p) : priceDisplay(p)}
       ${saleMode ? '' : priceNoteDisplay()}
@@ -2734,26 +2734,30 @@ async function loadSalePrices(){
   } catch(e){ console.warn('loadSalePrices error:', e); }
 }
 
+const _savingSkus=new Set();
 async function saveSalePrice(sku, price){
+  if(_savingSkus.has(sku)) return false; // evitar race condition
+  _savingSkus.add(sku);
   const token=localStorage.getItem('sb_access_token');
   try{
-    // DELETE + INSERT (evita upsert policy issues)
     await fetch(`${SUPABASE_URL}/rest/v1/user_prices?user_id=eq.${currentUser.id}&sku=eq.${sku}`,{
       method:'DELETE',
       headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
     });
     if(price>0){
-      await fetch(`${SUPABASE_URL}/rest/v1/user_prices`,{
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/user_prices`,{
         method:'POST',
         headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
         body:JSON.stringify({user_id:currentUser.id, sku, price})
       });
-      userSalePrices[sku]=price;
+      if(r.ok||r.status===201) userSalePrices[sku]=price;
+      else throw new Error('insert failed');
     } else {
       delete userSalePrices[sku];
     }
     return true;
-  } catch(e){ return false; }
+  } catch(e){ console.warn('saveSalePrice error:',e); return false; }
+  finally{ _savingSkus.delete(sku); }
 }
 
 // Selección en modo venta
@@ -2841,10 +2845,11 @@ async function shareSalePDF(){
   const imgB64={};
   await Promise.all(items.map(async item=>{
     try{
-      const res=await fetch(item.img);
-      if(!res.ok) return;
-      const blob=await res.blob();
-      imgB64[item.sku]=await new Promise(r=>{ const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsDataURL(blob); });
+      // Usar imgCache que ya tiene la URL con extensión correcta (.jpg/.webp/.png)
+      const cachedUrl=imgCache[item.sku];
+      if(!cachedUrl || cachedUrl==='error') return;
+      const b64=await imgToBase64(cachedUrl);
+      if(b64) imgB64[item.sku]=b64;
     } catch(e){}
   }));
 
@@ -2968,8 +2973,10 @@ async function autoSavePrice(sku){
   const priceEl=document.getElementById('sp-'+sku); if(!priceEl) return;
   const price=parseFloat(priceEl.value)||0;
   const ok=await saveSalePrice(sku, price);
-  if(ok) showToast(price>0?'✅ Precio guardado':'🗑 Precio eliminado');
-  if(saleMode) renderGrid();
+  if(ok){
+    showToast(price>0?'✅ Precio guardado':'🗑 Precio eliminado');
+    renderGrid(); // siempre actualizar vitrina
+  }
 }
 
 function closeUserMenu(){
