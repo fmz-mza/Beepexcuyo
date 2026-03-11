@@ -351,7 +351,7 @@
   .sale-action-btn.primary{background:var(--accent);color:#fff;}
   .sale-action-btn.secondary{background:var(--surface);border:1px solid var(--border);color:var(--text);}
   .card.sale-selected{outline:2px solid var(--accent);outline-offset:2px;}
-  .sale-check{display:none;position:absolute;bottom:54px;left:8px;width:28px;height:28px;border-radius:8px;background:rgba(28,31,42,.7);border:2px solid rgba(255,255,255,.15);cursor:pointer;z-index:10;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.6);transition:background .15s,border .15s;}
+  .sale-check{display:none;position:absolute;bottom:54px;right:8px;width:28px;height:28px;border-radius:8px;background:rgba(28,31,42,.7);border:2px solid rgba(255,255,255,.15);cursor:pointer;z-index:10;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.6);transition:background .15s,border .15s;}
   .sale-mode .sale-check{display:flex;}
   .card.sale-selected .sale-check{background:var(--accent);border-color:var(--accent);color:#fff;}
   /* Panel precios de venta */
@@ -367,7 +367,7 @@
   .sale-mode #descModalPvp{display:none!important;}
   .sale-mode .desc-modal-iva{display:none!important;}
   .sale-mode #descModalSku{display:none!important;}
-  .sale-mode #descModalPrice{display:none!important;}
+  /* .sale-mode #descModalPrice — se maneja en JS para mostrar precio venta */
   .sale-mode .desc-modal-price-note{display:none!important;}
   .back-top{position:fixed;bottom:24px;right:16px;width:40px;height:40px;background:rgba(28,31,42,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.07);border-radius:50%;color:rgba(240,242,255,.4);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:150;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .25s,transform .25s,color .15s,background .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .back-top:hover{background:rgba(28,31,42,.8);color:rgba(240,242,255,.9);}
@@ -469,7 +469,7 @@ let userSalePrices={}; // {sku: price}
 </head>
 <body>
 <header class="header">
-  <div class="sale-banner" id="saleBanner">🏪 MODO VENTA — Tus clientes ven los precios que configuraste</div>
+  <div class="sale-banner" id="saleBanner">🏪 MODO VENTA — Precios venta público</div>
   <div id="siteBanner" class="site-banner">
     <span id="siteBannerText"></span>
     <button class="site-banner-close" onclick="document.getElementById('siteBanner').classList.remove('visible')">✕</button>
@@ -2146,6 +2146,15 @@ function openDesc(sku){
     pvpTextEl.textContent=''; margenEl.style.display='none';
     if(descActionsEl) descActionsEl.style.display='none';
     if(descShareRowEl) descShareRowEl.style.display='none';
+  } else if(saleMode){
+    // Modo venta: mostrar precio de venta configurado
+    const sp=userSalePrices[sku];
+    priceModalEl.innerHTML=sp
+      ?`<span class="price" style="font-size:20px">${fmt(sp)}</span>`
+      :'<span style="color:var(--muted);font-size:14px">Sin precio configurado</span>';
+    pvpTextEl.textContent=''; margenEl.style.display='none';
+    if(descActionsEl) descActionsEl.style.display='none';
+    if(descShareRowEl) descShareRowEl.style.display='none';
   } else {
     priceModalEl.textContent=p.price===0?'Consultar':fmt(precio);
     if(p.pvp>0){
@@ -2823,15 +2832,24 @@ function shareSaleWhatsApp(){
   if(!items.length){ showToast('Seleccioná al menos un producto'); return; }
   const nombre=document.getElementById('clientName').value.trim()||'Mi negocio';
   let msg=`🏪 *${nombre}*
+`;
+  msg+=`━━━━━━━━━━━━━━━━━
 
 `;
-  items.forEach(i=>{
-    const precio=i.price>0?`$${i.price.toLocaleString('es-AR')}`:'A consultar';
-    msg+=`▪ ${i.name} — *${precio}*
+  items.forEach((i,idx)=>{
+    const precio=i.price>0?`💰 *$${i.price.toLocaleString('es-AR')}*`:'💰 A consultar';
+    msg+=`*${idx+1}. ${i.name}*
+`;
+    if(i.brand) msg+=`🏷 ${i.brand}
+`;
+    if(i.desc) msg+=`📝 ${i.desc}
+`;
+    msg+=`${precio}
+
 `;
   });
-  msg+=`
-_Catálogo de productos_`;
+  msg+=`━━━━━━━━━━━━━━━━━
+_Consultas por este medio_ 😊`;
   window.location.href=`https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 
@@ -2866,51 +2884,86 @@ async function shareSalePDF(){
     } catch(e){}
   }));
 
-  // Header
-  doc.setFillColor(28,31,42);
-  doc.rect(0,0,W,28,'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(15); doc.setFont('helvetica','bold');
-  doc.text(nombre, margin, 16);
-  doc.setFontSize(9); doc.setFont('helvetica','normal');
-  doc.setTextColor(160,165,200);
-  doc.text('Lista de precios · '+new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'}), margin, 23);
-  y=36;
+  // Fondo oscuro en toda la página
+  const BG=[18,20,30], SURFACE=[28,31,42], BORDER=[50,55,75];
+  const TEXT=[240,242,255], MUTED=[130,135,165], ACCENT=[74,128,245];
 
-  // Items con imagen
-  const imgSize=22, rowH=26, gap=4;
+  const fillBg=()=>{ doc.setFillColor(...BG); doc.rect(0,0,W,297,'F'); };
+  fillBg();
+
+  // Header
+  doc.setFillColor(...SURFACE);
+  doc.rect(0,0,W,30,'F');
+  doc.setDrawColor(...BORDER); doc.line(0,30,W,30);
+  doc.setTextColor(...TEXT);
+  doc.setFontSize(15); doc.setFont('helvetica','bold');
+  doc.text(nombre, margin, 17);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.setTextColor(...MUTED);
+  doc.text('Lista de precios · '+new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'}), margin, 24);
+  y=38;
+
+  const imgSize=28, gap=5;
   items.forEach(item=>{
-    if(y+rowH>282){ doc.addPage(); y=margin; }
+    // Calcular altura necesaria para este item
+    const tx=margin+imgSize+gap;
+    const maxTextW=W-tx-margin-2;
+    doc.setFontSize(10); doc.setFont('helvetica','bold');
+    const nameLines=doc.splitTextToSize(item.name, maxTextW);
+    doc.setFontSize(8); doc.setFont('helvetica','normal');
+    const descLines=item.desc?doc.splitTextToSize(item.desc, maxTextW):[];
+    const textH=Math.max(imgSize, (nameLines.length*5)+(descLines.length*4.5)+14);
+    const rowH=textH+10;
+
+    if(y+rowH>282){
+      doc.addPage();
+      fillBg();
+      y=margin;
+    }
+
+    // Fondo de item (alternado)
+    const isEven=items.indexOf(item)%2===0;
+    if(isEven){ doc.setFillColor(...SURFACE); doc.rect(margin-2,y-2,W-margin*2+4,rowH,'F'); }
+
     // Imagen
     if(imgB64[item.sku]){
-      try{ doc.addImage(imgB64[item.sku],'JPEG',margin,y,imgSize,imgSize); } catch(e){}
+      try{
+        doc.setFillColor(...SURFACE);
+        doc.roundedRect(margin,y,imgSize,imgSize,2,2,'F');
+        doc.addImage(imgB64[item.sku],'JPEG',margin,y,imgSize,imgSize);
+      } catch(e){}
     } else {
-      doc.setFillColor(240,241,245); doc.rect(margin,y,imgSize,imgSize,'F');
+      doc.setFillColor(...BORDER); doc.rect(margin,y,imgSize,imgSize,'F');
+      doc.setTextColor(...MUTED); doc.setFontSize(16);
+      doc.text('?', margin+imgSize/2, y+imgSize/2+3, {align:'center'});
     }
+
     // Nombre
-    const tx=margin+imgSize+gap;
-    doc.setTextColor(20,20,40); doc.setFontSize(10); doc.setFont('helvetica','bold');
-    const nameLines=doc.splitTextToSize(item.name, W-tx-margin-20);
-    doc.text(nameLines[0], tx, y+7);
-    // Descripción
-    if(item.desc){
-      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,130);
-      const descLines=doc.splitTextToSize(item.desc, W-tx-margin-20);
-      doc.text(descLines[0], tx, y+13);
+    doc.setTextColor(...TEXT); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text(nameLines, tx, y+7);
+
+    // Descripción — todas las líneas
+    if(descLines.length>0){
+      const descY=y+7+(nameLines.length*5)+2;
+      doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
+      doc.text(descLines, tx, descY);
     }
-    // Precio
-    const precio=item.price>0?'$'+item.price.toLocaleString('es-AR'):'A consultar';
+
+    // Precio — abajo del bloque
+    const precio=item.price>0?'$ '+item.price.toLocaleString('es-AR'):'A consultar';
+    const precioY=y+rowH-5;
     doc.setFontSize(11); doc.setFont('helvetica','bold');
-    doc.setTextColor(item.price>0?34:150, item.price>0?197:150, item.price>0?94:170);
-    doc.text(precio, W-margin, y+7, {align:'right'});
+    doc.setTextColor(...ACCENT);
+    doc.text(precio, W-margin, precioY, {align:'right'});
+
     // Separador
-    doc.setDrawColor(220,221,230); doc.line(margin,y+rowH-1,W-margin,y+rowH-1);
-    y+=rowH;
+    doc.setDrawColor(...BORDER); doc.line(margin,y+rowH,W-margin,y+rowH);
+    y+=rowH+2;
   });
 
   // Footer
-  doc.setFontSize(7); doc.setTextColor(180,180,190);
-  doc.text(nombre+' · Lista de precios', W/2, 290, {align:'center'});
+  doc.setFontSize(7); doc.setTextColor(...MUTED);
+  doc.text(nombre+' · Lista de precios', W/2, 292, {align:'center'});
 
   const blob=doc.output('blob');
   const url=URL.createObjectURL(blob);
