@@ -351,9 +351,10 @@
   .sale-action-btn.primary{background:var(--accent);color:#fff;}
   .sale-action-btn.secondary{background:var(--surface);border:1px solid var(--border);color:var(--text);}
   .card.sale-selected{outline:2px solid var(--accent);outline-offset:2px;}
-  .sale-check{display:none;position:absolute;bottom:54px;right:8px;width:28px;height:28px;border-radius:8px;background:rgba(28,31,42,.7);border:2px solid rgba(255,255,255,.15);cursor:pointer;z-index:10;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.6);transition:background .15s,border .15s;}
+  .sale-check{display:none;width:100%;padding:8px 0 2px;align-items:center;justify-content:center;gap:5px;cursor:pointer;border-top:1px solid var(--border);font-size:12px;font-weight:700;color:var(--muted);transition:color .15s,background .15s;border-radius:0 0 14px 14px;}
   .sale-mode .sale-check{display:flex;}
-  .card.sale-selected .sale-check{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .sale-mode .sale-check:active{background:var(--surface);}
+  .card.sale-selected .sale-check{color:var(--accent);background:rgba(74,128,245,.07);}
   /* Panel precios de venta */
   .sale-prices-table{width:100%;border-collapse:collapse;font-size:12px;}
   .sale-prices-table th{text-align:left;padding:8px 6px;color:var(--muted);font-weight:600;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border);}
@@ -681,8 +682,7 @@ let userSalePrices={}; // {sku: price}
     <button class="sale-action-btn secondary" onclick="clearSaleSelection()">Limpiar</button>
   </div>
   <div class="sale-select-actions">
-    <button class="sale-action-btn secondary" onclick="shareSaleWhatsApp()">📱 WhatsApp</button>
-    <button class="sale-action-btn primary" onclick="shareSalePDF()">📄 PDF</button>
+    <button class="sale-action-btn primary" onclick="shareSalePDF()">📤 Compartir</button>
   </div>
 </div>
 <!-- Panel Mis precios de venta -->
@@ -1237,8 +1237,7 @@ function createCard(p){
   div.id=`card-${p.sku}`;
   div.className=`card${qty>0?' in-cart':''}${isPrev?' is-preventa':''}${isNoStock?' is-nostock':''}`;
   div.innerHTML=`
-    <div class="sale-check" id="chk-${p.sku}" onclick="event.stopPropagation();toggleSaleSelect('${p.sku}')">✓</div>
-    <div class="card-img" onclick="saleMode?toggleSaleSelect('${p.sku}'):openLightbox('${p.sku}')">
+    <div class="card-img" onclick="openLightbox('${p.sku}')">
       <img id="img-${p.sku}" data-sku="${p.sku}" alt="${p.name}">
       <div class="ph">📷</div>
       ${isPrev?`<div class="preventa-banner">🕐 ${p.stock.toUpperCase()}</div>`:''}
@@ -1251,12 +1250,13 @@ function createCard(p){
         <span class="tag ${tagClass}">${stockLabel(p.stock)}</span>
       </div>
       <div class="iva-label">IVA ${p.iva}%</div>
-      <div class="prod-name" onclick="if(saleMode) toggleSaleSelect('${p.sku}')" style="cursor:${saleMode?'pointer':'default'}">${p.name}</div>
+      <div class="prod-name">${p.name}</div>
       <div class="sku">SKU: ${p.sku}</div>
       ${saleMode ? salePriceDisplay(p) : priceDisplay(p)}
       ${saleMode ? '' : priceNoteDisplay()}
       ${saleMode ? '' : pvpDisplay(p)}
 
+      <div class="sale-check" id="chk-${p.sku}" onclick="toggleSaleSelect('${p.sku}')">${saleSelected&&saleSelected.has(p.sku)?'✓ Seleccionado':'+ Seleccionar'}</div>
       <div class="qty-row">
         <button class="qty-btn" onclick="chg('${p.sku}',-1)">−</button>
         <span class="qty-val">${qty}</span>
@@ -2786,11 +2786,16 @@ async function saveSalePrice(sku, price){
 function toggleSaleSelect(sku){
   if(!saleMode) return;
   selectingMode=true;
-  document.body.classList.add('selecting'); // activa .sale-mode.selecting .sale-check
+  document.body.classList.add('selecting');
   if(saleSelected.has(sku)) saleSelected.delete(sku);
   else saleSelected.add(sku);
+  const selected=saleSelected.has(sku);
   const card=document.getElementById('card-'+sku);
-  if(card) card.classList.toggle('sale-selected', saleSelected.has(sku));
+  if(card){
+    card.classList.toggle('sale-selected', selected);
+    const chk=document.getElementById('chk-'+sku);
+    if(chk) chk.textContent=selected?'✓ Seleccionado':'+ Seleccionar';
+  }
   updateSaleSelectBar();
 }
 
@@ -3005,7 +3010,7 @@ async function shareSalePDF(){
   doc.setFontSize(8); doc.setFont('helvetica','normal');
   doc.setTextColor(...MUTED);
   doc.text('Lista de precios · '+today, margin, 22);
-  doc.text('Consultanos para más información 😊', W-margin, 22, {align:'right'});
+
   y=40;
 
   const imgSize=28, gap=5;
@@ -3071,7 +3076,7 @@ async function shareSalePDF(){
   y=Math.max(y+4, 282);
   doc.setDrawColor(...BORDER); doc.line(0,286,W,286);
   doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
-  doc.text('🐾 Beepex Cuyo · beepex.com.ar', W/2, 291, {align:'center'});
+  doc.text(nombre, W/2, 291, {align:'center'});
 
   // Compartir o descargar — mismo patrón que exportPDF
   const pdfBlob=doc.output('blob');
