@@ -2827,37 +2827,140 @@ function getSaleItems(){
   }).filter(Boolean);
 }
 
-function shareSaleWhatsApp(){
+async function shareSaleWhatsApp(){
   const items=getSaleItems();
   if(!items.length){ showToast('Seleccioná al menos un producto'); return; }
-  const nombre=document.getElementById('clientName').value.trim()||'Mi negocio';
-  let msg=`🏪 *${nombre}*
-`;
-  msg+=`━━━━━━━━━━━━━━━━━
+  showToast('⏳ Generando imágenes...');
+  try{
+    const files=[];
+    for(const item of items){
+      const png=await buildSaleCanvas(item);
+      if(png) files.push(new File([png], item.name.replace(/[^a-z0-9]/gi,'_')+'.png', {type:'image/png'}));
+    }
+    if(!files.length){ showToast('❌ No se pudieron generar las imágenes'); return; }
+    const text='Consultanos para más información 😊';
+    if(navigator.canShare&&navigator.canShare({files})){
+      await navigator.share({files, title:'Productos', text});
+    } else {
+      // Fallback: compartir como texto si no soporta archivos
+      const nombre=document.getElementById('clientName').value.trim()||'Mi negocio';
+      let msg=`🏪 *${nombre}*
+━━━━━━━━━━━━━━━━━
 
 `;
-  items.forEach((i,idx)=>{
-    const precio=i.price>0?`💰 *$${i.price.toLocaleString('es-AR')}*`:'💰 A consultar';
-    msg+=`*${idx+1}. ${i.name}*
+      items.forEach((i,idx)=>{
+        const precio=i.price>0?`💰 *$${i.price.toLocaleString('es-AR')}`:'💰 A consultar';
+        msg+=`*${idx+1}. ${i.name}*
 `;
-    if(i.brand) msg+=`🏷 ${i.brand}
+        if(i.brand) msg+=`🏷 ${i.brand}
 `;
-    if(i.desc) msg+=`📝 ${i.desc}
+        if(i.desc) msg+=`📝 ${i.desc}
 `;
-    msg+=`${precio}
+        msg+=`${precio}
 
 `;
-  });
-  msg+=`━━━━━━━━━━━━━━━━━
-_Consultas por este medio_ 😊`;
-  window.location.href=`https://wa.me/?text=${encodeURIComponent(msg)}`;
+      });
+      msg+=`━━━━━━━━━━━━━━━━━
+_${text}_`;
+      window.location.href=`https://wa.me/?text=${encodeURIComponent(msg)}`;
+    }
+  } catch(e){
+    if(e.name!=='AbortError') showToast('❌ Error al compartir');
+  }
+}
+
+async function buildSaleCanvas(item){
+  // Generar canvas oscuro igual que shareProductImage pero con precio de venta
+  const p=productMap[item.sku]; if(!p) return null;
+  const meta=productMeta[item.sku];
+  const W=1080, PAD=48;
+  let y=PAD;
+
+  // Cargar imagen
+  let productImg=null;
+  const imgUrl=imgCache[item.sku]&&imgCache[item.sku]!=='error'?imgCache[item.sku]:null;
+  if(imgUrl){
+    try{
+      productImg=await new Promise((res)=>{
+        const im=new Image(); im.crossOrigin='anonymous';
+        im.onload=()=>res(im); im.onerror=()=>res(null); im.src=imgUrl;
+      });
+    } catch(e){}
+  }
+
+  const IMG_H=productImg?560:0;
+  const tempC=document.createElement('canvas'); tempC.width=W;
+  const tempCtx=tempC.getContext('2d');
+  const descText=meta&&meta.desc&&meta.desc!=='Sin descripción disponible.'?meta.desc:'';
+  tempCtx.font='28px system-ui,sans-serif';
+  const descLines=wrapText(tempCtx,descText,W-PAD*2,34);
+
+  const totalH=PAD+IMG_H+(IMG_H?24:0)+60+44+72+(descLines.length?(descLines.length*38+24):0)+80+PAD;
+  const canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=totalH;
+  const ctx=canvas.getContext('2d');
+
+  // Fondo
+  const grad=ctx.createLinearGradient(0,0,0,totalH);
+  grad.addColorStop(0,'#1a1b22'); grad.addColorStop(1,'#12131a');
+  ctx.fillStyle=grad; ctx.fillRect(0,0,W,totalH);
+
+  // Imagen producto
+  if(productImg){
+    const maxW=W-PAD*2;
+    const scale=Math.min(maxW/productImg.width, IMG_H/productImg.height);
+    const iw=productImg.width*scale, ih=productImg.height*scale;
+    const actualH=Math.ceil(ih);
+    roundRect(ctx,PAD+(maxW-iw)/2,y,iw,actualH,16);
+    ctx.save(); ctx.clip();
+    ctx.drawImage(productImg,PAD+(maxW-iw)/2,y,iw,actualH);
+    ctx.restore();
+    y+=actualH+24;
+  }
+
+  // Marca
+  if(p.brand){
+    ctx.font='bold 26px system-ui,sans-serif';
+    ctx.fillStyle='#6b7280'; ctx.textAlign='left';
+    ctx.fillText(p.brand.toUpperCase(),PAD,y+26); y+=44;
+  }
+
+  // Nombre
+  ctx.font='bold 44px system-ui,sans-serif';
+  ctx.fillStyle='#ffffff'; ctx.textAlign='left';
+  const nameLines=wrapText(ctx,p.name,W-PAD*2,52);
+  nameLines.forEach(l=>{ ctx.fillText(l,PAD,y+46); y+=52; });
+  y+=8;
+
+  // Precio de venta
+  const displayPrice=item.price>0?fmt(item.price):'A consultar';
+  ctx.font='bold 56px system-ui,sans-serif';
+  ctx.fillStyle='#4a80f5';
+  ctx.fillText(displayPrice,PAD,y+56); y+=72;
+
+  // Descripción
+  if(descLines.length){
+    ctx.font='28px system-ui,sans-serif';
+    ctx.fillStyle='#9ca3af';
+    descLines.forEach(l=>{ ctx.fillText(l,PAD,y+32); y+=38; });
+    y+=16;
+  }
+
+  // Texto footer
+  y+=16;
+  ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,y,W,1); y+=20;
+  ctx.font='24px system-ui,sans-serif';
+  ctx.fillStyle='#4a4b55'; ctx.textAlign='center';
+  ctx.fillText('Consultanos para más información 😊',W/2,y+24);
+
+  return await new Promise(res=>canvas.toBlob(res,'image/png',0.92));
 }
 
 async function shareSalePDF(){
   const items=getSaleItems();
   if(!items.length){ showToast('Seleccioná al menos un producto'); return; }
   showToast('⏳ Generando PDF...');
-  // Lazy load jsPDF
+
   if(!window.jspdf){
     await new Promise((res,rej)=>{
       const s=document.createElement('script');
@@ -2867,109 +2970,123 @@ async function shareSalePDF(){
     });
   }
   const { jsPDF } = window.jspdf;
-  const nombre=document.getElementById('clientName').value.trim()||'Mi negocio';
-  const doc = new jsPDF({ unit:'mm', format:'a4' });
-  const W=210, margin=14;
+  const nombre=document.getElementById('clientName').value.trim()||'Lista de precios';
+  const today=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'});
+
+  // Mismos colores que exportPDF
+  const BG=[18,20,30], SURFACE=[28,31,42], CARD=[32,36,50], BORDER=[50,55,75];
+  const WHITE=[240,242,255], MUTED=[120,125,155], ACCENT=[74,128,245];
+
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210, margin=12;
   let y=margin;
 
-  // Precargar imágenes
+  const fillBg=()=>{ doc.setFillColor(...BG); doc.rect(0,0,W,297,'F'); };
+
+  // Precargar imágenes usando imgCache
   const imgB64={};
   await Promise.all(items.map(async item=>{
-    try{
-      // Usar imgCache que ya tiene la URL con extensión correcta (.jpg/.webp/.png)
-      const cachedUrl=imgCache[item.sku];
-      if(!cachedUrl || cachedUrl==='error') return;
-      const b64=await imgToBase64(cachedUrl);
-      if(b64) imgB64[item.sku]=b64;
-    } catch(e){}
+    const cachedUrl=imgCache[item.sku];
+    if(!cachedUrl||cachedUrl==='error') return;
+    const b64=await imgToBase64(cachedUrl);
+    if(b64) imgB64[item.sku]=b64;
   }));
 
-  // Fondo oscuro en toda la página
-  const BG=[18,20,30], SURFACE=[28,31,42], BORDER=[50,55,75];
-  const TEXT=[240,242,255], MUTED=[130,135,165], ACCENT=[74,128,245];
-
-  const fillBg=()=>{ doc.setFillColor(...BG); doc.rect(0,0,W,297,'F'); };
+  // ── Página inicial ──
   fillBg();
 
   // Header
   doc.setFillColor(...SURFACE);
-  doc.rect(0,0,W,30,'F');
-  doc.setDrawColor(...BORDER); doc.line(0,30,W,30);
-  doc.setTextColor(...TEXT);
-  doc.setFontSize(15); doc.setFont('helvetica','bold');
-  doc.text(nombre, margin, 17);
-  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.rect(0,0,W,32,'F');
+  doc.setDrawColor(...BORDER); doc.line(0,32,W,32);
+  doc.setTextColor(...WHITE);
+  doc.setFontSize(14); doc.setFont('helvetica','bold');
+  doc.text(nombre, margin, 14);
+  doc.setFontSize(8); doc.setFont('helvetica','normal');
   doc.setTextColor(...MUTED);
-  doc.text('Lista de precios · '+new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'}), margin, 24);
-  y=38;
+  doc.text('Lista de precios · '+today, margin, 22);
+  doc.text('Consultanos para más información 😊', W-margin, 22, {align:'right'});
+  y=40;
 
   const imgSize=28, gap=5;
-  items.forEach(item=>{
-    // Calcular altura necesaria para este item
-    const tx=margin+imgSize+gap;
-    const maxTextW=W-tx-margin-2;
-    doc.setFontSize(10); doc.setFont('helvetica','bold');
-    const nameLines=doc.splitTextToSize(item.name, maxTextW);
-    doc.setFontSize(8); doc.setFont('helvetica','normal');
-    const descLines=item.desc?doc.splitTextToSize(item.desc, maxTextW):[];
-    const textH=Math.max(imgSize, (nameLines.length*5)+(descLines.length*4.5)+14);
-    const rowH=textH+10;
 
-    if(y+rowH>282){
-      doc.addPage();
-      fillBg();
-      y=margin;
+  items.forEach((item,idx)=>{
+    // Calcular altura dinámica del item
+    const p=productMap[item.sku];
+    const meta=productMeta?productMeta[item.sku]:null;
+    const desc=meta?.desc&&meta.desc!=='Sin descripción disponible.'?meta.desc:'';
+    const tx=margin+imgSize+gap;
+    const maxW=W-tx-margin-2;
+
+    doc.setFontSize(9); doc.setFont('helvetica','bold');
+    const nameLines=doc.splitTextToSize(item.name||'', maxW);
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    const descLines=desc?doc.splitTextToSize(desc, maxW):[];
+
+    const contentH=(nameLines.length*5.5)+(descLines.length*4.5)+14;
+    const rowH=Math.max(imgSize+8, contentH)+6;
+
+    if(y+rowH>280){
+      doc.addPage(); fillBg(); y=margin;
     }
 
-    // Fondo de item (alternado)
-    const isEven=items.indexOf(item)%2===0;
-    if(isEven){ doc.setFillColor(...SURFACE); doc.rect(margin-2,y-2,W-margin*2+4,rowH,'F'); }
+    // Fondo alternado
+    if(idx%2===0){ doc.setFillColor(...CARD); doc.rect(margin-2,y-2,W-margin*2+4,rowH,'F'); }
 
     // Imagen
     if(imgB64[item.sku]){
       try{
         doc.setFillColor(...SURFACE);
         doc.roundedRect(margin,y,imgSize,imgSize,2,2,'F');
-        doc.addImage(imgB64[item.sku],'JPEG',margin,y,imgSize,imgSize);
+        doc.addImage(imgB64[item.sku],'JPEG',margin,y,imgSize,imgSize,undefined,'FAST');
       } catch(e){}
     } else {
-      doc.setFillColor(...BORDER); doc.rect(margin,y,imgSize,imgSize,'F');
-      doc.setTextColor(...MUTED); doc.setFontSize(16);
-      doc.text('?', margin+imgSize/2, y+imgSize/2+3, {align:'center'});
+      doc.setFillColor(...BORDER);
+      doc.roundedRect(margin,y,imgSize,imgSize,2,2,'F');
     }
 
     // Nombre
-    doc.setTextColor(...TEXT); doc.setFontSize(10); doc.setFont('helvetica','bold');
-    doc.text(nameLines, tx, y+7);
+    doc.setTextColor(...WHITE); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text(nameLines, tx, y+6);
 
-    // Descripción — todas las líneas
-    if(descLines.length>0){
-      const descY=y+7+(nameLines.length*5)+2;
-      doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
+    // Descripción
+    if(descLines.length){
+      const descY=y+6+(nameLines.length*5.5)+1;
+      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
       doc.text(descLines, tx, descY);
     }
 
-    // Precio — abajo del bloque
+    // Precio — alineado abajo derecha
     const precio=item.price>0?'$ '+item.price.toLocaleString('es-AR'):'A consultar';
-    const precioY=y+rowH-5;
     doc.setFontSize(11); doc.setFont('helvetica','bold');
     doc.setTextColor(...ACCENT);
-    doc.text(precio, W-margin, precioY, {align:'right'});
+    doc.text(precio, W-margin, y+rowH-6, {align:'right'});
 
-    // Separador
+    // Separador sutil
     doc.setDrawColor(...BORDER); doc.line(margin,y+rowH,W-margin,y+rowH);
     y+=rowH+2;
   });
 
   // Footer
-  doc.setFontSize(7); doc.setTextColor(...MUTED);
-  doc.text(nombre+' · Lista de precios', W/2, 292, {align:'center'});
+  y=Math.max(y+4, 282);
+  doc.setDrawColor(...BORDER); doc.line(0,286,W,286);
+  doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
+  doc.text('🐾 Beepex Cuyo · beepex.com.ar', W/2, 291, {align:'center'});
 
-  const blob=doc.output('blob');
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url;
-  a.download=`lista-${nombre.replace(/\s+/g,'-').toLowerCase()}.pdf`;
-  a.click(); URL.revokeObjectURL(url);
+  // Compartir o descargar — mismo patrón que exportPDF
+  const pdfBlob=doc.output('blob');
+  const fileName=`Lista_${nombre.replace(/[^a-z0-9]/gi,'_')}_${today.replace(/[^0-9]/g,'-')}.pdf`;
+
+  if(navigator.share&&navigator.canShare){
+    const file=new File([pdfBlob],fileName,{type:'application/pdf'});
+    if(navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:nombre, text:'Consultanos para más información 😊'});
+      return;
+    }
+  }
+  const url=URL.createObjectURL(pdfBlob);
+  const a=document.createElement('a'); a.href=url; a.download=fileName; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
   showToast('✅ PDF generado');
 }
 
