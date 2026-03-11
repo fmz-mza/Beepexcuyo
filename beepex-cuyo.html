@@ -1055,7 +1055,7 @@ function patchPrices(){
     if(cardEl) patchCard(cardEl, p);
   });
   document.getElementById('productCount').textContent=
-    `${lastRenderedSkus.length} producto${lastRenderedSkus.length!==1?'s':''} · Precios ${includeIVA?'con':'sin'} IVA`;
+    `${lastRenderedSkus.length} producto${lastRenderedSkus.length!==1?'s':''}`;
 }
 
 // ── Normalización de búsqueda ────────────────────────────────────────────────
@@ -1079,12 +1079,10 @@ function matchQuery(text, rawQ){
 
 // ── Filtros ───────────────────────────────────────────────────────────────────
 function renderBrands(){
-  const brands=['ALL',...new Set(products.map(p=>p.brand).filter(Boolean))];
-  let html=brands.map(b=>`<button class="filter-btn ${b===activeBrand?'active':''}" onclick="setBrand('${b}')">${b==='ALL'?'🐾 Todos':b}</button>`).join('');
-  html+=`<div class="filter-sep"></div>`;
-  html+=`<button class="filter-btn f-stock ${activeStock==='STOCK'?'active':''}" onclick="setStock('STOCK')">✅ En stock</button>`;
-  html+=`<button class="filter-btn f-preventa ${activeStock==='PREVENTA'?'active':''}" onclick="setStock('PREVENTA')">🕐 Preventa</button>`;
-  html+=`<button class="filter-btn f-nostock ${activeStock==='NOSTOCK'?'active':''}" onclick="setStock('NOSTOCK')">❌ Sin stock</button>`;
+  // Solo 2 categorías: TODOS y BEEPAW
+  const cats=['ALL','BEEPAW'];
+  const labels={'ALL':'🐾 Todos','BEEPAW':'BEEPAW'};
+  let html=cats.map(b=>`<button class="filter-btn ${b===activeBrand?'active':''}" onclick="setBrand('${b}')">${labels[b]}</button>`).join('');
   document.getElementById('brandFilters').innerHTML=html;
 }
 function setBrand(b){
@@ -1141,7 +1139,7 @@ function renderGrid(){
   lastRenderedSkus=sortedList.map(p=>p.sku);
   const grid=document.getElementById('grid');
   document.getElementById('productCount').textContent=
-    `${list.length} producto${list.length!==1?'s':''} · Precios ${includeIVA?'con':'sin'} IVA`;
+    `${list.length} producto${list.length!==1?'s':''}`;
 
   if(!list.length){
     // Ocultar todo en lugar de destruir
@@ -1231,8 +1229,6 @@ function createCard(p){
   const precio=mayorista(p);
   const st=stockType(p.stock);
   const isPrev=st==='PREVENTA', isNoStock=st==='NOSTOCK';
-  const brandClass=p.brand==='BEEPAW'?'brand-beepaw':'brand-gen';
-  const tagClass=st==='STOCK'?'t-stock':st==='PREVENTA'?'t-preventa':'t-nostock';
   const div=document.createElement('div');
   div.id=`card-${p.sku}`;
   div.className=`card${qty>0?' in-cart':''}${isPrev?' is-preventa':''}${isNoStock?' is-nostock':''}`;
@@ -1246,8 +1242,7 @@ function createCard(p){
     </div>
     <div class="card-body">
       <div class="tags">
-        <span class="tag ${brandClass}">${p.brand}</span>
-        <span class="tag ${tagClass}">${stockLabel(p.stock)}</span>
+        ${p.brand==='BEEPAW'?'<span class="tag brand-beepaw">BEEPAW</span>':''}
       </div>
       <div class="iva-label">IVA ${p.iva}%</div>
       <div class="prod-name">${p.name}</div>
