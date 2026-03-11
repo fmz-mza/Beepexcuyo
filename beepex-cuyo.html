@@ -369,6 +369,10 @@
   .sale-mode .desc-modal-iva{display:none!important;}
   .sale-mode #descModalSku{display:none!important;}
   /* .sale-mode #descModalPrice — se maneja en JS para mostrar precio venta */
+  .sale-mode .card .tag.brand-gen{display:none;}
+  .sale-mode .card .tag.t-stock{display:none;}
+  .sale-mode .card .tag.t-preventa{display:none;}
+  .sale-mode .card .tag.t-nostock{display:none;}
   .sale-mode .desc-modal-price-note{display:none!important;}
   .back-top{position:fixed;bottom:24px;right:16px;width:40px;height:40px;background:rgba(28,31,42,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.07);border-radius:50%;color:rgba(240,242,255,.4);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:150;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .25s,transform .25s,color .15s,background .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .back-top:hover{background:rgba(28,31,42,.8);color:rgba(240,242,255,.9);}
@@ -974,6 +978,7 @@ const productMap = Object.fromEntries(products.map(p=>[p.sku, p]));
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 let cart={}, includeIVA=false, activeBrand='ALL', activeStock='ALL', activeSort='default', descActiveSku=null, newSkus=new Set();
+let preSaleBrand='ALL'; // guarda filtro de marca antes de entrar a modo venta
 let renderTimer=null;
 // Último listado filtrado renderizado
 let lastRenderedSkus = [];
@@ -1079,13 +1084,26 @@ function matchQuery(text, rawQ){
 
 // ── Filtros ───────────────────────────────────────────────────────────────────
 function renderBrands(){
-  const brands=['ALL',...new Set(products.map(p=>p.brand).filter(Boolean))];
-  let html=brands.map(b=>`<button class="filter-btn ${b===activeBrand?'active':''}" onclick="setBrand('${b}')">${b==='ALL'?'🐾 Todos':b}</button>`).join('');
-  html+=`<div class="filter-sep"></div>`;
-  html+=`<button class="filter-btn f-stock ${activeStock==='STOCK'?'active':''}" onclick="setStock('STOCK')">✅ En stock</button>`;
-  html+=`<button class="filter-btn f-preventa ${activeStock==='PREVENTA'?'active':''}" onclick="setStock('PREVENTA')">🕐 Preventa</button>`;
-  html+=`<button class="filter-btn f-nostock ${activeStock==='NOSTOCK'?'active':''}" onclick="setStock('NOSTOCK')">❌ Sin stock</button>`;
+  let html='';
+  if(saleMode){
+    // Modo venta: solo TODOS y BEEPAW
+    // "TODOS" agrupa todo lo que no es BEEPAW — en renderGrid se maneja con activeBrand
+    const saleActive=activeBrand==='BEEPAW'?'BEEPAW':'ALL';
+    html+=`<button class="filter-btn ${saleActive==='ALL'?'active':''}" onclick="setSaleBrand('ALL')">🐾 Todos</button>`;
+    html+=`<button class="filter-btn ${saleActive==='BEEPAW'?'active':''}" onclick="setSaleBrand('BEEPAW')">BEEPAW</button>`;
+  } else {
+    // Modo compra: filtros completos
+    const brands=['ALL',...new Set(products.map(p=>p.brand).filter(Boolean))];
+    html+=brands.map(b=>`<button class="filter-btn ${b===activeBrand?'active':''}" onclick="setBrand('${b}')">${b==='ALL'?'🐾 Todos':b}</button>`).join('');
+    html+=`<div class="filter-sep"></div>`;
+    html+=`<button class="filter-btn f-stock ${activeStock==='STOCK'?'active':''}" onclick="setStock('STOCK')">✅ En stock</button>`;
+    html+=`<button class="filter-btn f-preventa ${activeStock==='PREVENTA'?'active':''}" onclick="setStock('PREVENTA')">🕐 Preventa</button>`;
+    html+=`<button class="filter-btn f-nostock ${activeStock==='NOSTOCK'?'active':''}" onclick="setStock('NOSTOCK')">❌ Sin stock</button>`;
+  }
   document.getElementById('brandFilters').innerHTML=html;
+}
+function setSaleBrand(b){
+  activeBrand=b; renderBrands(); renderGrid();
 }
 function setBrand(b){
   activeBrand=b; renderBrands(); renderGrid();
@@ -2715,10 +2733,16 @@ let selectingMode=false;
 async function toggleSaleMode(){
   saleMode=!saleMode;
   localStorage.setItem('beepex_sale_mode', saleMode?'1':'0');
+  if(saleMode){
+    preSaleBrand=activeBrand; // guardar filtro actual
+    activeBrand='ALL';        // modo venta arranca en TODOS
+  } else {
+    activeBrand=preSaleBrand; // restaurar filtro previo
+  }
   applySaleMode();
   if(saleMode) await loadSalePrices();
-  // Destruir cards existentes para forzar recreación con precio correcto
   document.querySelectorAll('#grid .card').forEach(el=>el.remove());
+  renderBrands();
   renderGrid();
   updateAuthUI();
   showToast(saleMode?'🏪 Modo Venta activado':'🛒 Modo Compra activado');
