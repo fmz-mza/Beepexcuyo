@@ -1060,7 +1060,7 @@ function patchPrices(){
     if(cardEl) patchCard(cardEl, p);
   });
   document.getElementById('productCount').textContent=
-    `${lastRenderedSkus.length} producto${lastRenderedSkus.length!==1?'s':''} · Precios ${includeIVA?'con':'sin'} IVA`;
+    `${lastRenderedSkus.length} producto${lastRenderedSkus.length!==1?'s':''}${saleMode?'':' · Precios '+(includeIVA?'con':'sin')+' IVA'}`;
 }
 
 // ── Normalización de búsqueda ────────────────────────────────────────────────
@@ -1159,7 +1159,7 @@ function renderGrid(){
   lastRenderedSkus=sortedList.map(p=>p.sku);
   const grid=document.getElementById('grid');
   document.getElementById('productCount').textContent=
-    `${list.length} producto${list.length!==1?'s':''} · Precios ${includeIVA?'con':'sin'} IVA`;
+    `${list.length} producto${list.length!==1?'s':''}${saleMode?'':' · Precios '+(includeIVA?'con':'sin')+' IVA'}`;
 
   if(!list.length){
     // Ocultar todo en lugar de destruir
