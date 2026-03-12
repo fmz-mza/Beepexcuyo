@@ -1140,6 +1140,7 @@ async function downloadProductsExcel(){
       headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
     });
     const data = await resp.json();
+    console.log('Productos descargados:', data.length, 'BEEPAW:', data.filter(p=>p.brand==='BEEPAW').length, 'GENERICO:', data.filter(p=>p.brand==='GENERICO').length, 'otros:', data.filter(p=>p.brand!=='BEEPAW'&&p.brand!=='GENERICO').map(p=>p.brand).slice(0,5));
 
     const wb = XLSX.utils.book_new();
     // Hoja BEEPAW
