@@ -320,7 +320,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
             <button class="btn-sm" onclick="downloadProductsExcel()">⬇️ Descargar Excel</button>
             <label class="btn-sm" style="cursor:pointer;">
               ⬆️ Subir Excel
-              <input type="file" id="excelUploadInput" accept=".xlsx,.xls" style="display:none;" onchange="handleExcelUpload(event)">
+              <input type="file" id="excelUploadInput" accept=".xlsx,.xls" style="display:none;">
             </label>
           </div>
         </div>
@@ -1057,6 +1057,12 @@ let excelPendingImport = null; // datos preparados para confirmar
 async function loadProdTable(){
   const tbody = document.getElementById('prodTableBody');
   if(!tbody) return;
+  // Vincular input de Excel (por si acaso)
+  const inp = document.getElementById('excelUploadInput');
+  if(inp && !inp._bound){
+    inp._bound = true;
+    inp.addEventListener('change', handleExcelUpload);
+  }
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr>';
   try{
     const token = localStorage.getItem('sb_access_token')||SUPABASE_ANON;
@@ -1155,9 +1161,11 @@ async function downloadProductsExcel(){
 
 // ── Upload Excel y preview ────────────────────────────────────────────────────
 async function handleExcelUpload(event){
-  const file = event.target.files[0];
+  console.log('handleExcelUpload llamado', event);
+  const file = event.target ? event.target.files[0] : event.files?.[0];
+  console.log('Archivo:', file?.name);
   if(!file) return;
-  event.target.value='';
+  if(event.target) event.target.value='';
   showToast('⏳ Procesando Excel...');
   try{
     if(!window.XLSX){
@@ -1168,8 +1176,13 @@ async function handleExcelUpload(event){
         document.head.appendChild(s);
       });
     }
+    console.log('XLSX cargado:', !!window.XLSX);
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, {type:'array'});
+    console.log('Hojas:', wb.SheetNames);
+    const rows0 = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null});
+    console.log('Primera hoja, filas:', rows0.length);
+    if(rows0.length) console.log('Primera fila:', JSON.stringify(rows0[0]));
     const incoming = [];
 
     function parseIva(val){
@@ -1188,16 +1201,34 @@ async function handleExcelUpload(event){
       return 'NOSTOCK';
     }
 
+    function getSku(r){
+      // Buscar columna CÓDIGO con o sin tilde
+      const val = r['CÓDIGO']||r['CODIGO']||r['C\u00d3DIGO']||r['sku']||r['SKU']||null;
+      if(!val) return null;
+      const n = parseFloat(String(val).trim());
+      return (!isNaN(n) && n>=1000) ? String(Math.round(n)) : null;
+    }
+    function getPrice(r, ...keys){
+      for(const k of keys){
+        const v = r[k];
+        if(v!==null&&v!==undefined&&v!==''){
+          const n = parseFloat(String(v).replace(/[.$\s]/g,'').replace(',','.'));
+          if(!isNaN(n)&&n>0) return Math.round(n);
+        }
+      }
+      return null;
+    }
+
     // Leer BEEPAW
     if(wb.SheetNames.includes('BEEPAW')){
       const rows = XLSX.utils.sheet_to_json(wb.Sheets['BEEPAW'],{defval:null});
       rows.forEach(r=>{
-        const sku = r['CÓDIGO'];
-        if(!sku||typeof sku!=='number') return;
-        const price = r['PRECIO EN PESOS']||r['PRECIO EN $'];
+        const sku = getSku(r);
+        if(!sku) return;
+        const price = getPrice(r,'PRECIO EN PESOS','PRECIO EN $','precio');
         if(!price) return;
         incoming.push({
-          sku:String(Math.round(sku)),
+          sku,
           name:(r['PRODUCTO']||'').toString().trim(),
           brand:'BEEPAW',
           price:Math.round(price),
@@ -1213,12 +1244,12 @@ async function handleExcelUpload(event){
     if(wb.SheetNames.includes('GENERICOS')){
       const rows = XLSX.utils.sheet_to_json(wb.Sheets['GENERICOS'],{defval:null});
       rows.forEach(r=>{
-        const sku = r['CÓDIGO'];
-        if(!sku||typeof sku!=='number') return;
-        const price = r['PRECIO EN $']||r['PRECIO EN PESOS'];
+        const sku = getSku(r);
+        if(!sku) return;
+        const price = getPrice(r,'PRECIO EN $','PRECIO EN PESOS','precio');
         if(!price) return;
         incoming.push({
-          sku:String(Math.round(sku)),
+          sku,
           name:(r['PRODUCTO']||'').toString().replace(/\n/g,' ').trim(),
           brand:'GENERICO',
           price:Math.round(price),
