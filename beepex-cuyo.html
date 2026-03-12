@@ -771,10 +771,21 @@ async function loadProducts(){
   try{
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/products?select=sku,name,brand,price,pvp,iva,stock,description&order=brand.asc,name.asc`,
-      { headers:{ 'apikey': SUPABASE_ANON, 'Content-Type':'application/json' } }
+      { headers:{
+          'apikey': SUPABASE_ANON,
+          'Authorization': `Bearer ${SUPABASE_ANON}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+      }}
     );
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    console.log('loadProducts status:', res.status);
+    if(!res.ok){
+      const txt = await res.text();
+      console.error('loadProducts error body:', txt);
+      throw new Error('HTTP '+res.status);
+    }
     const rows = await res.json();
+    console.log('loadProducts rows:', rows.length);
     products = rows.map(r=>({
       sku:   String(r.sku),
       name:  r.name,
@@ -953,6 +964,10 @@ function scheduleRender(){
 
 // ── Grid: DOM diferencial — show/hide + CSS order, nunca destruye nodos ────
 function renderGrid(){
+  // Limpiar spinner de carga inicial si existe
+  const spinner = document.querySelector('#grid div[style*="Cargando"]');
+  if(spinner) spinner.remove();
+
   const q=normalize(document.getElementById('searchInput').value);
   const list=products.filter(p=>{
     const okBrand=activeBrand==='ALL'||p.brand===activeBrand;
