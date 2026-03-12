@@ -965,7 +965,7 @@ function scheduleRender(){
 // ── Grid: DOM diferencial — show/hide + CSS order, nunca destruye nodos ────
 function renderGrid(){
   // Limpiar spinner de carga inicial si existe
-  const spinner = document.querySelector('#grid div[style*="Cargando"]');
+  const spinner = document.querySelector('#grid > div:first-child:not(.card):not(.section-title)');
   if(spinner) spinner.remove();
 
   const q=normalize(document.getElementById('searchInput').value);
