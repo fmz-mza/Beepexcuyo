@@ -1065,7 +1065,7 @@ async function loadProdTable(){
   }
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr>';
   try{
-    const token = localStorage.getItem('sb_access_token')||SUPABASE_ANON;
+    const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
     const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=sku,name,brand,price,pvp,iva,stock&order=brand.asc,name.asc`,{
       headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
     });
@@ -1135,7 +1135,7 @@ async function downloadProductsExcel(){
         document.head.appendChild(s);
       });
     }
-    const token = localStorage.getItem('sb_access_token')||SUPABASE_ANON;
+    const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/products?select=sku,name,brand,price,pvp,iva,stock,description,ean&order=brand.asc,name.asc`,{
       headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
     });
@@ -1338,7 +1338,7 @@ async function handleExcelUpload(event){
 async function confirmExcelImport(){
   if(!excelPendingImport) return;
   const {incoming, faltantes} = excelPendingImport;
-  const token = localStorage.getItem('sb_access_token')||SUPABASE_ANON;
+  const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
   const headers = {'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};
   showToast('⏳ Importando...');
   document.getElementById('excelPreviewModal').style.display = 'none';
