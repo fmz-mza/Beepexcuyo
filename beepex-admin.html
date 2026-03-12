@@ -1195,9 +1195,13 @@ async function handleExcelUpload(event){
     }
     function parseStock(val){
       if(!val) return 'NOSTOCK';
-      const s=String(val).toUpperCase();
-      if(s.includes('SIN')||s.includes('NO STOCK')) return 'NOSTOCK';
+      const s=String(val).toUpperCase().trim();
+      if(s==='NOSTOCK'||s==='SIN STOCK'||s==='SIN_STOCK') return 'NOSTOCK';
+      if(s==='PREVENTA') return 'PREVENTA';
+      if(s==='STOCK'||s==='EN STOCK') return 'STOCK';
+      // fallback con includes (para el Excel original de Beepex)
       if(s.includes('PREVENTA')) return 'PREVENTA';
+      if(s.includes('SIN')||s.includes('NO')) return 'NOSTOCK';
       if(s.includes('STOCK')) return 'STOCK';
       return 'NOSTOCK';
     }
