@@ -3740,6 +3740,12 @@ function renderVoiceResults(){
   const status = document.getElementById('voiceStatus');
   const actions = document.getElementById('voiceActions');
 
+  // Guardar cantidades actuales ANTES de re-renderizar
+  voiceParsed.forEach((item, idx) => {
+    const input = document.getElementById(`vqty_${idx}`);
+    if(input) item.qty = Math.max(1, parseInt(input.value)||1);
+  });
+
   if(!voiceParsed.length){
     el.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:8px;">No se reconocieron productos</div>';
     return;
@@ -3762,11 +3768,12 @@ function renderVoiceResults(){
           <div class="voice-result-sub">${price} · SKU ${item.chosen.sku}</div>
         </div>
         <div class="voice-result-qty">
-          <input type="number" min="1" max="99" value="${item.qty}" id="vqty_${idx}" style="width:44px;">
+          <button onclick="voiceQtyChange(${idx},-1)" style="width:26px;height:26px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;">−</button>
+          <input type="number" min="1" max="99" value="${item.qty}" id="vqty_${idx}" style="width:36px;text-align:center;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;padding:3px;" onchange="voiceQtySave(${idx},this.value)">
+          <button onclick="voiceQtyChange(${idx},1)" style="width:26px;height:26px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;">+</button>
         </div>
       </div>`;
     } else if(item.matched.length > 1){
-      // Sugerencias
       const sugs = item.matched.map(p =>
         `<button class="voice-suggestion-btn" onclick="voiceChoose(${idx},'${p.sku}')">${p.name}</button>`
       ).join('');
@@ -3785,9 +3792,20 @@ function renderVoiceResults(){
     }
   }).join('');
 
-  // Mostrar acciones si hay al menos uno con match
   const hasMatch = voiceParsed.some(i => i.chosen);
   actions.style.display = hasMatch ? 'flex' : 'none';
+}
+
+function voiceQtyChange(idx, delta){
+  const input = document.getElementById(`vqty_${idx}`);
+  if(!input) return;
+  const newVal = Math.max(1, (parseInt(input.value)||1) + delta);
+  input.value = newVal;
+  voiceParsed[idx].qty = newVal;
+}
+
+function voiceQtySave(idx, val){
+  voiceParsed[idx].qty = Math.max(1, parseInt(val)||1);
 }
 
 function voiceChoose(idx, sku){
@@ -3799,23 +3817,32 @@ function voiceChoose(idx, sku){
 }
 
 function addMoreVoice(){
-  // Mantiene los resultados actuales y activa el micrófono para agregar más
+  // Guardar cantidades actuales antes de seguir
+  voiceParsed.forEach((item, idx) => {
+    const input = document.getElementById(`vqty_${idx}`);
+    if(input) item.qty = Math.max(1, parseInt(input.value)||1);
+  });
+
   document.getElementById('voiceActions').style.display = 'none';
   document.getElementById('voiceStatus').textContent = '🔴 Escuchando más productos...';
+
+  // Limpiar transcript para la nueva búsqueda
+  const transcript = document.getElementById('voiceTranscript');
+  transcript.textContent = '...';
+  transcript.classList.add('listening');
+
+  const status = document.getElementById('voiceStatus');
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   voiceRecognition = new SpeechRecognition();
   voiceRecognition.lang = 'es-AR';
   voiceRecognition.continuous = true;
   voiceRecognition.interimResults = true;
-  const transcript = document.getElementById('voiceTranscript');
-  const status = document.getElementById('voiceStatus');
   let finalText = '';
   let silenceTimer = null;
 
   voiceRecognition.onstart = () => {
     voiceListening = true;
     document.getElementById('micFab').classList.add('listening');
-    transcript.classList.add('listening');
   };
 
   voiceRecognition.onresult = (e) => {
@@ -3825,13 +3852,12 @@ function addMoreVoice(){
       if(e.results[i].isFinal) finalText += (finalText ? ', ' : '') + t;
       else interim = t;
     }
-    transcript.textContent = (transcript.textContent.replace(' ...','') || '') + (finalText ? ' + ' + finalText : '') + (interim ? ' ' + interim : '');
+    transcript.textContent = finalText + (interim ? (finalText?', ':'')+interim : '') || '...';
     clearTimeout(silenceTimer);
     silenceTimer = setTimeout(() => {
       if(finalText){
         stopVoice();
         status.textContent = '✅ Procesando...';
-        // Parsear nuevos productos y SUMAR a los existentes
         const numWords = {'un':1,'uno':1,'una':1,'dos':2,'tres':3,'cuatro':4,'cinco':5,'seis':6,'siete':7,'ocho':8,'nueve':9,'diez':10};
         const chunks = finalText.toLowerCase().replace(/\s+y\s+/g,',').replace(/\s+más\s+/g,',').split(/[,;]/).map(s=>s.trim()).filter(Boolean);
         const newItems = chunks.map(chunk => {
@@ -3859,6 +3885,7 @@ function addMoreVoice(){
     clearTimeout(silenceTimer);
     voiceListening = false;
     document.getElementById('micFab').classList.remove('listening');
+    transcript.classList.remove('listening');
     if(e.error !== 'aborted') status.textContent = 'Error: ' + e.error;
   };
 
