@@ -3419,50 +3419,67 @@ function startListening(){
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   voiceRecognition = new SpeechRecognition();
   voiceRecognition.lang = 'es-AR';
-  voiceRecognition.continuous = false;
+  voiceRecognition.continuous = true;
   voiceRecognition.interimResults = true;
-  voiceRecognition.maxAlternatives = 3;
+  voiceRecognition.maxAlternatives = 1;
 
   const transcript = document.getElementById('voiceTranscript');
   const status = document.getElementById('voiceStatus');
+  let finalText = '';
+  let silenceTimer = null;
 
   voiceRecognition.onstart = () => {
     voiceListening = true;
+    finalText = '';
     document.getElementById('micFab').classList.add('listening');
     transcript.textContent = '...';
     transcript.classList.add('listening');
-    status.textContent = '🔴 Escuchando...';
+    status.textContent = '🔴 Escuchando... (silencio para confirmar)';
   };
 
   voiceRecognition.onresult = (e) => {
-    let interim = '', final = '';
+    let interim = '';
     for(let i = e.resultIndex; i < e.results.length; i++){
       const t = e.results[i][0].transcript;
-      if(e.results[i].isFinal) final += t;
-      else interim += t;
+      if(e.results[i].isFinal) finalText += (finalText ? ', ' : '') + t.trim();
+      else interim = t;
     }
-    transcript.textContent = final || interim || '...';
+    transcript.textContent = finalText + (interim ? ' ' + interim : '') || '...';
+
+    // Reiniciar timer de silencio — procesa 1.8s después del último sonido
+    clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(() => {
+      const text = finalText || transcript.textContent;
+      if(text && text !== '...'){
+        stopVoice();
+        status.textContent = '✅ Procesando...';
+        parseVoiceOrder(text);
+      }
+    }, 1800);
   };
 
   voiceRecognition.onend = () => {
+    // Si terminó sin haber procesado (ej: se cortó solo)
+    clearTimeout(silenceTimer);
     voiceListening = false;
     document.getElementById('micFab').classList.remove('listening');
     transcript.classList.remove('listening');
-    const text = transcript.textContent;
-    if(text && text !== '...' && text !== 'Ej: "dos rock-e, tres ball-e celeste y uno sand-e"'){
+    const text = finalText || transcript.textContent;
+    if(text && text !== '...' && text !== 'Ej: "dos rock-e, tres ball-e celeste y uno sand-e"'
+       && document.getElementById('voiceResults').innerHTML === ''){
       status.textContent = '✅ Procesando...';
       parseVoiceOrder(text);
-    } else {
-      status.textContent = 'No se escuchó nada. Intentá de nuevo.';
     }
   };
 
   voiceRecognition.onerror = (e) => {
+    clearTimeout(silenceTimer);
     voiceListening = false;
     document.getElementById('micFab').classList.remove('listening');
     transcript.classList.remove('listening');
     if(e.error === 'no-speech') status.textContent = 'No se detectó voz. Intentá de nuevo.';
     else if(e.error === 'not-allowed') status.textContent = '❌ Permiso de micrófono denegado.';
+    else if(e.error === 'aborted'){} // silencioso — fue stopVoice() intencional
     else status.textContent = 'Error: ' + e.error;
   };
 
