@@ -729,6 +729,7 @@ let userSalePrices={}; // {sku: price}
     <div class="voice-results" id="voiceResults"></div>
     <div class="voice-actions" id="voiceActions" style="display:none;">
       <button class="voice-btn secondary" onclick="resetVoice()">🔄 Repetir</button>
+      <button class="voice-btn secondary" onclick="addMoreVoice()">🎤 Buscar +</button>
       <button class="voice-btn primary" id="voiceAddBtn" onclick="addVoiceToCart()">🛒 Agregar al carrito</button>
     </div>
   </div>
@@ -3669,6 +3670,73 @@ function voiceChoose(idx, sku){
   renderVoiceResults();
 }
 
+function addMoreVoice(){
+  // Mantiene los resultados actuales y activa el micrófono para agregar más
+  document.getElementById('voiceActions').style.display = 'none';
+  document.getElementById('voiceStatus').textContent = '🔴 Escuchando más productos...';
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  voiceRecognition = new SpeechRecognition();
+  voiceRecognition.lang = 'es-AR';
+  voiceRecognition.continuous = true;
+  voiceRecognition.interimResults = true;
+  const transcript = document.getElementById('voiceTranscript');
+  const status = document.getElementById('voiceStatus');
+  let finalText = '';
+  let silenceTimer = null;
+
+  voiceRecognition.onstart = () => {
+    voiceListening = true;
+    document.getElementById('micFab').classList.add('listening');
+    transcript.classList.add('listening');
+  };
+
+  voiceRecognition.onresult = (e) => {
+    let interim = '';
+    for(let i = e.resultIndex; i < e.results.length; i++){
+      const t = e.results[i][0].transcript.trim();
+      if(e.results[i].isFinal) finalText += (finalText ? ', ' : '') + t;
+      else interim = t;
+    }
+    transcript.textContent = (transcript.textContent.replace(' ...','') || '') + (finalText ? ' + ' + finalText : '') + (interim ? ' ' + interim : '');
+    clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(() => {
+      if(finalText){
+        stopVoice();
+        status.textContent = '✅ Procesando...';
+        // Parsear nuevos productos y SUMAR a los existentes
+        const numWords = {'un':1,'uno':1,'una':1,'dos':2,'tres':3,'cuatro':4,'cinco':5,'seis':6,'siete':7,'ocho':8,'nueve':9,'diez':10};
+        const chunks = finalText.toLowerCase().replace(/\s+y\s+/g,',').replace(/\s+más\s+/g,',').split(/[,;]/).map(s=>s.trim()).filter(Boolean);
+        const newItems = chunks.map(chunk => {
+          let qty=1, query=chunk;
+          const fw=chunk.split(/\s+/)[0];
+          if(numWords[fw]){ qty=numWords[fw]; query=chunk.slice(fw.length).trim(); }
+          else { const m=chunk.match(/^(\d+)\s+/); if(m){ qty=parseInt(m[1]); query=chunk.slice(m[0].length).trim(); } }
+          const matched=findProductsByVoice(query);
+          return {query,qty,matched,chosen:matched.length===1?matched[0]:null};
+        }).filter(i=>i.query.length>1);
+        voiceParsed = [...voiceParsed, ...newItems];
+        renderVoiceResults();
+      }
+    }, 1800);
+  };
+
+  voiceRecognition.onend = () => {
+    clearTimeout(silenceTimer);
+    voiceListening = false;
+    document.getElementById('micFab').classList.remove('listening');
+    transcript.classList.remove('listening');
+  };
+
+  voiceRecognition.onerror = (e) => {
+    clearTimeout(silenceTimer);
+    voiceListening = false;
+    document.getElementById('micFab').classList.remove('listening');
+    if(e.error !== 'aborted') status.textContent = 'Error: ' + e.error;
+  };
+
+  voiceRecognition.start();
+}
+
 function addVoiceToCart(){
   let added = 0;
   voiceParsed.forEach((item, idx) => {
@@ -3679,7 +3747,8 @@ function addVoiceToCart(){
     added++;
   });
   saveCart();
-  updateFloatSummary();
+  updateCount();
+  patchPrices();
   closeVoice();
   showToast(`🛒 ${added} producto${added!==1?'s':''} agregado${added!==1?'s':''} al carrito`);
 }
