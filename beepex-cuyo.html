@@ -272,6 +272,42 @@
   .search-fab:hover{background:rgba(28,31,42,.95);color:#fff;}
   .search-fab.visible{opacity:1;pointer-events:auto;transform:translateY(0);}
   .search-fab:active{transform:scale(.88);}
+
+  /* ── Mic FAB ── */
+  .mic-fab{position:fixed;bottom:24px;right:112px;width:40px;height:40px;background:rgba(28,31,42,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.07);border-radius:50%;color:rgba(240,242,255,.4);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:151;transition:opacity .25s,transform .25s,color .15s,background .15s,box-shadow .2s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+  .mic-fab:hover{background:rgba(28,31,42,.95);color:#fff;}
+  .mic-fab:active{transform:scale(.88);}
+  .mic-fab.listening{background:rgba(220,50,50,.85);color:#fff;border-color:rgba(255,80,80,.4);box-shadow:0 0 0 6px rgba(220,50,50,.2),0 0 0 12px rgba(220,50,50,.08);animation:micPulse 1.2s infinite;}
+  .sale-mode .mic-fab{display:none!important;}
+  @keyframes micPulse{0%,100%{box-shadow:0 0 0 4px rgba(220,50,50,.25),0 0 0 8px rgba(220,50,50,.1);}50%{box-shadow:0 0 0 8px rgba(220,50,50,.2),0 0 0 16px rgba(220,50,50,.05);}}
+
+  /* ── Modal voz ── */
+  .voice-modal{position:fixed;inset:0;z-index:400;display:flex;align-items:flex-end;justify-content:center;padding:16px;pointer-events:none;opacity:0;transition:opacity .2s;}
+  .voice-modal.open{opacity:1;pointer-events:auto;}
+  .voice-modal-bg{position:absolute;inset:0;background:rgba(0,0,0,.5);}
+  .voice-modal-box{position:relative;width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 16px 16px;padding:20px;box-shadow:0 -8px 40px rgba(0,0,0,.4);transform:translateY(40px);transition:transform .3s cubic-bezier(.34,1.56,.64,1);}
+  .voice-modal.open .voice-modal-box{transform:translateY(0);}
+  .voice-transcript{min-height:48px;font-size:15px;color:var(--text);line-height:1.5;margin:10px 0;padding:10px 12px;background:var(--bg);border-radius:10px;border:1px solid var(--border);}
+  .voice-transcript.listening{border-color:rgba(220,50,50,.5);}
+  .voice-status{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .voice-results{margin-top:12px;display:flex;flex-direction:column;gap:8px;}
+  .voice-result-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-radius:10px;border:1px solid var(--border);}
+  .voice-result-item.matched{border-color:rgba(74,200,100,.3);background:rgba(74,200,100,.05);}
+  .voice-result-item.unmatched{border-color:rgba(220,50,50,.3);background:rgba(220,50,50,.05);}
+  .voice-result-img{width:36px;height:36px;object-fit:contain;border-radius:6px;background:var(--surface);}
+  .voice-result-info{flex:1;min-width:0;}
+  .voice-result-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .voice-result-sub{font-size:11px;color:var(--muted);}
+  .voice-result-qty{display:flex;align-items:center;gap:6px;}
+  .voice-result-qty input{width:44px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;text-align:center;}
+  .voice-suggestions{margin-top:6px;}
+  .voice-suggestion-btn{font-size:11px;padding:3px 8px;margin:2px;border:1px solid var(--border);border-radius:20px;background:var(--bg);color:var(--text);cursor:pointer;}
+  .voice-suggestion-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .voice-actions{display:flex;gap:8px;margin-top:14px;}
+  .voice-btn{flex:1;padding:11px;border-radius:10px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s;}
+  .voice-btn.primary{background:var(--accent);color:#fff;}
+  .voice-btn.secondary{background:var(--border);color:var(--text);}
+  .voice-btn:active{opacity:.8;}
   .float-search{position:fixed;bottom:76px;left:12px;right:12px;z-index:152;transform:translateY(12px);opacity:0;pointer-events:none;transition:transform .25s cubic-bezier(.34,1.56,.64,1),opacity .2s;max-width:600px;margin:0 auto;}
   .float-search.visible{transform:translateY(0);opacity:1;pointer-events:auto;}
   .float-search-inner{background:var(--card);border:1.5px solid var(--accent);border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);}
@@ -678,6 +714,25 @@ let userSalePrices={}; // {sku: price}
   </div>
 </div>
 <button class="search-fab" id="searchFab" onclick="toggleFloatSearch()" aria-label="Buscar">🔍</button>
+<button class="mic-fab" id="micFab" onclick="toggleVoice()" aria-label="Pedido por voz" title="Pedido por voz">🎤</button>
+
+<!-- Modal voz -->
+<div class="voice-modal" id="voiceModal">
+  <div class="voice-modal-bg" onclick="closeVoice()"></div>
+  <div class="voice-modal-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div style="font-size:14px;font-weight:700;">🎤 Pedido por voz</div>
+      <button onclick="closeVoice()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:2px 6px;">✕</button>
+    </div>
+    <div class="voice-status" id="voiceStatus">Tocá el micrófono y hablá tu pedido</div>
+    <div class="voice-transcript" id="voiceTranscript">Ej: "dos rock-e, tres ball-e celeste y uno sand-e"</div>
+    <div class="voice-results" id="voiceResults"></div>
+    <div class="voice-actions" id="voiceActions" style="display:none;">
+      <button class="voice-btn secondary" onclick="resetVoice()">🔄 Repetir</button>
+      <button class="voice-btn primary" id="voiceAddBtn" onclick="addVoiceToCart()">🛒 Agregar al carrito</button>
+    </div>
+  </div>
+</div>
 <div class="sale-select-bar" id="saleSelectBar">
   <div class="sale-select-top">
     <span class="sale-select-count" id="saleSelectCount">0 productos seleccionados</span>
@@ -2825,8 +2880,10 @@ async function buildSaleCanvas(item){
 }
 
 async function shareSalePDF(){
+  if(shareSalePDF._running) return;
+  shareSalePDF._running = true;
   const items=getSaleItems();
-  if(!items.length){ showToast('Seleccioná al menos un producto'); return; }
+  if(!items.length){ showToast('Seleccioná al menos un producto'); shareSalePDF._running=false; return; }
   showToast('⏳ Generando PDF...');
 
   if(!window.jspdf){
@@ -2948,7 +3005,9 @@ async function shareSalePDF(){
   if(navigator.share&&navigator.canShare){
     const file=new File([pdfBlob],fileName,{type:'application/pdf'});
     if(navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:nombre, text:'Consultanos para más información 😊'});
+      try{ await navigator.share({files:[file], title:nombre, text:'Consultanos para más información 😊'}); }
+      catch(e){ console.warn('share cancelled', e); }
+      shareSalePDF._running=false;
       return;
     }
   }
@@ -2956,6 +3015,7 @@ async function shareSalePDF(){
   const a=document.createElement('a'); a.href=url; a.download=fileName; a.click();
   setTimeout(()=>URL.revokeObjectURL(url),5000);
   showToast('✅ PDF generado');
+  shareSalePDF._running=false;
 }
 
 // ── Panel Mis precios de venta ───────────────────────────────────────────────
@@ -3315,7 +3375,255 @@ async function loadSettings(){
   } catch(e){ console.warn('loadSettings error:', e.message); }
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// PEDIDO POR VOZ — Web Speech API
+// ══════════════════════════════════════════════════════════════════════════════
+let voiceRecognition = null;
+let voiceListening = false;
+let voiceParsed = []; // [{query, qty, matched:[p,...], chosen:p|null}]
+
+function toggleVoice(){
+  if(voiceListening){ stopVoice(); return; }
+  openVoice();
+}
+
+function openVoice(){
+  if(!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)){
+    showToast('Tu browser no soporta reconocimiento de voz. Usá Chrome.');
+    return;
+  }
+  document.getElementById('voiceModal').classList.add('open');
+  resetVoice();
+  startListening();
+}
+
+function closeVoice(){
+  stopVoice();
+  document.getElementById('voiceModal').classList.remove('open');
+  voiceParsed = [];
+}
+
+function resetVoice(){
+  stopVoice();
+  voiceParsed = [];
+  document.getElementById('voiceTranscript').textContent = 'Ej: "dos rock-e, tres ball-e celeste y uno sand-e"';
+  document.getElementById('voiceTranscript').classList.remove('listening');
+  document.getElementById('voiceResults').innerHTML = '';
+  document.getElementById('voiceActions').style.display = 'none';
+  document.getElementById('voiceStatus').textContent = 'Tocá el micrófono y hablá tu pedido';
+  document.getElementById('micFab').classList.remove('listening');
+  setTimeout(startListening, 200);
+}
+
+function startListening(){
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  voiceRecognition = new SpeechRecognition();
+  voiceRecognition.lang = 'es-AR';
+  voiceRecognition.continuous = false;
+  voiceRecognition.interimResults = true;
+  voiceRecognition.maxAlternatives = 3;
+
+  const transcript = document.getElementById('voiceTranscript');
+  const status = document.getElementById('voiceStatus');
+
+  voiceRecognition.onstart = () => {
+    voiceListening = true;
+    document.getElementById('micFab').classList.add('listening');
+    transcript.textContent = '...';
+    transcript.classList.add('listening');
+    status.textContent = '🔴 Escuchando...';
+  };
+
+  voiceRecognition.onresult = (e) => {
+    let interim = '', final = '';
+    for(let i = e.resultIndex; i < e.results.length; i++){
+      const t = e.results[i][0].transcript;
+      if(e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    transcript.textContent = final || interim || '...';
+  };
+
+  voiceRecognition.onend = () => {
+    voiceListening = false;
+    document.getElementById('micFab').classList.remove('listening');
+    transcript.classList.remove('listening');
+    const text = transcript.textContent;
+    if(text && text !== '...' && text !== 'Ej: "dos rock-e, tres ball-e celeste y uno sand-e"'){
+      status.textContent = '✅ Procesando...';
+      parseVoiceOrder(text);
+    } else {
+      status.textContent = 'No se escuchó nada. Intentá de nuevo.';
+    }
+  };
+
+  voiceRecognition.onerror = (e) => {
+    voiceListening = false;
+    document.getElementById('micFab').classList.remove('listening');
+    transcript.classList.remove('listening');
+    if(e.error === 'no-speech') status.textContent = 'No se detectó voz. Intentá de nuevo.';
+    else if(e.error === 'not-allowed') status.textContent = '❌ Permiso de micrófono denegado.';
+    else status.textContent = 'Error: ' + e.error;
+  };
+
+  voiceRecognition.start();
+}
+
+function stopVoice(){
+  if(voiceRecognition){ try{ voiceRecognition.stop(); }catch(e){} }
+  voiceListening = false;
+  document.getElementById('micFab').classList.remove('listening');
+}
+
+// ── Parser de texto → productos ───────────────────────────────────────────────
+function parseVoiceOrder(text){
+  // Normalizar números escritos
+  const numWords = {
+    'un':1,'uno':1,'una':1,'dos':2,'tres':3,'cuatro':4,'cinco':5,
+    'seis':6,'siete':7,'ocho':8,'nueve':9,'diez':10,'once':11,'doce':12
+  };
+
+  // Separar por comas, "y", "más"
+  const chunks = text.toLowerCase()
+    .replace(/\s+y\s+/g, ',')
+    .replace(/\s+más\s+/g, ',')
+    .split(/[,;]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  voiceParsed = chunks.map(chunk => {
+    // Extraer cantidad al principio
+    let qty = 1;
+    let query = chunk;
+    const firstWord = chunk.split(/\s+/)[0];
+    if(numWords[firstWord]){
+      qty = numWords[firstWord];
+      query = chunk.slice(firstWord.length).trim();
+    } else {
+      const numMatch = chunk.match(/^(\d+)\s+/);
+      if(numMatch){ qty = parseInt(numMatch[1]); query = chunk.slice(numMatch[0].length).trim(); }
+    }
+
+    // Buscar matches en el catálogo
+    const matched = findProductsByVoice(query);
+    return { query, qty, matched, chosen: matched.length === 1 ? matched[0] : null };
+  }).filter(item => item.query.length > 1);
+
+  renderVoiceResults();
+}
+
+function findProductsByVoice(query){
+  const q = normalize(query);
+  const qWords = q.split(' ').filter(w => w.length > 1);
+  if(!qWords.length) return [];
+
+  const scored = products
+    .filter(p => p.stock !== 'NOSTOCK')
+    .map(p => {
+      const name = normalize(p.name);
+      const meta = productMeta[p.sku];
+      const tags = meta ? normalize(meta.tags) : '';
+      const full = name + ' ' + tags + ' ' + p.sku;
+
+      // Score: coincidencia exacta > palabras individuales
+      let score = 0;
+      if(full.includes(q)) score += 100;
+      qWords.forEach(w => { if(full.includes(w)) score += 10; });
+      // Bonus por SKU
+      if(p.sku === q.replace(/\D/g,'')) score += 200;
+      return { p, score };
+    })
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  // Devolver top 4
+  return scored.slice(0, 4).map(x => x.p);
+}
+
+// ── Render resultados ─────────────────────────────────────────────────────────
+function renderVoiceResults(){
+  const el = document.getElementById('voiceResults');
+  const status = document.getElementById('voiceStatus');
+  const actions = document.getElementById('voiceActions');
+
+  if(!voiceParsed.length){
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:8px;">No se reconocieron productos</div>';
+    return;
+  }
+
+  const matchedCount = voiceParsed.filter(i => i.chosen).length;
+  const unmatchedCount = voiceParsed.filter(i => !i.chosen && !i.matched.length).length;
+  status.textContent = `${matchedCount} encontrado${matchedCount!==1?'s':''} · ${unmatchedCount} sin coincidencia`;
+
+  el.innerHTML = voiceParsed.map((item, idx) => {
+    if(item.chosen){
+      const img = imgCache[item.chosen.sku] && imgCache[item.chosen.sku] !== 'error'
+        ? `<img class="voice-result-img" src="${imgCache[item.chosen.sku]}" onerror="this.style.display='none'">`
+        : `<div class="voice-result-img" style="background:var(--border);border-radius:6px;"></div>`;
+      const price = item.chosen.price ? '$'+Math.round(item.chosen.price*(includeIVA?1+item.chosen.iva/100:1)).toLocaleString('es-AR') : '';
+      return `<div class="voice-result-item matched">
+        ${img}
+        <div class="voice-result-info">
+          <div class="voice-result-name">${item.chosen.name}</div>
+          <div class="voice-result-sub">${price} · SKU ${item.chosen.sku}</div>
+        </div>
+        <div class="voice-result-qty">
+          <input type="number" min="1" max="99" value="${item.qty}" id="vqty_${idx}" style="width:44px;">
+        </div>
+      </div>`;
+    } else if(item.matched.length > 1){
+      // Sugerencias
+      const sugs = item.matched.map(p =>
+        `<button class="voice-suggestion-btn" onclick="voiceChoose(${idx},'${p.sku}')">${p.name}</button>`
+      ).join('');
+      return `<div class="voice-result-item unmatched">
+        <div style="flex:1;">
+          <div style="font-size:12px;color:var(--muted);">❓ "${item.query}" — ¿cuál querés?</div>
+          <div class="voice-suggestions" style="margin-top:6px;">${sugs}</div>
+        </div>
+      </div>`;
+    } else {
+      return `<div class="voice-result-item unmatched">
+        <div style="flex:1;">
+          <div style="font-size:12px;color:var(--muted);">❌ No encontrado: "${item.query}"</div>
+        </div>
+      </div>`;
+    }
+  }).join('');
+
+  // Mostrar acciones si hay al menos uno con match
+  const hasMatch = voiceParsed.some(i => i.chosen);
+  actions.style.display = hasMatch ? 'flex' : 'none';
+}
+
+function voiceChoose(idx, sku){
+  const p = productMap[sku];
+  if(!p) return;
+  voiceParsed[idx].chosen = p;
+  voiceParsed[idx].matched = [p];
+  renderVoiceResults();
+}
+
+function addVoiceToCart(){
+  let added = 0;
+  voiceParsed.forEach((item, idx) => {
+    if(!item.chosen) return;
+    const qtyInput = document.getElementById(`vqty_${idx}`);
+    const qty = qtyInput ? Math.max(1, parseInt(qtyInput.value)||1) : item.qty;
+    cart[item.chosen.sku] = (cart[item.chosen.sku]||0) + qty;
+    added++;
+  });
+  saveCart();
+  updateFloatSummary();
+  closeVoice();
+  showToast(`🛒 ${added} producto${added!==1?'s':''} agregado${added!==1?'s':''} al carrito`);
+}
+
+// Mostrar mic-fab junto con search-fab (siempre visible en modo compra)
+(function initMicFab(){
+  const fab = document.getElementById('micFab');
+  if(fab) fab.style.opacity = '1';
+})();
 (async function initApp(){
   // Mostrar spinner mientras carga el catálogo
   const grid = document.getElementById('grid');
