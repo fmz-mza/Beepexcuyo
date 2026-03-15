@@ -3548,50 +3548,178 @@ function levenshtein(a, b){
   return dp[m][n];
 }
 
-// Aliases fonéticos para nombres de productos Beepex
-const VOICE_ALIASES = {
-  'rocky':'rock e','rocke':'rock e','rock e':'rock e',
-  'sandy':'sand e','sande':'sand e','sand e':'sand e',
-  'balle':'ball e','ball e':'ball e','vale':'ball e','bali':'ball e','vali':'ball e',
-  'bubli':'bubbl e','buble':'bubbl e','bubble':'bubbl e',
-  'faunte':'fount e','fonte':'fount e','fuente':'fount e',
-  'stroky':'strock e','stroke':'strock e','strocke':'strock e',
-  'groomy':'groom e','grume':'groom e',
-  'snaky':'snack e','snake':'snack e',
-  'cleane':'clean e','clini':'clean e',
+// ── Diccionario de sinónimos español → términos de búsqueda ──────────────────
+// Cada entrada: palabra en español → array de términos a buscar en el catálogo
+const VOICE_SYNONYMS = {
+  // Animales → productos relacionados
+  'pato':['duck'],
+  'patos':['duck'],
+  'pez':['fish','cardum'],
+  'peces':['fish','cardum'],
+  'pececito':['fish','cardum'],
+  'pececitos':['fish','cardum'],
+  'pescado':['fish','cardum'],
+  'pajaro':['bird','tuit','owl','wand'],
+  'pajarito':['bird','tuit','wand'],
+  'pajaro':['bird','tuit'],
+  'buho':['owl'],
+  'tucan':['tuk'],
+  'grillo':['crick'],
+  'rana':['frog'],
+  'raton':['wheel'],
+  'ratoncito':['wheel'],
+  // Nombres fonéticos de productos BEEPAW
+  'rocky':['rock'],
+  'rocki':['rock'],
+  'sandy':['sand'],
+  'sandi':['sand'],
+  'bally':['ball'],
+  'bali':['ball'],
+  'vali':['ball'],
+  'vale':['ball'],
+  'bubble':['bubbl'],
+  'bubli':['bubbl'],
+  'buble':['bubbl'],
+  'stroky':['strock'],
+  'stroke':['strock'],
+  'groomy':['groom'],
+  'grumi':['groom'],
+  'snaky':['snack'],
+  'shooty':['shoot'],
+  'speedy':['speed'],
+  'jumpy':['jump'],
+  'wandi':['wand'],
+  'rolly':['roll'],
+  'foody':['food','feed'],
+  'fonte':['fount'],
+  'fuente':['fount'],
+  'faunte':['fount'],
+  'cleani':['clean'],
+  'treny':['train'],
+  'draky':['drink'],
+  'naili':['nail'],
+  'sharpy':['sharp'],
+  'cuti':['cut'],
+  'brushi':['brush'],
+  'fluffy':['fluff'],
+  'boli':['bowl'],
+  'slofi':['slow'],
+  'wili':['wheel'],
+  'ovni':['ovn'],
+  'tuiti':['tuit'],
+  'duky':['duck'],
+  'birdi':['bird'],
+  'frigy':['frog'],
+  'criki':['crick'],
+  // Palabras descriptivas en español
+  'litera':['rock','sand'],
+  'literas':['rock','sand'],
+  'arenero':['rock','sand'],
+  'caja arena':['rock','sand'],
+  'cepillo':['brush','strock','groom','orca','panda','fruta','cardinas'],
+  'cepillos':['brush','strock','groom'],
+  'cortaunas':['nail','sharp','cut'],
+  'cortauna':['nail','sharp','cut'],
+  'bebedero':['fount','drink','clean','bowl'],
+  'bebederos':['fount','drink','clean'],
+  'comedero':['food','feed','slow','bowl','snack'],
+  'comederos':['food','feed','slow','bowl'],
+  'pelota':['ball','jump','speed','roll'],
+  'pelotas':['ball','jump','speed','roll'],
+  'juguete':['duck','bird','tuit','owl','tuk','crick','frog','wheel','fish','cardum','wand','speed','ball','jump','roll','snack','shoot','ovn'],
+  'juguetes':['duck','bird','tuit','owl','tuk','crick','frog','wheel','fish','cardum','wand','speed','ball','jump'],
+  'dispenser':['food','feed','snack','roll'],
+  'dispensador':['food','feed','snack','roll'],
+  'lanzador':['shoot'],
+  'varita':['wand'],
+  'varitas':['wand'],
+  'mochila':['mochila','bolso transportador'],
+  'mochilas':['mochila','bolso transportador'],
+  'bolso':['bolso'],
+  'transportador':['bolso transportador','mochila'],
+  'transportadora':['mochila','bolso transportador'],
+  'rampa':['rampa'],
+  'rampas':['rampa'],
+  'arbol':['arbol'],
+  'arboles':['arbol'],
+  'rascador':['rascador','palo'],
+  'rascadores':['rascador','palo'],
+  'cama':['cama'],
+  'camita':['cama'],
+  'mecedora':['mecedora'],
+  'correa':['correa'],
+  'correas':['correa'],
+  'collar':['collar'],
+  'collares':['collar'],
+  'funda':['funda'],
+  'fundas':['funda'],
+  'silla auto':['silla'],
+  'silla coche':['silla'],
+  'botella':['botella'],
+  'botellas':['botella'],
+  'bolsa':['bolsas','train'],
+  'bolsas':['bolsas','train'],
+  'pano':['train'],
+  'panos':['train'],
+  'catnip':['catnip'],
+  'bandeja':['bandeja'],
+  'robot':['robot'],
+  'camara':['robot','camara'],
+  // Colores — ayudan a afinar
+  'celeste':['celeste'],
+  'rosa':['rosa'],
+  'verde':['verde'],
+  'azul':['azul'],
+  'negro':['negro'],
+  'blanco':['blanco'],
+  'rojo':['rojo'],
+  'naranja':['naranja'],
+  'gris':['gris'],
+  'amarillo':['amarillo'],
 };
+
+// Expande una query con sinónimos
+function expandVoiceQuery(q){
+  const words = q.split(' ');
+  const expanded = new Set([q]);
+  // Buscar coincidencias de 1, 2 y 3 palabras
+  for(let len = 3; len >= 1; len--){
+    for(let i = 0; i <= words.length - len; i++){
+      const phrase = words.slice(i, i+len).join(' ');
+      if(VOICE_SYNONYMS[phrase]){
+        VOICE_SYNONYMS[phrase].forEach(t => expanded.add(t));
+      }
+    }
+  }
+  return [...expanded];
+}
 
 function findProductsByVoice(query){
   const q = normalize(query);
   if(!q || q.length < 2) return [];
 
-  // Aplicar alias fonético si existe
-  const qAliased = VOICE_ALIASES[q] || q;
-  const qWords = qAliased.split(' ').filter(w => w.length > 1);
+  const terms = expandVoiceQuery(q);
 
   const scored = products
     .filter(p => p.stock !== 'NOSTOCK')
     .map(p => {
       const name = normalize(p.name);
       const meta = productMeta[p.sku];
-      const tags = meta ? normalize(meta.tags) : '';
-      const full = name + ' ' + tags;
+      const desc = meta ? normalize(meta.desc) : '';
+      const full = name + ' ' + desc;
       let score = 0;
 
-      // Coincidencia exacta del query completo
-      if(name.includes(qAliased)) score += 200;
-      else if(full.includes(qAliased)) score += 150;
-
-      // Cada palabra del query vs nombre
-      qWords.forEach(w => {
-        if(name.includes(w)) score += 30;
-        else if(full.includes(w)) score += 15;
+      terms.forEach(term => {
+        // Coincidencia en nombre (más peso)
+        if(name.includes(term)) score += term.length > 3 ? 80 : 40;
+        // Coincidencia en descripción
+        else if(desc.includes(term)) score += term.length > 3 ? 30 : 15;
+        // Fuzzy sobre palabras del nombre
         else {
-          // Fuzzy: mejor distancia entre w y cada palabra del nombre
           const nameWords = name.split(' ');
-          const best = Math.min(...nameWords.map(nw => levenshtein(w, nw)));
-          if(best === 1 && w.length >= 3) score += 20;
-          else if(best === 2 && w.length >= 5) score += 10;
+          const best = Math.min(...nameWords.map(nw => levenshtein(term, nw)));
+          if(best === 1 && term.length >= 3) score += 20;
+          else if(best === 2 && term.length >= 5) score += 10;
         }
       });
 
@@ -3603,7 +3731,7 @@ function findProductsByVoice(query){
     .filter(x => x.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  return scored.slice(0, 4).map(x => x.p);
+  return scored.slice(0, 6).map(x => x.p);
 }
 
 // ── Render resultados ─────────────────────────────────────────────────────────
