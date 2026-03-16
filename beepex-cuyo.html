@@ -3817,11 +3817,13 @@ function voiceChoose(idx, sku){
 }
 
 function addMoreVoice(){
-  // Guardar cantidades actuales antes de seguir
+  // Guardar cantidades actuales y descartar los sin coincidencia
   voiceParsed.forEach((item, idx) => {
     const input = document.getElementById(`vqty_${idx}`);
     if(input) item.qty = Math.max(1, parseInt(input.value)||1);
   });
+  // Quedarse solo con los que tienen producto elegido
+  voiceParsed = voiceParsed.filter(item => item.chosen);
 
   document.getElementById('voiceActions').style.display = 'none';
   document.getElementById('voiceStatus').textContent = '🔴 Escuchando más productos...';
@@ -3898,12 +3900,20 @@ function addVoiceToCart(){
     if(!item.chosen) return;
     const qtyInput = document.getElementById(`vqty_${idx}`);
     const qty = qtyInput ? Math.max(1, parseInt(qtyInput.value)||1) : item.qty;
-    cart[item.chosen.sku] = (cart[item.chosen.sku]||0) + qty;
+    const p = item.chosen;
+    const prev = cart[p.sku]?.qty || 0;
+    cart[p.sku] = { product: p, qty: prev + qty };
     added++;
   });
   saveCart();
   updateCount();
-  patchPrices();
+  // Parchear cards de los productos agregados
+  voiceParsed.forEach(item => {
+    if(!item.chosen) return;
+    const cardEl = document.getElementById(`card-${item.chosen.sku}`);
+    if(cardEl) patchCard(cardEl, item.chosen);
+  });
+  renderCart();
   closeVoice();
   showToast(`🛒 ${added} producto${added!==1?'s':''} agregado${added!==1?'s':''} al carrito`);
 }
