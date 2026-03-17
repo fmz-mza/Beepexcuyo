@@ -244,8 +244,10 @@
   .auth-skip{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:4px;font-family:inherit;text-align:center;}
   .auth-skip:hover{color:var(--text);}
   /* Precio oculto para no registrados */
-  .price-locked{font-size:14px;font-weight:700;color:var(--muted);background:var(--card);border-radius:6px;padding:4px 10px;letter-spacing:2px;cursor:pointer;border:1px dashed var(--border);display:inline-block;margin-top:4px;}
+  .price-locked{font-size:14px;font-weight:700;color:var(--muted);background:var(--card);border-radius:6px;padding:4px 10px;letter-spacing:2px;cursor:pointer;border:1px dashed var(--border);display:inline-block;margin-top:4px;position:relative;}
   .price-locked:hover{border-color:var(--accent);color:var(--accent);}
+  .price-locked::after{content:'Iniciá sesión para ver el precio';position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:11px;font-weight:500;padding:5px 10px;border-radius:8px;white-space:nowrap;letter-spacing:0;pointer-events:none;opacity:0;transition:opacity .15s;box-shadow:0 4px 12px rgba(0,0,0,.3);z-index:10;}
+  .price-locked:hover::after{opacity:1;}
   /* Badge usuario en header */
   .user-badge{font-size:11px;font-weight:700;color:var(--accent2);white-space:nowrap;cursor:pointer;padding:4px 8px;border-radius:8px;background:var(--card);border:1px solid var(--border);flex-shrink:0;}
   .user-badge:hover{border-color:var(--accent);}
@@ -416,6 +418,9 @@
   .back-top:active{transform:scale(.88);}
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;font-size:13px;font-weight:600;padding:10px 20px;border-radius:20px;z-index:300;transition:opacity .3s ease,visibility .3s ease;pointer-events:none;opacity:0;visibility:hidden;}
   .toast.show{opacity:1;visibility:visible;}
+  .toast-undo{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:10px 16px;border-radius:20px;z-index:301;display:flex;align-items:center;gap:12px;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.4);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .3s ease,visibility .3s ease;}
+  .toast-undo.show{opacity:1;visibility:visible;pointer-events:auto;}
+  .toast-undo-btn{background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:12px;font-weight:700;padding:5px 12px;cursor:pointer;font-family:inherit;touch-action:manipulation;}
   /* Modal descripción */
   .desc-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:400;align-items:center;justify-content:center;padding:16px;}
   .desc-overlay.open{display:flex;}
@@ -759,6 +764,10 @@ let userSalePrices={}; // {sku: price}
 </div>
 <button class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Volver arriba">↑</button>
 <div class="toast" id="toast"></div>
+<div class="toast-undo" id="toastUndo">
+  <span id="toastUndoMsg">🗑 Pedido vaciado</span>
+  <button class="toast-undo-btn" onclick="undoClearCart()">Deshacer</button>
+</div>
 
 <script>
 // ── Configuración ────────────────────────────────────────────────────────────
@@ -1269,15 +1278,20 @@ function add(sku){
     items:[{item_id:sku, item_name:p.name, item_brand:p.brand, price:p.price, quantity:1}]
   });
 }
+const _chgDebounce = {};
 function chg(sku,d){
   const p=productMap[sku]; if(!p) return;
   if(!userApproved){ openAuth(()=>chg(sku,d)); return; }
+  // Debounce: ignorar taps repetidos en menos de 150ms
+  const now = Date.now();
+  if(_chgDebounce[sku] && now - _chgDebounce[sku] < 150) return;
+  _chgDebounce[sku] = now;
   const prevQty=(cart[sku]?.qty||0);
   const q=prevQty+d;
   if(q<=0){ delete cart[sku]; trackEvent('cart_events',{sku, action:'remove'}); }
   else{
     cart[sku]={product:p,qty:q};
-    if(prevQty===0) trackEvent('cart_events',{sku, action:'add'}); // primer add
+    if(prevQty===0) trackEvent('cart_events',{sku, action:'add'});
   }
   syncCart(sku);
 }
@@ -1461,19 +1475,54 @@ function closeCart(){
   window.scrollTo(0, scrollY);
 }
 
+let _cartUndoSnapshot = null;
+let _cartUndoTimer = null;
+
 function clearCart(){
   if(!Object.values(cart).some(c=>c.qty>0)) return;
-  if(!confirm('¿Vaciar todo el pedido?')) return;
+  // Guardar snapshot para deshacer
+  _cartUndoSnapshot = JSON.parse(JSON.stringify(cart));
+  // Vaciar
   Object.keys(cart).forEach(sku=>{ delete cart[sku]; });
   saveCart();
-  // Actualizar todas las cards
   document.querySelectorAll('.card.in-cart').forEach(el=>{
     const sku=el.id.replace('card-','');
     syncCart(sku);
   });
   updateCount();
   renderCart();
-  showToast('🗑 Pedido vaciado');
+  // Mostrar toast con deshacer
+  showUndoToast('🗑 Pedido vaciado', undoClearCart, 5000);
+}
+
+function undoClearCart(){
+  if(!_cartUndoSnapshot) return;
+  cart = _cartUndoSnapshot;
+  _cartUndoSnapshot = null;
+  hideUndoToast();
+  saveCart();
+  updateCount();
+  renderCart();
+  // Parchear todas las cards restauradas
+  Object.keys(cart).forEach(sku=>{
+    const cardEl=document.getElementById(`card-${sku}`);
+    const p=productMap[sku];
+    if(cardEl&&p) patchCard(cardEl,p);
+  });
+  showToast('↩ Pedido restaurado');
+}
+
+function showUndoToast(msg, _fn, duration=5000){
+  clearTimeout(_cartUndoTimer);
+  const el = document.getElementById('toastUndo');
+  document.getElementById('toastUndoMsg').textContent = msg;
+  el.classList.add('show');
+  _cartUndoTimer = setTimeout(()=>{ hideUndoToast(); _cartUndoSnapshot=null; }, duration);
+}
+
+function hideUndoToast(){
+  clearTimeout(_cartUndoTimer);
+  document.getElementById('toastUndo').classList.remove('show');
 }
 function renderCart(){
   const items=Object.values(cart).filter(c=>c.qty>0);
@@ -3339,7 +3388,7 @@ function salePriceDisplay(p){
 function priceDisplay(p){
   if(p.price===0) return '<span class="price">Consultar</span>';
   if(userApproved) return `<span class="price">${fmt(mayorista(p))}</span>`;
-  return `<span class="price-locked" onclick="openAuth()" title="Registrate para ver el precio">●●●●</span>`;
+  return `<span class="price-locked" onclick="openAuth()" title="Iniciá sesión para ver el precio">🔒 Ver precio</span>`;
 }
 function pvpDisplay(p){
   if(!userApproved) return '';
