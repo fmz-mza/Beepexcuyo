@@ -1527,6 +1527,11 @@ function hideUndoToast(){
 function renderCart(){
   const items=Object.values(cart).filter(c=>c.qty>0);
   const box=document.getElementById('cartItems');
+
+  // Botón vaciar — siempre sincronizado con el estado del carrito
+  const cb=document.getElementById('clearCartBtn');
+  if(cb) cb.classList.toggle('visible', items.length>0);
+
   if(!items.length){
     let emptyHtml='<div class="cart-empty">🛒<br>El pedido está vacío<br><small>Agregá productos desde el catálogo</small></div>';
     // Productos frecuentes del último pedido
@@ -1567,40 +1572,59 @@ function renderCart(){
   document.getElementById('pdfBtn').disabled=false;
   const groups={};
   items.forEach(c=>{ const b=c.product.brand||'Sin marca'; (groups[b]=groups[b]||[]).push(c); });
-  let html='';
-  Object.entries(groups).forEach(([brand,list])=>{
-    html+=`<div class="cart-section-label">📦 ${brand}</div>`;
-    list.forEach(c=>{
-      const p=c.product, precio=mayorista(p);
-      const isPrev=stockType(p.stock)==='PREVENTA';
-      html+=`
-      <div class="cart-item ${isPrev?'ci-preventa':''}">
-        <div class="cart-item-img"><img id="ci-${p.sku}" alt="${p.name}"><span id="cp-${p.sku}">📦</span></div>
-        <div class="cart-item-info">
-          <div class="cart-item-name">${p.name}</div>
-          <div class="cart-item-sku">SKU ${p.sku}</div>
-          <div class="cart-item-price">${fmt(precio)} × ${c.qty} = ${fmt(precio*c.qty)}</div>
-          ${isPrev?`<div class="cart-item-badge">🕐 ${p.stock}</div>`:''}
-          <div class="cart-item-qty">
-            <button onclick="chg('${p.sku}',-1)">−</button>
-            <span>${c.qty}</span>
-            <button onclick="chg('${p.sku}',1)">+</button>
+
+  // DOM diferencial: solo re-renderizar si cambió la lista de SKUs
+  const newSkuList = items.map(c=>c.product.sku).join(',');
+  const oldSkuList = box.dataset.skuList||'';
+
+  if(newSkuList !== oldSkuList){
+    // Lista de productos cambió → reconstruir HTML completo
+    let html='';
+    Object.entries(groups).forEach(([brand,list])=>{
+      html+=`<div class="cart-section-label">📦 ${brand}</div>`;
+      list.forEach(c=>{
+        const p=c.product, precio=mayorista(p);
+        const isPrev=stockType(p.stock)==='PREVENTA';
+        html+=`
+        <div class="cart-item ${isPrev?'ci-preventa':''}" id="ci-row-${p.sku}">
+          <div class="cart-item-img"><img id="ci-${p.sku}" alt="${p.name}"><span id="cp-${p.sku}">📦</span></div>
+          <div class="cart-item-info">
+            <div class="cart-item-name">${p.name}</div>
+            <div class="cart-item-sku">SKU ${p.sku}</div>
+            <div class="cart-item-price" id="ci-price-${p.sku}">${fmt(precio)} × ${c.qty} = ${fmt(precio*c.qty)}</div>
+            ${isPrev?`<div class="cart-item-badge">🕐 ${p.stock}</div>`:''}
+            <div class="cart-item-qty">
+              <button onclick="chg('${p.sku}',-1)">−</button>
+              <span id="ci-qty-${p.sku}">${c.qty}</span>
+              <button onclick="chg('${p.sku}',1)">+</button>
+            </div>
           </div>
-        </div>
-        <button class="cart-remove" onclick="chg('${p.sku}',${-c.qty})">🗑</button>
-      </div>`;
+          <button class="cart-remove" onclick="chg('${p.sku}',${-c.qty})">🗑</button>
+        </div>`;
+      });
     });
-  });
-  box.innerHTML=html;
-  items.forEach(c=>{
-    const el=document.getElementById(`ci-${c.product.sku}`); if(!el) return;
-    const cached=imgCache[c.product.sku];
-    if(cached&&cached!=='error'){
-      el.src=cached; el.onload=()=>{ el.classList.add('visible'); document.getElementById(`cp-${c.product.sku}`)?.remove(); };
-    } else {
-      tryLoadImg(el, c.product.sku);
-    }
-  });
+    box.innerHTML=html;
+    box.dataset.skuList = newSkuList;
+    // Cargar imágenes solo para items nuevos
+    items.forEach(c=>{
+      const el=document.getElementById(`ci-${c.product.sku}`); if(!el) return;
+      const cached=imgCache[c.product.sku];
+      if(cached&&cached!=='error'){
+        el.src=cached; el.onload=()=>{ el.classList.add('visible'); document.getElementById(`cp-${c.product.sku}`)?.remove(); };
+      } else {
+        tryLoadImg(el, c.product.sku);
+      }
+    });
+  } else {
+    // Mismos productos → solo actualizar cantidades y precios sin tocar imágenes
+    items.forEach(c=>{
+      const p=c.product, precio=mayorista(p);
+      const qtyEl=document.getElementById(`ci-qty-${p.sku}`);
+      const priceEl=document.getElementById(`ci-price-${p.sku}`);
+      if(qtyEl) qtyEl.textContent=c.qty;
+      if(priceEl) priceEl.textContent=`${fmt(precio)} × ${c.qty} = ${fmt(precio*c.qty)}`;
+    });
+  }
   let sub=0, ivaTot=0;
   items.forEach(c=>{ sub+=c.product.price*c.qty; ivaTot+=Math.round(c.product.price*c.qty*c.product.iva/100); });
   const total=includeIVA?sub+ivaTot:sub;
