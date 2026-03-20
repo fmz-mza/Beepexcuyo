@@ -848,6 +848,29 @@ const imgObserver = new IntersectionObserver((entries)=>{
   });
 }, { rootMargin:'400px', threshold:0 });
 
+// ── Efecto 1: scroll-triggered card entrance ────────────────────────────────
+let _cardEnterIdx = 0; // contador global para stagger de cards en viewport
+const cardObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(!e.isIntersecting) return;
+    const el = e.target;
+    cardObserver.unobserve(el);
+    // Delay corto y creciente solo para las primeras 8 cards visibles juntas
+    const delay = Math.min(_cardEnterIdx, 7) * 40;
+    _cardEnterIdx++;
+    el.style.transition = 'none';
+    // Si ya fue animada (recarga de filtro), saltear
+    if(el.dataset.entered) return;
+    el.dataset.entered = '1';
+    requestAnimationFrame(()=>{
+      el.style.transition = `opacity .35s ease ${delay}ms, transform .35s cubic-bezier(.34,1.56,.64,1) ${delay}ms`;
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0)';
+      setTimeout(()=>{ el.style.transition=''; el.style.opacity=''; el.style.transform=''; }, delay+450);
+    });
+  });
+}, { rootMargin:'60px', threshold:0.05 });
+
 // ── Helpers de stock ─────────────────────────────────────────────────────────
 function stockType(s){
   if(!s||s==='NOSTOCK') return 'NOSTOCK';
@@ -1069,11 +1092,12 @@ function _applyFilterAnim(){
 
 function setBrand(b){
   activeBrand=b; renderBrands();
+  _cardEnterIdx=0;
   _applyFilterAnim();
   setTimeout(()=>renderGrid(), 0);
   if(typeof gtag!=='undefined'&&b!=='ALL') gtag('event','select_item',{item_list_name:'filtro_marca',item_list_id:b});
 }
-function setStock(s){ activeStock=activeStock===s?'ALL':s; renderBrands(); _applyFilterAnim(); setTimeout(()=>renderGrid(),0); }
+function setStock(s){ activeStock=activeStock===s?'ALL':s; renderBrands(); _cardEnterIdx=0; _applyFilterAnim(); setTimeout(()=>renderGrid(),0); }
 function setSort(v){ activeSort=v; renderGrid(); }
 
 // ── Debounce para el buscador ─────────────────────────────────────────────────
@@ -1192,6 +1216,11 @@ function renderGrid(){
       // Mostrar/ocultar con display:none via clase hidden
       if(visibleSkus.has(p.sku)){
         cardEl.classList.remove('hidden');
+        // Si ya fue animada antes, asegurar que esté visible
+        if(cardEl.dataset.entered){
+          cardEl.style.opacity='';
+          cardEl.style.transform='';
+        }
         // Si la imagen aun no cargo, intentar ahora que es visible
         const imgEl=cardEl.querySelector('img');
         if(imgEl && !imgEl.src && imgEl.dataset.sku){
@@ -1256,13 +1285,15 @@ function createCard(p){
   const imgEl=div.querySelector(`#img-${p.sku}`);
   if(imgEl){
     if(imgCache[p.sku] && imgCache[p.sku]!=='error'){
-      // Cache hit: cargar inmediatamente sin observer
       tryLoadImg(imgEl, p.sku);
     } else {
-      // Sin cache: lazy load con observer
       imgObserver.observe(imgEl);
     }
   }
+  // ── Efecto 1: registrar card para animación al entrar en viewport ────────────
+  div.style.opacity = '0';
+  div.style.transform = 'translateY(22px)';
+  cardObserver.observe(div);
   return div;
 }
 
@@ -4122,22 +4153,6 @@ function addVoiceToCart(){
 
   renderBrands();
   renderGrid();
-  // ── Efecto 1: entrada escalonada — correr DESPUÉS de que el DOM esté pintado ──
-  setTimeout(()=>{
-    const cards=[...document.querySelectorAll('#grid .card:not(.hidden)')];
-    if(!cards.length) return;
-    cards.forEach(el=>{ el.style.opacity='0'; el.style.transform='translateY(28px)'; el.style.transition='none'; });
-    // Doble rAF garantiza que el browser aplicó opacity:0 antes de animar
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      cards.forEach((el,i)=>{
-        const d=i*120;
-        el.style.transition=`opacity .4s ease ${d}ms, transform .4s cubic-bezier(.34,1.56,.64,1) ${d}ms`;
-        el.style.opacity='1';
-        el.style.transform='translateY(0)';
-      });
-      setTimeout(()=>cards.forEach(el=>{ el.style.transition=''; el.style.opacity=''; el.style.transform=''; }), cards.length*120+500);
-    }));
-  }, 100);
 
   // Auth en paralelo (no bloquea el catálogo)
   initAuth();
