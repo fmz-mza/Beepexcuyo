@@ -419,9 +419,9 @@
   .sale-action-btn.primary{background:var(--accent);color:#fff;}
   .sale-action-btn.secondary{background:var(--surface);border:1px solid var(--border);color:var(--text);}
   .card.sale-selected{outline:none;}
-  .card.sale-selected .sale-svg-border rect{stroke-dashoffset:0 !important;}
-  .sale-svg-border{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;border-radius:14px;overflow:visible;}
-  .sale-svg-border rect{fill:none;stroke:var(--accent2);stroke-width:2.5;rx:14;ry:14;stroke-dasharray:600;stroke-dashoffset:600;transition:stroke-dashoffset .55s cubic-bezier(.4,0,.2,1);}
+  /* Efecto 10: borde dibujado — dimensiones manejadas por JS en toggleSaleSelect */
+  .sale-svg-border{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:4;overflow:visible;}
+  .sale-svg-border rect{fill:none;stroke:var(--accent2);stroke-width:2.5;stroke-dasharray:9999;stroke-dashoffset:9999;transition:none;}
   .sale-check{display:none;width:100%;padding:8px 0 2px;align-items:center;justify-content:center;gap:5px;cursor:pointer;border-top:1px solid var(--border);font-size:12px;font-weight:700;color:var(--muted);transition:color .15s,background .15s;border-radius:0 0 14px 14px;}
   .sale-mode .sale-check{display:flex;}
   .sale-mode .sale-check:active{background:var(--surface);}
@@ -1224,7 +1224,7 @@ function createCard(p){
   div.className=`card${qty>0?' in-cart':''}${isPrev?' is-preventa':''}${isNoStock?' is-nostock':''}`;
   div.style.position='relative';
   div.innerHTML=`
-    <svg class="sale-svg-border" viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:3;"><rect x="1.5" y="1.5" width="97" height="97" rx="13" ry="13"/></svg>
+    <svg class="sale-svg-border"><rect x="0" y="0" width="100%" height="100%" rx="13" ry="13" vector-effect="non-scaling-stroke"/></svg>
     <div class="card-img" onclick="openLightbox('${p.sku}')">
       <img id="img-${p.sku}" data-sku="${p.sku}" alt="${p.name}">
       <div class="ph">📷</div>
@@ -2866,6 +2866,23 @@ function toggleSaleSelect(sku){
   const card=document.getElementById('card-'+sku);
   if(card){
     card.classList.toggle('sale-selected', selected);
+    // ── Efecto 10: actualizar SVG con dimensiones reales de la card ──────────
+    const svg=card.querySelector('.sale-svg-border');
+    if(svg){
+      const rect=svg.querySelector('rect');
+      const W=card.offsetWidth, H=card.offsetHeight;
+      const pad=1.5;
+      rect.setAttribute('x', pad);
+      rect.setAttribute('y', pad);
+      rect.setAttribute('width',  W - pad*2);
+      rect.setAttribute('height', H - pad*2);
+      // Calcular perimetro real para dasharray exacto
+      const perimeter = 2*(W + H);
+      rect.style.strokeDasharray  = perimeter;
+      rect.style.strokeDashoffset = selected ? 0 : perimeter;
+      if(!selected) rect.style.transition = 'none';
+      else rect.style.transition = 'stroke-dashoffset .6s cubic-bezier(.4,0,.2,1)';
+    }
     const chk=document.getElementById('chk-'+sku);
     if(chk) chk.textContent=selected?'✓ Seleccionado':'+ Seleccionar';
   }
@@ -4105,19 +4122,22 @@ function addVoiceToCart(){
 
   renderBrands();
   renderGrid();
-  // ── Efecto 1: entrada escalonada de cards al cargar ──────────────────────────
-  requestAnimationFrame(()=>{
+  // ── Efecto 1: entrada escalonada — correr DESPUÉS de que el DOM esté pintado ──
+  setTimeout(()=>{
     const cards=[...document.querySelectorAll('#grid .card:not(.hidden)')];
-    cards.forEach((el,i)=>{ el.style.opacity='0'; el.style.transform='translateY(22px)'; });
-    requestAnimationFrame(()=>{
+    if(!cards.length) return;
+    cards.forEach(el=>{ el.style.opacity='0'; el.style.transform='translateY(28px)'; el.style.transition='none'; });
+    // Doble rAF garantiza que el browser aplicó opacity:0 antes de animar
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
       cards.forEach((el,i)=>{
-        const delay=i*150;
-        el.style.transition=`opacity .38s cubic-bezier(.34,1.56,.64,1) ${delay}ms,transform .38s cubic-bezier(.34,1.56,.64,1) ${delay}ms`;
-        el.style.opacity='1'; el.style.transform='translateY(0)';
+        const d=i*120;
+        el.style.transition=`opacity .4s ease ${d}ms, transform .4s cubic-bezier(.34,1.56,.64,1) ${d}ms`;
+        el.style.opacity='1';
+        el.style.transform='translateY(0)';
       });
-      setTimeout(()=>cards.forEach(el=>{ el.style.transition=''; el.style.opacity=''; el.style.transform=''; }), cards.length*150+500);
-    });
-  });
+      setTimeout(()=>cards.forEach(el=>{ el.style.transition=''; el.style.opacity=''; el.style.transform=''; }), cards.length*120+500);
+    }));
+  }, 100);
 
   // Auth en paralelo (no bloquea el catálogo)
   initAuth();
