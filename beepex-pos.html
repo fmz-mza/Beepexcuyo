@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0b0f">
+<title>Beepex POS</title>
+<link rel="icon" type="image/png" href="https://favicon.im/beepex.com.ar?larger=true">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ── Variables ───────────────────────────────────────────── */
+:root {
+  --bg:       #0a0b0f;
+  --surface:  #13141a;
+  --card:     #1a1c25;
+  --border:   #252836;
+  --border2:  #2e3245;
+  --accent:   #f0a500;
+  --accent2:  #00c9a7;
+  --red:      #ef4444;
+  --blue:     #4a7cff;
+  --text:     #eceef8;
+  --muted:    #6b6e82;
+  --muted2:   #9395a8;
+  --mono:     'DM Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
+button { font-family: inherit; cursor: pointer; }
+input, textarea, select { font-family: inherit; }
+
+/* ── AUTH GATE ───────────────────────────────────────────── */
+#authGate {
+  position: fixed; inset: 0; z-index: 1000;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.auth-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 36px 28px; width: 100%; max-width: 360px;
+  display: flex; flex-direction: column; gap: 16px; text-align: center;
+}
+.auth-logo { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+.auth-logo span { color: var(--accent); }
+.auth-sub { font-size: 13px; color: var(--muted2); line-height: 1.5; }
+.auth-input {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; font-size: 15px;
+  color: var(--text); outline: none; transition: border .2s; width: 100%;
+}
+.auth-input:focus { border-color: var(--accent); }
+.auth-btn {
+  background: var(--accent); border: none; border-radius: 10px;
+  color: #000; font-size: 15px; font-weight: 700; padding: 13px;
+  transition: opacity .2s;
+}
+.auth-btn:hover { opacity: .85; }
+.auth-msg { font-size: 12px; color: var(--red); min-height: 16px; }
+
+/* ── LAYOUT PRINCIPAL ────────────────────────────────────── */
+#app { display: none; flex-direction: column; height: 100vh; overflow: hidden; }
+#app.ready { display: flex; }
+
+/* Header */
+.pos-header {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0; z-index: 10;
+}
+.pos-logo { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; }
+.pos-logo span { color: var(--accent); }
+.pos-badge {
+  font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+  background: rgba(240,165,0,.15); color: var(--accent);
+  border: 1px solid rgba(240,165,0,.3); letter-spacing: .5px;
+}
+.pos-user { margin-left: auto; font-size: 11px; color: var(--muted); }
+.pos-logout {
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--muted); font-size: 11px; padding: 5px 10px; transition: all .15s;
+}
+.pos-logout:hover { border-color: var(--red); color: var(--red); }
+.conn-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent2);
+  flex-shrink: 0; transition: background .3s;
+}
+.conn-dot.offline { background: var(--red); animation: connPulse 1.5s infinite; }
+@keyframes connPulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── MAIN CONTENT: 2 columnas en desktop, 1 en mobile ────── */
+.pos-main {
+  display: flex; flex: 1; overflow: hidden;
+}
+
+/* ── PANEL IZQUIERDO: búsqueda + productos ───────────────── */
+.panel-left {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  border-right: 1px solid var(--border);
+}
+
+/* Search bar */
+.search-bar {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  display: flex; gap: 8px; flex-shrink: 0;
+}
+.search-input-wrap { position: relative; flex: 1; }
+.search-input {
+  width: 100%; background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 10px; padding: 10px 36px 10px 14px;
+  font-size: 15px; color: var(--text); outline: none; transition: border .2s;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--muted); }
+.search-clear {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--muted); font-size: 16px;
+  display: none; line-height: 1; padding: 2px 4px;
+}
+.search-clear.visible { display: block; }
+.scan-btn {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 10px; padding: 0 14px; font-size: 20px;
+  color: var(--muted2); transition: all .2s; flex-shrink: 0;
+}
+.scan-btn:hover, .scan-btn.active {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(240,165,0,.08);
+}
+
+/* Scanner overlay */
+.scanner-overlay {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,.92); flex-direction: column;
+  align-items: center; justify-content: center; gap: 20px;
+}
+.scanner-overlay.open { display: flex; }
+.scanner-box {
+  position: relative; width: min(340px, 90vw); height: min(340px, 90vw);
+  border-radius: 16px; overflow: hidden; background: #000;
+}
+#scannerVideo { width: 100%; height: 100%; object-fit: cover; }
+.scanner-frame {
+  position: absolute; inset: 0; pointer-events: none;
+}
+.scanner-frame::before {
+  content: ''; position: absolute; inset: 20px;
+  border: 2px solid var(--accent); border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,.5);
+}
+.scanner-line {
+  position: absolute; left: 20px; right: 20px; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  top: 20px; animation: scanLine 2s ease-in-out infinite;
+}
+@keyframes scanLine {
+  0%   { top: 22px; opacity: 1; }
+  90%  { top: calc(100% - 22px); opacity: 1; }
+  100% { top: calc(100% - 22px); opacity: 0; }
+}
+.scanner-status {
+  font-size: 14px; color: var(--muted2); text-align: center;
+  font-family: var(--mono);
+}
+.scanner-status.found { color: var(--accent2); font-weight: 600; }
+.scanner-status.notfound { color: var(--red); }
+.scanner-close {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); font-size: 13px;
+  font-weight: 600; padding: 10px 24px;
+}
+
+/* Productos grid */
+.products-area {
+  flex: 1; overflow-y: auto; padding: 12px;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+}
+@media (min-width: 480px) { .products-area { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px) { .products-area { grid-template-columns: repeat(3, 1fr); } }
+
+.prod-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px; cursor: pointer;
+  transition: all .15s; display: flex; flex-direction: column; gap: 6px;
+  position: relative; overflow: hidden;
+}
+.prod-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.prod-card:active { transform: scale(.97); }
+.prod-card.no-stock { opacity: .45; pointer-events: none; }
+.prod-card.in-cart { border-color: var(--accent2); }
+.prod-img {
+  width: 100%; aspect-ratio: 1; border-radius: 8px;
+  background: var(--surface); object-fit: cover; display: block;
+}
+.prod-img-ph {
+  width: 100%; aspect-ratio: 1; border-radius: 8px;
+  background: var(--surface); display: flex; align-items: center;
+  justify-content: center; font-size: 24px; opacity: .3;
+}
+.prod-name {
+  font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+  line-height: 1.2; color: var(--text);
+}
+.prod-price {
+  font-family: var(--mono); font-size: 13px; font-weight: 500;
+  color: var(--accent);
+}
+.prod-brand {
+  font-size: 9px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.prod-in-cart {
+  position: absolute; top: 6px; right: 6px;
+  background: var(--accent2); color: #000; font-size: 9px; font-weight: 800;
+  padding: 2px 6px; border-radius: 20px;
+}
+.no-results {
+  grid-column: 1/-1; text-align: center; color: var(--muted);
+  padding: 60px 20px; font-size: 14px;
+}
+.loading-grid {
+  grid-column: 1/-1; text-align: center; color: var(--muted);
+  padding: 60px 20px; font-size: 14px;
+}
+
+/* ── PANEL DERECHO: carrito + cliente + pago ─────────────── */
+.panel-right {
+  width: 340px; flex-shrink: 0; display: flex; flex-direction: column;
+  overflow: hidden; background: var(--surface);
+}
+@media (max-width: 767px) {
+  .panel-right { display: none; position: fixed; inset: 0; z-index: 200; width: 100%; }
+  .panel-right.open { display: flex; }
+  .panel-left { flex: 1; }
+}
+
+/* Cliente selector */
+.client-bar {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.client-select {
+  flex: 1; background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 600;
+  color: var(--text); outline: none; cursor: pointer;
+  transition: border .2s; appearance: none;
+}
+.client-select:focus { border-color: var(--accent); }
+.new-client-btn {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 18px;
+  color: var(--muted2); transition: all .15s; flex-shrink: 0;
+}
+.new-client-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+/* Cart items */
+.cart-area {
+  flex: 1; overflow-y: auto; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.cart-empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 8px; color: var(--muted); font-size: 13px;
+  text-align: center; padding: 40px 20px;
+}
+.cart-empty-icon { font-size: 36px; opacity: .4; }
+
+.cart-item {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px; display: flex;
+  flex-direction: column; gap: 6px;
+  animation: cartItemIn .2s ease;
+}
+@keyframes cartItemIn { from{opacity:0;transform:translateX(12px)} to{opacity:1;transform:none} }
+.cart-item-top { display: flex; align-items: flex-start; gap: 8px; }
+.cart-item-img {
+  width: 36px; height: 36px; border-radius: 6px; object-fit: cover;
+  background: var(--surface); flex-shrink: 0;
+}
+.cart-item-info { flex: 1; min-width: 0; }
+.cart-item-name {
+  font-size: 12px; font-weight: 600; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cart-item-sku { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+.cart-item-remove {
+  background: none; border: none; color: var(--muted);
+  font-size: 14px; padding: 2px; flex-shrink: 0;
+  transition: color .15s;
+}
+.cart-item-remove:hover { color: var(--red); }
+
+/* Precio editable + qty */
+.cart-item-bottom { display: flex; align-items: center; gap: 6px; }
+.price-input-wrap { flex: 1; position: relative; }
+.price-prefix {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; color: var(--muted); font-family: var(--mono);
+  pointer-events: none;
+}
+.cart-price-input {
+  width: 100%; background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 7px; padding: 6px 8px 6px 18px;
+  font-size: 13px; font-weight: 600; color: var(--accent);
+  font-family: var(--mono); outline: none; transition: border .2s;
+}
+.cart-price-input:focus { border-color: var(--accent); }
+.cart-price-input.modified { border-color: rgba(240,165,0,.6); background: rgba(240,165,0,.06); }
+.qty-controls { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.qty-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; width: 28px; height: 28px; font-size: 16px;
+  color: var(--text); display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.qty-btn:hover { background: var(--accent); border-color: var(--accent); color: #000; }
+.qty-val {
+  font-family: var(--mono); font-size: 13px; font-weight: 600;
+  min-width: 24px; text-align: center;
+}
+.motivo-input {
+  width: 100%; background: none; border: none; border-top: 1px solid var(--border);
+  padding: 5px 4px; font-size: 11px; color: var(--muted2);
+  outline: none; display: none;
+}
+.motivo-input.visible { display: block; }
+.motivo-input::placeholder { color: var(--muted); }
+
+/* ── TOTALES Y DESCUENTO ─────────────────────────────────── */
+.totals-area {
+  padding: 10px 14px; border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.discount-row {
+  display: flex; gap: 6px; margin-bottom: 8px; align-items: center;
+}
+.discount-label { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.discount-input {
+  flex: 1; background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 7px; padding: 6px 8px; font-size: 13px;
+  color: var(--text); font-family: var(--mono); outline: none;
+  transition: border .2s; text-align: right;
+}
+.discount-input:focus { border-color: var(--accent); }
+.discount-type {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 7px; padding: 6px 8px; font-size: 12px;
+  font-weight: 600; color: var(--text); outline: none; cursor: pointer;
+  appearance: none; text-align: center;
+}
+.total-rows { display: flex; flex-direction: column; gap: 3px; }
+.total-row {
+  display: flex; justify-content: space-between; font-size: 12px;
+  color: var(--muted);
+}
+.total-row.big {
+  font-size: 16px; font-weight: 700; color: var(--text);
+  padding-top: 6px; margin-top: 3px; border-top: 1px solid var(--border);
+}
+.total-row.big .total-val { color: var(--accent); font-family: var(--mono); }
+
+/* ── PAGO ────────────────────────────────────────────────── */
+.payment-area {
+  padding: 10px 14px; border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.payment-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.payment-methods { display: flex; gap: 6px; margin-bottom: 8px; }
+.pay-method {
+  flex: 1; background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 8px; padding: 8px 4px; font-size: 11px; font-weight: 600;
+  color: var(--muted2); text-align: center; transition: all .15s;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.pay-method:hover { border-color: var(--accent); color: var(--text); }
+.pay-method.active { background: rgba(240,165,0,.12); border-color: var(--accent); color: var(--accent); }
+.pay-method .pay-icon { font-size: 18px; }
+.pay-amount-row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.pay-amount-label { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.pay-amount-input {
+  flex: 1; background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 7px; padding: 8px 10px; font-size: 14px; font-weight: 700;
+  color: var(--accent2); font-family: var(--mono); outline: none;
+  transition: border .2s; text-align: right;
+}
+.pay-amount-input:focus { border-color: var(--accent2); }
+.saldo-row {
+  display: flex; justify-content: space-between; font-size: 12px;
+  padding: 6px 8px; border-radius: 7px; margin-bottom: 8px;
+  background: rgba(0,201,167,.08); border: 1px solid rgba(0,201,167,.2);
+  color: var(--accent2);
+}
+.saldo-row.deuda { background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.2); color: var(--red); }
+.confirm-btn {
+  width: 100%; background: var(--accent); border: none; border-radius: 10px;
+  color: #000; font-size: 14px; font-weight: 800; padding: 13px;
+  transition: opacity .2s; display: flex; align-items: center;
+  justify-content: center; gap: 8px;
+}
+.confirm-btn:hover { opacity: .88; }
+.confirm-btn:disabled { opacity: .4; cursor: not-allowed; }
+.cancel-btn {
+  width: 100%; background: none; border: 1px solid var(--border);
+  border-radius: 10px; color: var(--muted); font-size: 13px;
+  font-weight: 600; padding: 10px; margin-top: 6px; transition: all .15s;
+}
+.cancel-btn:hover { border-color: var(--red); color: var(--red); }
+
+/* ── MOBILE: botón flotante carrito ──────────────────────── */
+.cart-fab {
+  display: none; position: fixed; bottom: 24px; right: 20px;
+  background: var(--accent); border: none; border-radius: 20px;
+  color: #000; font-size: 14px; font-weight: 800; padding: 12px 20px;
+  z-index: 100; box-shadow: 0 4px 20px rgba(240,165,0,.4);
+  align-items: center; gap: 8px;
+}
+@media (max-width: 767px) { .cart-fab { display: flex; } }
+.cart-fab-count {
+  background: #000; color: var(--accent); border-radius: 50%;
+  width: 22px; height: 22px; font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.panel-right-close {
+  display: none; background: none; border: none; color: var(--muted);
+  font-size: 20px; padding: 4px 8px;
+}
+@media (max-width: 767px) { .panel-right-close { display: block; } }
+
+/* ── MODALES ─────────────────────────────────────────────── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75);
+  z-index: 600; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 18px; padding: 24px; width: 100%; max-width: 380px;
+  display: flex; flex-direction: column; gap: 14px;
+  animation: modalIn .2s ease;
+}
+@keyframes modalIn { from{opacity:0;transform:scale(.95)translateY(10px)} to{opacity:1;transform:none} }
+.modal-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800; }
+.modal-input {
+  width: 100%; background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 10px; padding: 11px 14px; font-size: 14px;
+  color: var(--text); outline: none; transition: border .2s;
+}
+.modal-input:focus { border-color: var(--accent); }
+.modal-row { display: flex; gap: 8px; }
+.modal-btn {
+  flex: 1; border: none; border-radius: 10px; font-size: 14px;
+  font-weight: 700; padding: 12px; transition: opacity .2s;
+}
+.modal-btn.primary { background: var(--accent); color: #000; }
+.modal-btn.secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+.modal-btn:hover { opacity: .85; }
+
+/* ── TOAST ───────────────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) scale(.9);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 10px 20px; font-size: 13px; font-weight: 600;
+  z-index: 800; opacity: 0; pointer-events: none;
+  transition: opacity .25s, transform .25s;
+  white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,.5);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) scale(1); }
+.toast.success { border-color: rgba(0,201,167,.4); color: var(--accent2); }
+.toast.error   { border-color: rgba(239,68,68,.4); color: var(--red); }
+
+/* ── TICKET SUCCESS ──────────────────────────────────────── */
+.success-overlay {
+  display: none; position: fixed; inset: 0; z-index: 700;
+  background: rgba(0,0,0,.85); align-items: center;
+  justify-content: center; padding: 20px;
+}
+.success-overlay.open { display: flex; }
+.success-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 32px 24px; width: 100%; max-width: 340px;
+  text-align: center; display: flex; flex-direction: column;
+  gap: 12px; animation: modalIn .25s ease;
+}
+.success-icon { font-size: 52px; }
+.success-ticket {
+  font-family: var(--mono); font-size: 28px; font-weight: 500;
+  color: var(--accent); letter-spacing: 2px;
+}
+.success-sub { font-size: 13px; color: var(--muted2); line-height: 1.5; }
+.success-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.success-btn {
+  border: none; border-radius: 10px; font-size: 14px; font-weight: 700;
+  padding: 12px; transition: opacity .2s; display: flex;
+  align-items: center; justify-content: center; gap: 8px;
+}
+.success-btn.primary { background: var(--accent); color: #000; }
+.success-btn.wa { background: #25d366; color: #fff; }
+.success-btn.secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+.success-btn:hover { opacity: .85; }
+
+/* ── OFFLINE BANNER ──────────────────────────────────────── */
+.offline-banner {
+  display: none; background: rgba(239,68,68,.15); border-bottom: 1px solid rgba(239,68,68,.3);
+  color: var(--red); font-size: 12px; font-weight: 600; text-align: center;
+  padding: 6px; flex-shrink: 0;
+}
+.offline-banner.visible { display: block; }
+
+/* ── MORA WARNING ────────────────────────────────────────── */
+.mora-warning {
+  display: none; margin: 0 14px 0; padding: 8px 12px; border-radius: 8px;
+  background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3);
+  color: var(--red); font-size: 12px; font-weight: 600; flex-shrink: 0;
+}
+.mora-warning.visible { display: block; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ── AUTH GATE ─────────────────────────────────────────── -->
+<div id="authGate">
+  <div class="auth-box">
+    <div class="auth-logo">🐾 Beepex <span>POS</span></div>
+    <div class="auth-sub">Acceso restringido a vendedores autorizados</div>
+    <input type="email" class="auth-input" id="authEmail" placeholder="Email" autocomplete="email">
+    <input type="password" class="auth-input" id="authPass" placeholder="Contraseña">
+    <button class="auth-btn" onclick="doLogin()">Ingresar al POS</button>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<!-- ── APP PRINCIPAL ─────────────────────────────────────── -->
+<div id="app">
+  <!-- Offline banner -->
+  <div class="offline-banner" id="offlineBanner">
+    ⚠️ Sin conexión — las ventas se guardarán localmente y se sincronizarán al reconectar
+  </div>
+
+  <!-- Header -->
+  <div class="pos-header">
+    <div class="pos-logo">🐾 <span>POS</span></div>
+    <div class="pos-badge">PUNTO DE VENTA</div>
+    <div class="conn-dot" id="connDot" title="Conexión"></div>
+    <div class="pos-user" id="posUser"></div>
+    <button class="pos-logout" onclick="doLogout()">Salir</button>
+  </div>
+
+  <!-- Main -->
+  <div class="pos-main">
+
+    <!-- ── PANEL IZQUIERDO ────────────────────────────── -->
+    <div class="panel-left">
+      <div class="search-bar">
+        <div class="search-input-wrap">
+          <input type="text" class="search-input" id="searchInput"
+            placeholder="Buscar producto o SKU..."
+            oninput="filterProducts()" autocomplete="off">
+          <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
+        </div>
+        <button class="scan-btn" id="scanBtn" onclick="toggleScanner()" title="Escanear código de barras">
+          📷
+        </button>
+      </div>
+
+      <div class="products-area" id="productsArea">
+        <div class="loading-grid">⏳ Cargando productos...</div>
+      </div>
+    </div>
+
+    <!-- ── PANEL DERECHO ──────────────────────────────── -->
+    <div class="panel-right" id="panelRight">
+      <!-- Header mobile -->
+      <div class="pos-header" style="justify-content:space-between;">
+        <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;">Pedido</div>
+        <button class="panel-right-close" onclick="closeCart()">✕</button>
+      </div>
+
+      <!-- Cliente -->
+      <div class="client-bar">
+        <select class="client-select" id="clientSelect" onchange="onClientChange()">
+          <option value="">— Seleccionar cliente —</option>
+        </select>
+        <button class="new-client-btn" onclick="openNewClient()" title="Nuevo cliente">＋</button>
+      </div>
+
+      <!-- Mora warning -->
+      <div class="mora-warning" id="moraWarning"></div>
+
+      <!-- Cart items -->
+      <div class="cart-area" id="cartArea">
+        <div class="cart-empty">
+          <div class="cart-empty-icon">🛒</div>
+          <div>Agregá productos<br>desde el catálogo</div>
+        </div>
+      </div>
+
+      <!-- Descuento -->
+      <div class="totals-area">
+        <div class="discount-row">
+          <span class="discount-label">Descuento</span>
+          <input type="number" class="discount-input" id="discountVal"
+            placeholder="0" min="0" oninput="recalcTotals()">
+          <select class="discount-type" id="discountType" onchange="recalcTotals()">
+            <option value="pct">%</option>
+            <option value="monto">$</option>
+          </select>
+        </div>
+        <div class="total-rows" id="totalRows">
+          <div class="total-row"><span>Subtotal</span><span id="subtotalVal">$0</span></div>
+          <div class="total-row big"><span>TOTAL</span><span class="total-val" id="totalVal">$0</span></div>
+        </div>
+      </div>
+
+      <!-- Método de pago -->
+      <div class="payment-area">
+        <div class="payment-label">MÉTODO DE PAGO</div>
+        <div class="payment-methods">
+          <button class="pay-method active" data-type="efectivo" onclick="setPayMethod(this)">
+            <span class="pay-icon">💵</span>Efectivo
+          </button>
+          <button class="pay-method" data-type="transferencia" onclick="setPayMethod(this)">
+            <span class="pay-icon">📲</span>Transfer.
+          </button>
+          <button class="pay-method" data-type="cta_cte" onclick="setPayMethod(this)">
+            <span class="pay-icon">📒</span>Cta Cte
+          </button>
+        </div>
+        <div class="pay-amount-row" id="payAmountRow">
+          <span class="pay-amount-label">Monto recibido</span>
+          <input type="number" class="pay-amount-input" id="payAmount"
+            placeholder="0" min="0" oninput="recalcSaldo()">
+        </div>
+        <div class="saldo-row" id="saldoRow" style="display:none"></div>
+        <button class="confirm-btn" id="confirmBtn" onclick="confirmSale()" disabled>
+          ✓ Confirmar venta
+        </button>
+        <button class="cancel-btn" onclick="cancelOrder()">Cancelar pedido</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FAB CARRITO MOBILE ─────────────────────────────────── -->
+<button class="cart-fab" id="cartFab" onclick="openCartPanel()">
+  🛒 Ver pedido
+  <span class="cart-fab-count" id="cartFabCount">0</span>
+</button>
+
+<!-- ── SCANNER OVERLAY ────────────────────────────────────── -->
+<div class="scanner-overlay" id="scannerOverlay">
+  <div class="scanner-box">
+    <video id="scannerVideo" autoplay playsinline muted></video>
+    <div class="scanner-frame">
+      <div class="scanner-line"></div>
+    </div>
+  </div>
+  <div class="scanner-status" id="scannerStatus">Apuntá la cámara al código de barras</div>
+  <button class="scanner-close" onclick="closeScanner()">Cerrar</button>
+</div>
+
+<!-- ── MODAL NUEVO CLIENTE ────────────────────────────────── -->
+<div class="modal-overlay" id="newClientModal">
+  <div class="modal">
+    <div class="modal-title">Nuevo cliente</div>
+    <input type="text" class="modal-input" id="ncNombre" placeholder="Nombre *">
+    <input type="tel" class="modal-input" id="ncTelefono" placeholder="Teléfono (ej: 2614123456)">
+    <input type="email" class="modal-input" id="ncEmail" placeholder="Email">
+    <div class="modal-row">
+      <button class="modal-btn secondary" onclick="closeNewClient()">Cancelar</button>
+      <button class="modal-btn primary" onclick="saveNewClient()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SUCCESS / TICKET ───────────────────────────────────── -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-box">
+    <div class="success-icon">✅</div>
+    <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;">¡Venta confirmada!</div>
+    <div class="success-ticket" id="successTicket">#000001</div>
+    <div class="success-sub" id="successSub"></div>
+    <div class="success-actions">
+      <button class="success-btn primary" onclick="downloadTicket()">📄 Descargar ticket PDF</button>
+      <button class="success-btn wa" onclick="shareTicketWA()">📲 Compartir por WhatsApp</button>
+      <button class="success-btn secondary" onclick="newSale()">➕ Nueva venta</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ──────────────────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+'use strict';
+
+// ── Config ────────────────────────────────────────────────
+const SUPABASE_URL  = 'https://mmerrzniuxbrjryhcsda.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_oJzr70DjfOZsK4mjFX5rRw_5hc03thM';
+const WA_NUMBER     = '5492616531533';
+
+const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: false }
+});
+
+// ── Estado global ─────────────────────────────────────────
+let currentUser   = null;
+let products      = [];         // catálogo completo
+let clients       = [];         // lista de clientes
+let cart          = [];         // [{product, qty, precioFinal, precioModificado, motivoPrecio}]
+let payMethod     = 'efectivo';
+let currentOrder  = null;       // orden en borrador (id de Supabase)
+let lastTicket    = null;       // datos del último ticket generado
+let isOnline      = navigator.onLine;
+let pendingSync   = JSON.parse(localStorage.getItem('pos_pending_sync') || '[]');
+
+// ── Helpers formato ───────────────────────────────────────
+const fmt = n => '$' + Math.round(n).toLocaleString('es-AR');
+
+function normalizeWA(tel) {
+  if (!tel) return '';
+  const digits = tel.replace(/\D/g, '');
+  if (digits.startsWith('549')) return digits;
+  if (digits.startsWith('54'))  return '549' + digits.slice(2);
+  if (digits.startsWith('0'))   return '549' + digits.slice(1);
+  return '549' + digits;
+}
+
+// ── Conexión ──────────────────────────────────────────────
+function setOnline(v) {
+  isOnline = v;
+  document.getElementById('connDot').classList.toggle('offline', !v);
+  document.getElementById('offlineBanner').classList.toggle('visible', !v);
+  if (v) syncPending();
+}
+window.addEventListener('online',  () => setOnline(true));
+window.addEventListener('offline', () => setOnline(false));
+
+// ── AUTH ──────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass  = document.getElementById('authPass').value;
+  const msg   = document.getElementById('authMsg');
+  msg.textContent = '';
+  if (!email || !pass) { msg.textContent = 'Completá email y contraseña'; return; }
+
+  const { data, error } = await _sb.auth.signInWithPassword({ email, password: pass });
+  if (error) { msg.textContent = 'Credenciales incorrectas'; return; }
+
+  // Verificar que sea seller
+  const { data: seller } = await _sb.from('seller_profiles')
+    .select('id, activo')
+    .eq('profile_id', data.user.id)
+    .single();
+
+  if (!seller || !seller.activo) {
+    await _sb.auth.signOut();
+    msg.textContent = 'No tenés acceso al POS';
+    return;
+  }
+
+  currentUser = data.user;
+  initApp();
+}
+
+async function checkSession() {
+  const { data: { session } } = await _sb.auth.getSession();
+  if (!session) return;
+
+  const { data: seller } = await _sb.from('seller_profiles')
+    .select('id, activo')
+    .eq('profile_id', session.user.id)
+    .single();
+
+  if (!seller || !seller.activo) return;
+
+  currentUser = session.user;
+  initApp();
+}
+
+async function doLogout() {
+  await _sb.auth.signOut();
+  location.reload();
+}
+
+// ── INIT APP ──────────────────────────────────────────────
+async function initApp() {
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('app').classList.add('ready');
+  document.getElementById('posUser').textContent = currentUser.email;
+
+  setOnline(navigator.onLine);
+  await Promise.all([loadProducts(), loadClients()]);
+  cleanExpiredDrafts();
+}
+
+// ── PRODUCTOS ─────────────────────────────────────────────
+async function loadProducts() {
+  const { data, error } = await _sb.from('products').select('*').order('name');
+  if (error) { showToast('Error cargando productos', 'error'); return; }
+  products = data || [];
+  renderProducts(products);
+}
+
+function renderProducts(list) {
+  const area = document.getElementById('productsArea');
+  if (!list.length) {
+    area.innerHTML = '<div class="no-results">😿 Sin resultados</div>';
+    return;
+  }
+  area.innerHTML = list.map(p => {
+    const inCart = cart.find(c => c.product.sku === p.sku);
+    const noStock = !p.stock || p.stock === 'NOSTOCK';
+    const imgSrc = `https://fmz-mza.github.io/Beepexcuyo/images/SKU_${p.sku}.jpg`;
+    return `
+      <div class="prod-card${noStock?' no-stock':''}${inCart?' in-cart':''}"
+           onclick="addToCart('${p.sku}')" id="pc-${p.sku}">
+        ${inCart ? `<div class="prod-in-cart">${inCart.qty}</div>` : ''}
+        <img class="prod-img" src="${imgSrc}"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="prod-img-ph" style="display:none">📦</div>
+        <div class="prod-brand">${p.brand || ''}</div>
+        <div class="prod-name">${p.name}</div>
+        <div class="prod-price">${fmt(p.price)}</div>
+      </div>`;
+  }).join('');
+}
+
+function filterProducts() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  document.getElementById('searchClear').classList.toggle('visible', q.length > 0);
+  const filtered = q
+    ? products.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.sku.toLowerCase().includes(q) ||
+        (p.brand || '').toLowerCase().includes(q) ||
+        (p.ean  || '').includes(q))
+    : products;
+  renderProducts(filtered);
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchClear').classList.remove('visible');
+  renderProducts(products);
+}
+
+// ── CARRITO ───────────────────────────────────────────────
+function addToCart(sku) {
+  const p = products.find(x => x.sku === sku);
+  if (!p) return;
+  const existing = cart.find(c => c.product.sku === sku);
+  if (existing) {
+    existing.qty++;
+  } else {
+    cart.push({ product: p, qty: 1, precioFinal: p.price, precioModificado: null, motivoPrecio: '' });
+  }
+  renderCart();
+  updateFab();
+  // Actualizar badge en producto
+  const pc = document.getElementById(`pc-${sku}`);
+  if (pc) {
+    pc.classList.add('in-cart');
+    let badge = pc.querySelector('.prod-in-cart');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'prod-in-cart';
+      pc.prepend(badge);
+    }
+    badge.textContent = cart.find(c => c.product.sku === sku).qty;
+  }
+}
+
+function removeFromCart(sku) {
+  cart = cart.filter(c => c.product.sku !== sku);
+  const pc = document.getElementById(`pc-${sku}`);
+  if (pc) {
+    pc.classList.remove('in-cart');
+    pc.querySelector('.prod-in-cart')?.remove();
+  }
+  renderCart();
+  updateFab();
+}
+
+function changeQty(sku, d) {
+  const item = cart.find(c => c.product.sku === sku);
+  if (!item) return;
+  item.qty = Math.max(1, item.qty + d);
+  renderCart();
+  updateFab();
+  const pc = document.getElementById(`pc-${sku}`);
+  if (pc) { const b = pc.querySelector('.prod-in-cart'); if (b) b.textContent = item.qty; }
+}
+
+function onPriceChange(sku, val) {
+  const item = cart.find(c => c.product.sku === sku);
+  if (!item) return;
+  const newPrice = parseFloat(val) || item.product.price;
+  item.precioFinal = newPrice;
+  item.precioModificado = newPrice !== item.product.price ? newPrice : null;
+  const inp = document.getElementById(`pi-${sku}`);
+  if (inp) inp.classList.toggle('modified', item.precioModificado !== null);
+  // Mostrar campo motivo si hay modificación
+  const motivo = document.getElementById(`mot-${sku}`);
+  if (motivo) motivo.classList.toggle('visible', item.precioModificado !== null);
+  recalcTotals();
+}
+
+function onMotivoChange(sku, val) {
+  const item = cart.find(c => c.product.sku === sku);
+  if (item) item.motivoPrecio = val;
+}
+
+function renderCart() {
+  const area = document.getElementById('cartArea');
+  if (!cart.length) {
+    area.innerHTML = `
+      <div class="cart-empty">
+        <div class="cart-empty-icon">🛒</div>
+        <div>Agregá productos<br>desde el catálogo</div>
+      </div>`;
+    recalcTotals();
+    return;
+  }
+  area.innerHTML = cart.map(item => {
+    const p = item.product;
+    const imgSrc = `https://fmz-mza.github.io/Beepexcuyo/images/SKU_${p.sku}.jpg`;
+    return `
+      <div class="cart-item">
+        <div class="cart-item-top">
+          <img class="cart-item-img" src="${imgSrc}" onerror="this.src=''">
+          <div class="cart-item-info">
+            <div class="cart-item-name">${p.name}</div>
+            <div class="cart-item-sku">SKU ${p.sku}</div>
+          </div>
+          <button class="cart-item-remove" onclick="removeFromCart('${p.sku}')">🗑</button>
+        </div>
+        <div class="cart-item-bottom">
+          <div class="price-input-wrap">
+            <span class="price-prefix">$</span>
+            <input type="number" class="cart-price-input${item.precioModificado?'  modified':''}"
+              id="pi-${p.sku}" value="${item.precioFinal}"
+              onchange="onPriceChange('${p.sku}', this.value)"
+              oninput="onPriceChange('${p.sku}', this.value)">
+          </div>
+          <div class="qty-controls">
+            <button class="qty-btn" onclick="changeQty('${p.sku}',-1)">−</button>
+            <div class="qty-val">${item.qty}</div>
+            <button class="qty-btn" onclick="changeQty('${p.sku}',1)">+</button>
+          </div>
+        </div>
+        <input type="text" class="motivo-input${item.precioModificado?' visible':''}"
+          id="mot-${p.sku}" placeholder="Motivo del precio modificado..."
+          value="${item.motivoPrecio || ''}"
+          onchange="onMotivoChange('${p.sku}', this.value)">
+      </div>`;
+  }).join('');
+  recalcTotals();
+}
+
+function recalcTotals() {
+  const subtotal = cart.reduce((s, c) => s + c.precioFinal * c.qty, 0);
+  const discVal  = parseFloat(document.getElementById('discountVal').value) || 0;
+  const discType = document.getElementById('discountType').value;
+  let descMonto = 0, descPct = 0;
+  if (discVal > 0) {
+    if (discType === 'pct')   { descPct = discVal; descMonto = subtotal * discVal / 100; }
+    else                       { descMonto = discVal; descPct = subtotal > 0 ? discVal/subtotal*100 : 0; }
+  }
+  const total = Math.max(0, subtotal - descMonto);
+
+  document.getElementById('subtotalVal').textContent = fmt(subtotal);
+  let html = `<div class="total-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>`;
+  if (descMonto > 0) html += `<div class="total-row"><span>Descuento${descType==='pct'?` (${discVal}%)`:''}
+    </span><span style="color:var(--accent2)">−${fmt(descMonto)}</span></div>`;
+  html += `<div class="total-row big"><span>TOTAL</span><span class="total-val">${fmt(total)}</span></div>`;
+  document.getElementById('totalRows').innerHTML = html;
+  document.getElementById('totalVal').textContent = fmt(total);
+
+  // Si método de pago es cta_cte, monto recibido = 0
+  if (payMethod === 'cta_cte') {
+    document.getElementById('payAmount').value = '0';
+  }
+  recalcSaldo();
+  updateConfirmBtn();
+}
+
+function recalcSaldo() {
+  const totalText = document.getElementById('totalVal').textContent;
+  const total = parseFloat(totalText.replace(/[^0-9.]/g,'')) || 0;
+  const pagado = parseFloat(document.getElementById('payAmount').value) || 0;
+  const saldo  = total - pagado;
+  const row = document.getElementById('saldoRow');
+
+  if (payMethod === 'cta_cte') {
+    row.style.display = 'flex';
+    row.className = 'saldo-row deuda';
+    row.innerHTML = `<span>Va a cuenta corriente</span><span>${fmt(total)}</span>`;
+  } else if (pagado > 0) {
+    row.style.display = 'flex';
+    if (saldo > 0) {
+      row.className = 'saldo-row deuda';
+      row.innerHTML = `<span>Saldo a cuenta corriente</span><span>${fmt(saldo)}</span>`;
+    } else {
+      row.className = 'saldo-row';
+      row.innerHTML = `<span>Vuelto</span><span>${fmt(Math.abs(saldo))}</span>`;
+    }
+  } else {
+    row.style.display = 'none';
+  }
+  updateConfirmBtn();
+}
+
+function setPayMethod(btn) {
+  document.querySelectorAll('.pay-method').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  payMethod = btn.dataset.type;
+  const amountRow = document.getElementById('payAmountRow');
+  amountRow.style.display = payMethod === 'cta_cte' ? 'none' : 'flex';
+  if (payMethod === 'cta_cte') document.getElementById('payAmount').value = '';
+  recalcTotals();
+}
+
+function updateConfirmBtn() {
+  const hasCart   = cart.length > 0;
+  const hasClient = document.getElementById('clientSelect').value !== '';
+  document.getElementById('confirmBtn').disabled = !(hasCart && hasClient);
+}
+
+function updateFab() {
+  const count = cart.reduce((s,c) => s + c.qty, 0);
+  document.getElementById('cartFabCount').textContent = count;
+}
+
+// ── CLIENTES ──────────────────────────────────────────────
+async function loadClients() {
+  const { data, error } = await _sb.from('clients').select('*').order('nombre');
+  if (error) return;
+  clients = data || [];
+  renderClientSelect();
+}
+
+function renderClientSelect() {
+  const sel = document.getElementById('clientSelect');
+  const val = sel.value;
+  sel.innerHTML = '<option value="">— Seleccionar cliente —</option>' +
+    clients.map(c => `<option value="${c.id}">${c.nombre}${c.telefono?' · '+c.telefono:''}</option>`).join('');
+  if (val) sel.value = val;
+}
+
+async function onClientChange() {
+  const clientId = document.getElementById('clientSelect').value;
+  const warn = document.getElementById('moraWarning');
+  warn.classList.remove('visible');
+  if (!clientId) { updateConfirmBtn(); return; }
+
+  // Verificar si está en mora
+  const { data } = await _sb.rpc('clientes_en_mora', { dias: 30 });
+  if (data) {
+    const mora = data.find(m => m.client_id === clientId);
+    if (mora) {
+      warn.classList.add('visible');
+      warn.innerHTML = `⚠️ Cliente con deuda vencida — Saldo pendiente: <strong>${fmt(mora.saldo)}</strong>`;
+    }
+  }
+  updateConfirmBtn();
+}
+
+function openNewClient()  { document.getElementById('newClientModal').classList.add('open'); }
+function closeNewClient() { document.getElementById('newClientModal').classList.remove('open'); }
+
+async function saveNewClient() {
+  const nombre   = document.getElementById('ncNombre').value.trim();
+  const telefono = document.getElementById('ncTelefono').value.trim();
+  const email    = document.getElementById('ncEmail').value.trim();
+  if (!nombre) { showToast('El nombre es obligatorio', 'error'); return; }
+
+  const telWA = normalizeWA(telefono);
+  const { data, error } = await _sb.from('clients').insert({
+    nombre, telefono, telefono_wa: telWA, email: email || null
+  }).select().single();
+
+  if (error) { showToast('Error guardando cliente', 'error'); return; }
+
+  clients.push(data);
+  clients.sort((a,b) => a.nombre.localeCompare(b.nombre));
+  renderClientSelect();
+  document.getElementById('clientSelect').value = data.id;
+  closeNewClient();
+  showToast(`Cliente ${nombre} creado`, 'success');
+  // Limpiar campos
+  ['ncNombre','ncTelefono','ncEmail'].forEach(id => document.getElementById(id).value = '');
+  onClientChange();
+}
+
+// ── CONFIRMAR VENTA ───────────────────────────────────────
+async function confirmSale() {
+  const clientId = document.getElementById('clientSelect').value;
+  if (!clientId || !cart.length) return;
+
+  const totalText = document.getElementById('totalVal').textContent;
+  const total   = parseFloat(totalText.replace(/[^0-9.]/g,'')) || 0;
+  const subtotal = cart.reduce((s, c) => s + c.precioFinal * c.qty, 0);
+  const discVal  = parseFloat(document.getElementById('discountVal').value) || 0;
+  const discType = document.getElementById('discountType').value;
+  const descMonto = discType === 'pct' ? subtotal * discVal / 100 : (discType === 'monto' ? discVal : 0);
+  const descPct   = discType === 'pct' ? discVal : 0;
+  const pagado    = payMethod === 'cta_cte' ? 0 : (parseFloat(document.getElementById('payAmount').value) || total);
+
+  document.getElementById('confirmBtn').disabled = true;
+  document.getElementById('confirmBtn').textContent = 'Procesando...';
+
+  const orderData = {
+    client_id:       clientId,
+    vendedor_id:     currentUser.id,
+    subtotal,
+    descuento_monto: descMonto || null,
+    descuento_pct:   descPct || null,
+    total,
+    estado:          'cerrada',
+    expires_at:      null,
+  };
+
+  const items = cart.map(c => ({
+    sku:               c.product.sku,
+    nombre:            c.product.name,
+    precio_unitario:   c.product.price,
+    precio_modificado: c.precioModificado || null,
+    motivo_precio:     c.motivoPrecio || null,
+    cantidad:          c.qty,
+    subtotal:          c.precioFinal * c.qty,
+  }));
+
+  if (!isOnline) {
+    // Guardar offline
+    const pending = { orderData, items, pagado, payMethod, timestamp: Date.now() };
+    pendingSync.push(pending);
+    localStorage.setItem('pos_pending_sync', JSON.stringify(pendingSync));
+    showSuccess('OFFLINE', total, pagado, payMethod);
+    resetSale();
+    return;
+  }
+
+  try {
+    // 1. Crear orden (el trigger de Supabase asigna numero_ticket y ticket_display)
+    const { data: order, error: orderErr } = await _sb
+      .from('pos_orders').insert(orderData).select().single();
+    if (orderErr) throw orderErr;
+
+    // 2. Insertar items
+    const itemsWithOrder = items.map(i => ({ ...i, order_id: order.id }));
+    const { error: itemsErr } = await _sb.from('order_items').insert(itemsWithOrder);
+    if (itemsErr) throw itemsErr;
+
+    // 3. Registrar pago
+    if (pagado > 0 || payMethod === 'efectivo' || payMethod === 'transferencia') {
+      const montoReal = Math.min(pagado, total);
+      if (montoReal > 0) {
+        const { data: payment, error: payErr } = await _sb.from('payments').insert({
+          client_id: clientId,
+          monto:     montoReal,
+          tipo:      payMethod,
+        }).select().single();
+        if (!payErr && payment) {
+          // Allocation: pago → orden
+          await _sb.from('payment_allocations').insert({
+            payment_id:     payment.id,
+            order_id:       order.id,
+            monto_aplicado: montoReal,
+          });
+        }
+      }
+    }
+
+    lastTicket = { order, items, clientId, total, pagado, payMethod };
+    showSuccess(order.ticket_display, total, pagado, payMethod);
+    resetSale();
+
+  } catch (err) {
+    console.error(err);
+    showToast('Error al confirmar venta: ' + (err.message || err), 'error');
+    document.getElementById('confirmBtn').disabled = false;
+    document.getElementById('confirmBtn').textContent = '✓ Confirmar venta';
+  }
+}
+
+function cancelOrder() {
+  if (!cart.length) return;
+  if (!confirm('¿Cancelar el pedido actual?')) return;
+  resetSale();
+}
+
+function resetSale() {
+  cart = [];
+  document.getElementById('discountVal').value = '';
+  document.getElementById('payAmount').value = '';
+  document.getElementById('clientSelect').value = '';
+  document.getElementById('moraWarning').classList.remove('visible');
+  document.querySelectorAll('.pay-method').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-type="efectivo"]').classList.add('active');
+  payMethod = 'efectivo';
+  document.getElementById('payAmountRow').style.display = 'flex';
+  renderCart();
+  renderProducts(products);
+  updateFab();
+  document.getElementById('confirmBtn').textContent = '✓ Confirmar venta';
+  document.getElementById('confirmBtn').disabled = true;
+}
+
+// ── SUCCESS / TICKET ──────────────────────────────────────
+function showSuccess(ticketDisplay, total, pagado, metodo) {
+  const saldo = total - pagado;
+  document.getElementById('successTicket').textContent = '#' + ticketDisplay;
+  let sub = `Total: ${fmt(total)}`;
+  if (metodo === 'cta_cte') sub += ' · Pasa a cuenta corriente';
+  else if (saldo > 0)       sub += ` · Saldo en cta cte: ${fmt(saldo)}`;
+  else                       sub += ' · Pagado';
+  document.getElementById('successSub').textContent = sub;
+  document.getElementById('successOverlay').classList.add('open');
+}
+
+async function downloadTicket() {
+  if (!lastTicket) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: [80, 200] });
+  const { order, items, total, pagado, payMethod: met } = lastTicket;
+  const client = clients.find(c => c.id === lastTicket.clientId);
+
+  let y = 8;
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(14);
+  doc.text('BEEPEX CUYO', 40, y, { align: 'center' });
+  y += 6;
+  doc.setFontSize(9);
+  doc.setFont('helvetica','normal');
+  doc.text('Punto de Venta', 40, y, { align: 'center' });
+  y += 5;
+  doc.setLineWidth(0.3);
+  doc.line(4, y, 76, y); y += 4;
+
+  doc.setFont('helvetica','bold');
+  doc.text(`Ticket #${order.ticket_display}`, 4, y);
+  y += 4;
+  doc.setFont('helvetica','normal');
+  doc.text(new Date(order.fecha).toLocaleString('es-AR'), 4, y); y += 4;
+  if (client) { doc.text(`Cliente: ${client.nombre}`, 4, y); y += 4; }
+  doc.line(4, y, 76, y); y += 4;
+
+  items.forEach(item => {
+    const precio = item.precio_modificado ?? item.precio_unitario;
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+    const name = item.nombre.length > 28 ? item.nombre.slice(0,28)+'…' : item.nombre;
+    doc.text(name, 4, y); y += 3.5;
+    doc.text(`  ${item.cantidad} x ${fmt(precio)} = ${fmt(precio*item.cantidad)}`, 4, y);
+    if (item.precio_modificado) {
+      doc.setTextColor(200,120,0);
+      doc.text('  (precio modificado)', 4, y+3);
+      doc.setTextColor(0,0,0);
+      y += 3;
+    }
+    y += 4;
+  });
+
+  doc.line(4, y, 76, y); y += 4;
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(11);
+  doc.text(`TOTAL: ${fmt(total)}`, 4, y); y += 5;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  const metLabel = { efectivo:'Efectivo', transferencia:'Transferencia', cta_cte:'Cuenta Corriente' };
+  doc.text(`Método: ${metLabel[met]||met}`, 4, y); y += 4;
+  if (pagado > 0 && met !== 'cta_cte') {
+    doc.text(`Pagado: ${fmt(pagado)}`, 4, y); y += 4;
+    const saldo = total - pagado;
+    if (saldo > 0) { doc.text(`Saldo cta cte: ${fmt(saldo)}`, 4, y); y += 4; }
+  }
+  y += 2;
+  doc.line(4, y, 76, y); y += 4;
+  doc.setFontSize(8);
+  doc.text('🐾 Beepex Cuyo · gracias!', 40, y, { align: 'center' });
+
+  doc.save(`ticket-${order.ticket_display}.pdf`);
+}
+
+function shareTicketWA() {
+  if (!lastTicket) return;
+  const { order, items, total, pagado } = lastTicket;
+  const client = clients.find(c => c.id === lastTicket.clientId);
+  const saldo = total - pagado;
+  let msg = `🐾 *BEEPEX CUYO*\nTicket #${order.ticket_display}\n`;
+  msg += `📅 ${new Date(order.fecha).toLocaleDateString('es-AR')}\n`;
+  if (client) msg += `👤 ${client.nombre}\n`;
+  msg += `━━━━━━━━━━━━━━\n`;
+  items.forEach(i => {
+    const p = i.precio_modificado ?? i.precio_unitario;
+    msg += `• ${i.nombre}\n  ${i.cantidad} × ${fmt(p)} = ${fmt(p*i.cantidad)}\n`;
+  });
+  msg += `━━━━━━━━━━━━━━\n`;
+  msg += `*TOTAL: ${fmt(total)}*\n`;
+  if (saldo > 0) msg += `Saldo cta cte: ${fmt(saldo)}`;
+  const telWA = client?.telefono_wa || WA_NUMBER;
+  window.open(`https://wa.me/${telWA}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+function newSale() {
+  document.getElementById('successOverlay').classList.remove('open');
+  lastTicket = null;
+}
+
+// ── ESCÁNER EAN ───────────────────────────────────────────
+let scannerStream   = null;
+let barcodeDetector = null;
+let scanInterval    = null;
+
+async function toggleScanner() {
+  const overlay = document.getElementById('scannerOverlay');
+  if (overlay.classList.contains('open')) { closeScanner(); return; }
+  overlay.classList.add('open');
+  document.getElementById('scanBtn').classList.add('active');
+  await startScanner();
+}
+
+async function startScanner() {
+  const status = document.getElementById('scannerStatus');
+  status.textContent = 'Iniciando cámara...';
+  status.className = 'scanner-status';
+
+  try {
+    // BarcodeDetector API nativa
+    if ('BarcodeDetector' in window) {
+      barcodeDetector = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e'] });
+    }
+
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    document.getElementById('scannerVideo').srcObject = scannerStream;
+    status.textContent = 'Apuntá la cámara al código de barras';
+
+    if (barcodeDetector) {
+      // Usar BarcodeDetector nativo
+      scanInterval = setInterval(async () => {
+        const video = document.getElementById('scannerVideo');
+        if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+        try {
+          const barcodes = await barcodeDetector.detect(video);
+          if (barcodes.length > 0) onBarcodeDetected(barcodes[0].rawValue);
+        } catch(e) {}
+      }, 300);
+    } else {
+      // Fallback: cargar ZXing
+      status.textContent = 'Cargando lector...';
+      await loadZXing();
+    }
+  } catch(err) {
+    status.textContent = 'Error: ' + (err.message || 'No se pudo acceder a la cámara');
+    status.className = 'scanner-status notfound';
+  }
+}
+
+function loadZXing() {
+  return new Promise((resolve) => {
+    if (window.ZXing) { startZXing(); resolve(); return; }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.21.3/index.min.js';
+    script.onload = () => { startZXing(); resolve(); };
+    document.head.appendChild(script);
+  });
+}
+
+function startZXing() {
+  const status = document.getElementById('scannerStatus');
+  try {
+    const hints = new Map();
+    const codeReader = new ZXing.BrowserMultiFormatReader(hints);
+    const video = document.getElementById('scannerVideo');
+    codeReader.decodeFromStream(scannerStream, video, (result, err) => {
+      if (result) onBarcodeDetected(result.getText());
+    });
+    status.textContent = 'Apuntá al código de barras';
+  } catch(e) {
+    status.textContent = 'Lector no disponible en este dispositivo';
+    status.className = 'scanner-status notfound';
+  }
+}
+
+function onBarcodeDetected(code) {
+  const status = document.getElementById('scannerStatus');
+  const product = products.find(p => p.ean === code || p.sku === code);
+  if (product) {
+    status.textContent = `✓ ${product.name}`;
+    status.className = 'scanner-status found';
+    addToCart(product.sku);
+    // Vibración en mobile
+    if (navigator.vibrate) navigator.vibrate(100);
+    setTimeout(() => {
+      status.textContent = 'Apuntá la cámara al código de barras';
+      status.className = 'scanner-status';
+    }, 1500);
+  } else {
+    status.textContent = `Código ${code} no encontrado`;
+    status.className = 'scanner-status notfound';
+    if (navigator.vibrate) navigator.vibrate([100,50,100]);
+    setTimeout(() => {
+      status.textContent = 'Apuntá la cámara al código de barras';
+      status.className = 'scanner-status';
+    }, 2000);
+  }
+}
+
+function closeScanner() {
+  document.getElementById('scannerOverlay').classList.remove('open');
+  document.getElementById('scanBtn').classList.remove('active');
+  if (scanInterval)    { clearInterval(scanInterval); scanInterval = null; }
+  if (scannerStream)   { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
+  barcodeDetector = null;
+}
+
+// ── OFFLINE SYNC ──────────────────────────────────────────
+async function syncPending() {
+  if (!pendingSync.length || !isOnline) return;
+  showToast(`Sincronizando ${pendingSync.length} venta(s) offline...`);
+  const toProcess = [...pendingSync];
+  pendingSync = [];
+  localStorage.setItem('pos_pending_sync', '[]');
+
+  for (const sale of toProcess) {
+    try {
+      const { data: order } = await _sb.from('pos_orders').insert(sale.orderData).select().single();
+      if (order) {
+        await _sb.from('order_items').insert(sale.items.map(i => ({ ...i, order_id: order.id })));
+        if (sale.pagado > 0) {
+          const { data: payment } = await _sb.from('payments').insert({
+            client_id: sale.orderData.client_id,
+            monto: sale.pagado, tipo: sale.payMethod
+          }).select().single();
+          if (payment) {
+            await _sb.from('payment_allocations').insert({
+              payment_id: payment.id, order_id: order.id, monto_aplicado: sale.pagado
+            });
+          }
+        }
+      }
+    } catch(e) {
+      pendingSync.push(sale);
+    }
+  }
+  if (pendingSync.length) {
+    localStorage.setItem('pos_pending_sync', JSON.stringify(pendingSync));
+    showToast(`${pendingSync.length} venta(s) pendiente(s) de sincronizar`, 'error');
+  } else {
+    showToast('Ventas sincronizadas ✓', 'success');
+  }
+}
+
+// ── BORRADORES EXPIRADOS ──────────────────────────────────
+async function cleanExpiredDrafts() {
+  if (!isOnline) return;
+  await _sb.from('pos_orders')
+    .delete()
+    .eq('estado', 'borrador')
+    .lt('expires_at', new Date().toISOString());
+}
+
+// ── MOBILE CART PANEL ─────────────────────────────────────
+function openCartPanel()  { document.getElementById('panelRight').classList.add('open'); }
+function closeCart()      { document.getElementById('panelRight').classList.remove('open'); }
+
+// ── TOAST ─────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── TICKET DISPLAY TRIGGER ───────────────────────────────
+// Función SQL que genera ticket_display automáticamente en Supabase
+// Se puede también hacer desde el front por si el trigger no está:
+function generateTicketDisplay(num) {
+  return String(num).padStart(6, '0');
+}
+
+// ── ARRANQUE ──────────────────────────────────────────────
+checkSession();
+</script>
+</body>
+</html>
