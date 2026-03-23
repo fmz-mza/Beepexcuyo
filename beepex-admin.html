@@ -303,11 +303,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
   </header>
 
   <div class="admin-tabs" id="adminTabs">
-    <button class="admin-tab active" onclick="switchTab('usuarios')">👥 Usuarios</button>
-    <button class="admin-tab" onclick="switchTab('catalogo')">📦 Catálogo</button>
-    <button class="admin-tab" onclick="switchTab('productos')">🗂️ Productos</button>
-    <button class="admin-tab" onclick="switchTab('estadisticas')">📊 Estadísticas</button>
-    <button class="admin-tab" id="tab-btn-ctacte" onclick="switchTab('ctacte')">💰 Cta Cte</button>
+    <button class="admin-tab active" onclick="switchTab('usuarios',this)">👥 Usuarios</button>
+    <button class="admin-tab" onclick="switchTab('catalogo',this)">📦 Catálogo</button>
+    <button class="admin-tab" onclick="switchTab('productos',this)">🗂️ Productos</button>
+    <button class="admin-tab" onclick="switchTab('estadisticas',this)">📊 Estadísticas</button>
+    <button class="admin-tab" id="tab-btn-ctacte" onclick="switchTab('ctacte',this)">💰 Cta Cte</button>
   </div>
 
   <div class="admin-content">
@@ -463,11 +463,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <!-- TAB ESTADÍSTICAS -->
     <div class="tab-panel" id="tab-estadisticas">
       <div class="filter-bar" id="periodFilter">
-        <button class="filter-btn active" onclick="setPeriod('today')">Hoy</button>
-        <button class="filter-btn" onclick="setPeriod('week')">Semana</button>
-        <button class="filter-btn" onclick="setPeriod('month')">Mes</button>
-        <button class="filter-btn" onclick="setPeriod('year')">Año</button>
-        <button class="filter-btn" onclick="setPeriod('all')">Todo</button>
+        <button class="filter-btn active" onclick="setPeriod('today',this)">Hoy</button>
+        <button class="filter-btn" onclick="setPeriod('week',this)">Semana</button>
+        <button class="filter-btn" onclick="setPeriod('month',this)">Mes</button>
+        <button class="filter-btn" onclick="setPeriod('year',this)">Año</button>
+        <button class="filter-btn" onclick="setPeriod('all',this)">Todo</button>
       </div>
 
       <div class="stats-grid" id="statsCards"></div>
@@ -610,7 +610,7 @@ const SUPABASE_ANON='sb_publishable_oJzr70DjfOZsK4mjFX5rRw_5hc03thM';
 let currentUser=null;
 let isAdmin=false;
 let activePeriod='today';
-let allOrdersData=[];
+let allOrdersData={orders:[],views:[],cartEvts:[],profiles:[]};
 let allUsersData=[];
 
 // ── Formato ──
@@ -717,13 +717,16 @@ async function api(path, opts={}){
 }
 
 // ── Tabs ──
-function switchTab(tab){
+function switchTab(tab, el){
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById(`tab-${tab}`).classList.add('active');
-  event.target.classList.add('active');
-  if(tab==='productos') loadProdTable();
-  if(tab==='ctacte') loadCtaCte();
+  document.getElementById('tab-'+tab).classList.add('active');
+  // Marcar activo: usar el elemento pasado, o buscarlo por onclick
+  const btn = el || [...document.querySelectorAll('.admin-tab')].find(b=>b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'"+tab+"'"));
+  if(btn) btn.classList.add('active');
+  if(tab==='productos')    loadProdTable();
+  if(tab==='ctacte')       loadCtaCte();
+  if(tab==='estadisticas') { if(typeof loadStats==='function') loadStats(); }
 }
 
 // ── CTA CTE ─────────────────────────────────────────────────────────────────
@@ -731,28 +734,51 @@ let allClientsData = [];
 let activeClientId = null;
 
 async function loadCtaCte(){
-  // Cargar clientes
-  const token = localStorage.getItem('admin_token');
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?select=*&order=nombre`, {
-    headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
-  });
-  allClientsData = await res.json();
-  if(!Array.isArray(allClientsData)){ allClientsData=[]; }
+  const grid = document.getElementById('ctacteGrid');
+  grid.innerHTML = '<div class="loading">Cargando clientes...</div>';
 
-  // Calcular saldo de cada cliente via RPC
-  await enrichClientSaldos();
-  renderCtaCteGrid(allClientsData);
-  renderCtaCteKPIs();
+  const token = localStorage.getItem('admin_token');
+  if(!token){ grid.innerHTML='<div class="empty">Sin sesión activa</div>'; return; }
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?select=*&order=nombre`, {
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    const data = await res.json();
+    allClientsData = Array.isArray(data) ? data : [];
+
+    if(!allClientsData.length){
+      grid.innerHTML='<div class="empty">No hay clientes registrados aún.<br><small style="color:var(--muted)">Creá clientes desde el POS.</small></div>';
+      document.getElementById('kpiDeudaTotal').textContent = fmt(0);
+      document.getElementById('kpiClientesMora').textContent = '0';
+      document.getElementById('kpiPagosHoy').textContent = fmt(0);
+      return;
+    }
+
+    await enrichClientSaldos();
+    renderCtaCteGrid(allClientsData);
+    renderCtaCteKPIs();
+  } catch(err) {
+    grid.innerHTML = '<div class="empty">Error al cargar clientes: '+(err.message||err)+'</div>';
+  }
 }
 
 async function enrichClientSaldos(){
   const token = localStorage.getItem('admin_token');
-  // Traer todos los movimientos de account_movements
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/account_movements?select=client_id,monto`, {
-    headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
-  });
-  const movs = await res.json();
-  if(!Array.isArray(movs)) return;
+  // Traer saldos desde account_movements (vista materializada)
+  let movs = [];
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/account_movements?select=client_id,monto`, {
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    const data = await res.json();
+    movs = Array.isArray(data) ? data : [];
+  } catch(e) { movs = []; }
+  if(!movs.length) {
+    // Si la vista no tiene datos, saldos quedan en 0
+    allClientsData = allClientsData.map(c=>({...c, saldo:0, ultimo_pago:null}));
+  }
+  if(!Array.isArray(movs) || !movs.length) return;
 
   // Agrupar por client_id
   const saldos = {};
@@ -1247,25 +1273,46 @@ function periodFilter(created_at){
   return true;
 }
 
-function setPeriod(p){
+function setPeriod(p, el){
   activePeriod=p;
   document.querySelectorAll('#periodFilter .filter-btn').forEach(b=>b.classList.remove('active'));
-  event.target.classList.add('active');
+  if(el) el.classList.add('active');
   renderStats();
 }
 
 async function loadStats(){
-  const [orders, views, cartEvts, profiles]=await Promise.all([
-    api('orders?select=*&order=created_at.desc'),
-    api('product_views?select=sku,viewed_at'),
-    api('cart_events?select=sku,action,user_id,created_at'),
-    api('profiles?select=id,nombre,approved')
-  ]);
-  allOrdersData={ orders:Array.isArray(orders)?orders:[], views:Array.isArray(views)?views:[], cartEvts:Array.isArray(cartEvts)?cartEvts:[], profiles:Array.isArray(profiles)?profiles:[] };
-  renderStats();
+  // Mostrar loading solo si el tab está activo
+  const statsPanel = document.getElementById('tab-estadisticas');
+  if(statsPanel && statsPanel.classList.contains('active')){
+    document.getElementById('statsCards').innerHTML='<div class="loading">Cargando estadísticas...</div>';
+  }
+  try {
+    const [orders, views, cartEvts, profiles]=await Promise.all([
+      api('orders?select=*&order=created_at.desc'),
+      api('product_views?select=sku,viewed_at'),
+      api('cart_events?select=sku,action,user_id,created_at'),
+      api('profiles?select=id,nombre,approved')
+    ]);
+    allOrdersData={
+      orders:  Array.isArray(orders)   ? orders   : [],
+      views:   Array.isArray(views)    ? views    : [],
+      cartEvts:Array.isArray(cartEvts) ? cartEvts : [],
+      profiles:Array.isArray(profiles) ? profiles : []
+    };
+    renderStats();
+  } catch(err) {
+    console.error('loadStats error:', err);
+    if(statsPanel && statsPanel.classList.contains('active')){
+      document.getElementById('statsCards').innerHTML='<div class="empty">Error al cargar estadísticas</div>';
+    }
+  }
 }
 
 function renderStats(){
+  if(!allOrdersData || !allOrdersData.orders){
+    document.getElementById('statsCards').innerHTML='<div class="loading">Cargando estadísticas...</div>';
+    return;
+  }
   const { orders, views, cartEvts, profiles }=allOrdersData;
   const filtOrders=orders.filter(o=>periodFilter(o.created_at));
   const filtViews=views.filter(v=>periodFilter(v.viewed_at));
