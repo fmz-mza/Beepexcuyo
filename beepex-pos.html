@@ -425,7 +425,8 @@ input, textarea, select { font-family: inherit; }
 .cart-fab-count {
   background: #000; color: var(--accent); border-radius: 50%;
   width: 22px; height: 22px; font-size: 11px; font-weight: 800;
-  display: flex; align-items: center; justify-content: center;
+  display: flex !important; align-items: center; justify-content: center;
+  flex-shrink: 0; min-width: 22px;
 }
 .panel-right-close {
   display: none; background: none; border: none; color: var(--muted);
@@ -813,6 +814,7 @@ async function initApp() {
   setOnline(navigator.onLine);
   await Promise.all([loadProducts(), loadClients()]);
   cleanExpiredDrafts();
+  updateFab(); // estado inicial correcto
 }
 
 // ── PRODUCTOS ─────────────────────────────────────────────
@@ -1064,24 +1066,19 @@ function updateFab() {
   const count = cart.reduce((s, c) => s + (c.qty || 0), 0);
   const total = cart.reduce((s, c) => s + (c.precioFinal || 0) * (c.qty || 0), 0);
 
-  // Actualizar badge con cantidad
+  // Badge: siempre visible, solo cambiar número
   const fabCount = document.getElementById('cartFabCount');
-  if (fabCount) {
-    fabCount.textContent = count;
-    fabCount.style.display = count > 0 ? 'flex' : 'none';
-  }
+  if (fabCount) fabCount.textContent = count;
 
-  // Actualizar texto con total
+  // Texto: mostrar total o "Ver pedido"
   const fabText = document.getElementById('cartFabText');
-  if (fabText) {
-    fabText.textContent = count > 0 ? fmt(total) : 'Ver pedido';
-  }
+  if (fabText) fabText.textContent = count > 0 ? fmt(total) : 'Ver pedido';
 
-  // Animar
+  // Animar solo si hay items
   const fab = document.getElementById('cartFab');
   if (fab && count > 0) {
     fab.style.animation = 'none';
-    void fab.offsetWidth; // forzar reflow
+    void fab.offsetWidth;
     fab.style.animation = 'fabBounce .3s cubic-bezier(.36,.07,.19,.97)';
   }
 }
