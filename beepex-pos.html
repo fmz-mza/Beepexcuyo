@@ -666,6 +666,11 @@ input, textarea, select { font-family: inherit; }
     </div>
   </div>
   <div class="scanner-status" id="scannerStatus">Apuntá la cámara al código de barras</div>
+  <div id="scannerDebug" style="
+    font-family:monospace; font-size:12px; color:#6b6e82;
+    background:rgba(0,0,0,.5); border-radius:8px; padding:8px 14px;
+    max-width:320px; word-break:break-all; text-align:center; display:none;
+  "></div>
   <button class="scanner-close" onclick="closeScanner()">Cerrar</button>
 </div>
 
@@ -851,7 +856,7 @@ function filterProducts() {
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q) ||
         (p.brand || '').toLowerCase().includes(q) ||
-        (p.ean  || '').includes(q))
+        String(p.ean || '').trim().includes(q))
     : products;
   renderProducts(filtered);
 }
@@ -1335,6 +1340,11 @@ async function toggleScanner() {
   if (overlay.classList.contains('open')) { closeScanner(); return; }
   overlay.classList.add('open');
   document.getElementById('scanBtn').classList.add('active');
+  // Si productos aún no cargaron, esperar
+  if (!products.length) {
+    document.getElementById('scannerStatus').textContent = '⏳ Esperando catálogo...';
+    await loadProducts();
+  }
   await startScanner();
 }
 
@@ -1353,7 +1363,8 @@ async function startScanner() {
       video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
     });
     document.getElementById('scannerVideo').srcObject = scannerStream;
-    status.textContent = 'Apuntá la cámara al código de barras';
+    const motor = barcodeDetector ? 'BarcodeDetector nativo' : 'ZXing';
+    status.textContent = `Apuntá al código · ${products.length} prods · Motor: ${motor}`;
 
     if (barcodeDetector) {
       // Usar BarcodeDetector nativo
@@ -1380,49 +1391,131 @@ function loadZXing() {
   return new Promise((resolve) => {
     if (window.ZXing) { startZXing(); resolve(); return; }
     const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.21.3/index.min.js';
+    // ZXing browser bundle
+    script.src = 'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js';
     script.onload = () => { startZXing(); resolve(); };
+    script.onerror = () => {
+      // Fallback a BarcodeDetector si ZXing no carga
+      startBarcodeDetector();
+      resolve();
+    };
     document.head.appendChild(script);
   });
 }
 
 function startZXing() {
   const status = document.getElementById('scannerStatus');
+  const debug  = document.getElementById('scannerDebug');
   try {
     const hints = new Map();
-    const codeReader = new ZXing.BrowserMultiFormatReader(hints);
+    // Priorizar EAN-13 y EAN-8
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.UPC_A,
+    ]);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    const codeReader = new ZXing.BrowserMultiFormatReader(hints, 300);
     const video = document.getElementById('scannerVideo');
     codeReader.decodeFromStream(scannerStream, video, (result, err) => {
-      if (result) onBarcodeDetected(result.getText());
+      if (result) {
+        if (debug) debug.textContent = `Leído: ${result.getText()} (${result.getBarcodeFormat()})`;
+        onBarcodeDetected(result.getText());
+      }
     });
     status.textContent = 'Apuntá al código de barras';
+    if (debug) debug.textContent = 'Motor: ZXing listo';
   } catch(e) {
-    status.textContent = 'Lector no disponible en este dispositivo';
-    status.className = 'scanner-status notfound';
+    if (debug) debug.textContent = 'ZXing error: ' + e.message;
+    startBarcodeDetector();
   }
 }
 
+function startBarcodeDetector() {
+  const status = document.getElementById('scannerStatus');
+  const debug  = document.getElementById('scannerDebug');
+  if (!('BarcodeDetector' in window)) {
+    status.textContent = 'Escáner no disponible en este dispositivo';
+    status.className = 'scanner-status notfound';
+    if (debug) debug.textContent = 'Ni ZXing ni BarcodeDetector disponibles';
+    return;
+  }
+  barcodeDetector = new BarcodeDetector({
+    formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e']
+  });
+  if (debug) debug.textContent = 'Motor: BarcodeDetector nativo';
+  scanInterval = setInterval(async () => {
+    const video = document.getElementById('scannerVideo');
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    try {
+      const barcodes = await barcodeDetector.detect(video);
+      if (barcodes.length > 0) {
+        if (debug) debug.textContent = `Leído: ${barcodes[0].rawValue}`;
+        onBarcodeDetected(barcodes[0].rawValue);
+      }
+    } catch(e) {}
+  }, 300);
+  status.textContent = 'Apuntá al código de barras';
+}
+
+// Debounce para evitar detectar el mismo código múltiples veces
+let _lastDetectedCode = '';
+let _lastDetectedTime = 0;
+
 function onBarcodeDetected(code) {
   const status = document.getElementById('scannerStatus');
-  const product = products.find(p => p.ean === code || p.sku === code);
+  const debug  = document.getElementById('scannerDebug');
+
+  // Normalizar: trim, quitar caracteres no imprimibles
+  const codeStr = String(code).trim().replace(/[^ -~]/g, '');
+
+  // Debounce: ignorar mismo código dentro de 2 segundos
+  const now = Date.now();
+  if (codeStr === _lastDetectedCode && now - _lastDetectedTime < 2000) return;
+  _lastDetectedCode = codeStr;
+  _lastDetectedTime = now;
+
+  // Mostrar debug en pantalla (útil en mobile sin consola)
+  debug.style.display = 'block';
+  debug.innerHTML = `
+    Leído: <strong style="color:#eceef8">${codeStr}</strong><br>
+    Largo: ${codeStr.length} · Tipo: ${typeof code}<br>
+    Muestra EAN: ${products.slice(0,2).map(p=>p.ean).join(' / ')}
+  `;
+
+  // Buscar por EAN exacto, EAN con cero inicial, o SKU
+  const product = products.find(p => {
+    const ean = String(p.ean || '').trim();
+    // EAN-13 vs UPC-A: algunos lectores omiten el primer 0
+    return ean === codeStr ||
+           ean === '0' + codeStr ||
+           codeStr === '0' + ean ||
+           String(p.sku).trim() === codeStr;
+  });
+
   if (product) {
     status.textContent = `✓ ${product.name}`;
     status.className = 'scanner-status found';
+    debug.innerHTML += `<br>✅ Encontrado: ${product.sku}`;
     addToCart(product.sku);
-    // Vibración en mobile
     if (navigator.vibrate) navigator.vibrate(100);
     setTimeout(() => {
       status.textContent = 'Apuntá la cámara al código de barras';
       status.className = 'scanner-status';
-    }, 1500);
+      debug.style.display = 'none';
+    }, 2000);
   } else {
-    status.textContent = `Código ${code} no encontrado`;
+    status.textContent = `Código no encontrado en catálogo`;
     status.className = 'scanner-status notfound';
+    debug.innerHTML += `<br>❌ Sin coincidencia en ${products.length} productos`;
     if (navigator.vibrate) navigator.vibrate([100,50,100]);
     setTimeout(() => {
       status.textContent = 'Apuntá la cámara al código de barras';
       status.className = 'scanner-status';
-    }, 2000);
+      // Mantener debug visible para diagnóstico
+    }, 3000);
   }
 }
 
