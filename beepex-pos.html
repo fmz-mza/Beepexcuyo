@@ -280,6 +280,7 @@ input, textarea, select { font-family: inherit; }
   animation: cartItemIn .2s ease;
 }
 @keyframes cartItemIn { from{opacity:0;transform:translateX(12px)} to{opacity:1;transform:none} }
+@keyframes fabBounce { 0%{transform:scale(1)} 40%{transform:scale(1.18)} 70%{transform:scale(.93)} 100%{transform:scale(1)} }
 .cart-item-top { display: flex; align-items: flex-start; gap: 8px; }
 .cart-item-img {
   width: 36px; height: 36px; border-radius: 6px; object-fit: cover;
@@ -877,7 +878,7 @@ function addToCart(sku) {
   } else {
     cart.push({ product: p, qty: 1, precioFinal: p.price, precioModificado: null, motivoPrecio: '' });
   }
-  renderCart();
+  renderCart();   // renderCart ya llama recalcTotals internamente
   updateFab();
   // Actualizar badge en producto
   const pc = document.getElementById(`pc-${sku}`);
@@ -981,23 +982,33 @@ function renderCart() {
 }
 
 function recalcTotals() {
-  const subtotal = cart.reduce((s, c) => s + c.precioFinal * c.qty, 0);
+  const subtotal = cart.reduce((s, c) => s + (c.precioFinal || 0) * (c.qty || 0), 0);
   const discVal  = parseFloat(document.getElementById('discountVal').value) || 0;
   const discType = document.getElementById('discountType').value;
-  let descMonto = 0, descPct = 0;
+  let descMonto = 0;
   if (discVal > 0) {
-    if (discType === 'pct')   { descPct = discVal; descMonto = subtotal * discVal / 100; }
-    else                       { descMonto = discVal; descPct = subtotal > 0 ? discVal/subtotal*100 : 0; }
+    if (discType === 'pct') descMonto = subtotal * discVal / 100;
+    else                    descMonto = discVal;
   }
   const total = Math.max(0, subtotal - descMonto);
 
-  document.getElementById('subtotalVal').textContent = fmt(subtotal);
-  let html = `<div class="total-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>`;
-  if (descMonto > 0) html += `<div class="total-row"><span>Descuento${descType==='pct'?` (${discVal}%)`:''}
-    </span><span style="color:var(--accent2)">−${fmt(descMonto)}</span></div>`;
-  html += `<div class="total-row big"><span>TOTAL</span><span class="total-val">${fmt(total)}</span></div>`;
-  document.getElementById('totalRows').innerHTML = html;
-  document.getElementById('totalVal').textContent = fmt(total);
+  // Actualizar subtotalVal si existe
+  const subtotalEl = document.getElementById('subtotalVal');
+  if (subtotalEl) subtotalEl.textContent = fmt(subtotal);
+
+  // Construir HTML de totales sin template literals partidos
+  let html = '<div class="total-row"><span>Subtotal</span><span>' + fmt(subtotal) + '</span></div>';
+  if (descMonto > 0) {
+    const label = discType === 'pct' ? 'Descuento (' + discVal + '%)' : 'Descuento';
+    html += '<div class="total-row"><span>' + label + '</span><span style="color:var(--accent2)">−' + fmt(descMonto) + '</span></div>';
+  }
+  html += '<div class="total-row big"><span>TOTAL</span><span class="total-val">' + fmt(total) + '</span></div>';
+
+  const totalRowsEl = document.getElementById('totalRows');
+  if (totalRowsEl) totalRowsEl.innerHTML = html;
+
+  const totalValEl = document.getElementById('totalVal');
+  if (totalValEl) totalValEl.textContent = fmt(total);
 
   // Si método de pago es cta_cte, monto recibido = 0
   if (payMethod === 'cta_cte') {
@@ -1050,8 +1061,16 @@ function updateConfirmBtn() {
 }
 
 function updateFab() {
-  const count = cart.reduce((s,c) => s + c.qty, 0);
-  document.getElementById('cartFabCount').textContent = count;
+  const count = cart.reduce((s, c) => s + (c.qty || 0), 0);
+  const fabCount = document.getElementById('cartFabCount');
+  if (fabCount) fabCount.textContent = count;
+  // Animar el FAB cuando se agrega algo
+  const fab = document.getElementById('cartFab');
+  if (fab && count > 0) {
+    fab.style.animation = 'none';
+    fab.offsetHeight;
+    fab.style.animation = 'fabBounce .3s cubic-bezier(.36,.07,.19,.97)';
+  }
 }
 
 // ── CLIENTES ──────────────────────────────────────────────
