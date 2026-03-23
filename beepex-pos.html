@@ -654,7 +654,7 @@ input, textarea, select { font-family: inherit; }
 
 <!-- ── FAB CARRITO MOBILE ─────────────────────────────────── -->
 <button class="cart-fab" id="cartFab" onclick="openCartPanel()">
-  🛒 Ver pedido
+  🛒 <span id="cartFabText">Ver pedido</span>
   <span class="cart-fab-count" id="cartFabCount">0</span>
 </button>
 
@@ -1062,13 +1062,26 @@ function updateConfirmBtn() {
 
 function updateFab() {
   const count = cart.reduce((s, c) => s + (c.qty || 0), 0);
+  const total = cart.reduce((s, c) => s + (c.precioFinal || 0) * (c.qty || 0), 0);
+
+  // Actualizar badge con cantidad
   const fabCount = document.getElementById('cartFabCount');
-  if (fabCount) fabCount.textContent = count;
-  // Animar el FAB cuando se agrega algo
+  if (fabCount) {
+    fabCount.textContent = count;
+    fabCount.style.display = count > 0 ? 'flex' : 'none';
+  }
+
+  // Actualizar texto con total
+  const fabText = document.getElementById('cartFabText');
+  if (fabText) {
+    fabText.textContent = count > 0 ? fmt(total) : 'Ver pedido';
+  }
+
+  // Animar
   const fab = document.getElementById('cartFab');
   if (fab && count > 0) {
     fab.style.animation = 'none';
-    fab.offsetHeight;
+    void fab.offsetWidth; // forzar reflow
     fab.style.animation = 'fabBounce .3s cubic-bezier(.36,.07,.19,.97)';
   }
 }
