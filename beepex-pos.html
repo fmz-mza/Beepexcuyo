@@ -112,6 +112,10 @@ input,select,textarea{font-family:inherit;}
 .cart-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;}
 .cart-clear{color:var(--muted);font-size:20px;padding:4px 8px;}
 .cart-clear:active{color:var(--red);}
+.cart-scan-btn{color:var(--muted2);font-size:20px;padding:4px 8px;transition:color .15s;}
+.cart-scan-btn:active{color:var(--accent);}
+.cart-scan-btn.active{color:var(--accent);}
+.cart-hdr-actions{display:flex;align-items:center;gap:2px;}
 .cart-items-wrap{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch;}
 .cart-empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);text-align:center;padding:40px 20px;}
 .cart-empty-icon{font-size:48px;opacity:.3;}
@@ -292,7 +296,10 @@ input,select,textarea{font-family:inherit;}
     <div class="tab-page" id="tabCarrito">
       <div class="cart-hdr">
         <div class="cart-title">Tu pedido</div>
-        <button class="cart-clear" onclick="clearCart()">🗑</button>
+        <div class="cart-hdr-actions">
+          <button class="cart-scan-btn" id="cartScanBtn" onclick="toggleCartScanner()" title="Escanear producto">📷</button>
+          <button class="cart-clear" onclick="clearCart()" title="Vaciar pedido">🗑</button>
+        </div>
       </div>
       <div class="cart-items-wrap" id="cartItemsWrap"></div>
       <div class="cart-totals-wrap">
@@ -873,6 +880,24 @@ function shareWA(){
 
 /* SCANNER */
 let scanStream=null,scanDetector=null,scanInterval=null;
+
+// Scanner desde el carrito — misma lógica, vuelve al tab carrito al cerrar
+async function toggleCartScanner(){
+  const btn=document.getElementById('cartScanBtn');
+  const ov=document.getElementById('scanOverlay');
+  if(ov.classList.contains('open')){
+    closeScanner();
+    btn.classList.remove('active');
+    return;
+  }
+  btn.classList.add('active');
+  ov.classList.add('open');
+  // Marcar origen para saber a qué tab volver al cerrar
+  ov.dataset.fromCart='1';
+  if(!products.length) await loadProducts();
+  await startScanner();
+}
+
 async function toggleScanner(){
   const ov=document.getElementById('scanOverlay');
   if(ov.classList.contains('open')){closeScanner();return;}
@@ -965,7 +990,13 @@ function onScan(code,format){
     status.textContent='✓ '+product.name;
     debug.textContent+=' · ✅ '+product.sku;
     if(navigator.vibrate) navigator.vibrate(80);
-    setTimeout(()=>{closeScanner();addToCart(product.sku);showToast('✓ '+product.name+' agregado','ok');},500);
+    setTimeout(()=>{
+      const fromCart=document.getElementById('scanOverlay').dataset.fromCart==='1';
+      closeScanner();
+      addToCart(product.sku);
+      showToast('✓ '+product.name+' agregado','ok');
+      if(fromCart) goTab('Carrito');
+    },500);
   }else{
     status.className='scan-status err';
     status.textContent='Código no encontrado en catálogo';
@@ -975,11 +1006,18 @@ function onScan(code,format){
   }
 }
 function closeScanner(){
-  document.getElementById('scanOverlay').classList.remove('open');
+  const ov=document.getElementById('scanOverlay');
+  const fromCart=ov.dataset.fromCart==='1';
+  ov.classList.remove('open');
+  ov.dataset.fromCart='';
   document.getElementById('scanBtn').classList.remove('active');
+  const cartScanBtn=document.getElementById('cartScanBtn');
+  if(cartScanBtn) cartScanBtn.classList.remove('active');
   if(scanInterval){clearInterval(scanInterval);scanInterval=null;}
   if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
   scanDetector=null;_lastScanCode='';
+  // Si se abrió desde el carrito, no cambiar de tab
+  if(fromCart) goTab('Carrito');
 }
 
 /* OFFLINE SYNC */
