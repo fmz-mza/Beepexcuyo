@@ -470,6 +470,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
         <button class="filter-btn" onclick="setPeriod('all',this)">Todo</button>
       </div>
 
+      <div id="statsDiag" style="font-size:11px;color:var(--muted);padding:4px 0 8px;font-family:monospace;display:none;"></div>
       <div class="stats-grid" id="statsCards"></div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;" class="two-col">
@@ -721,12 +722,18 @@ function switchTab(tab, el){
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
-  // Marcar activo: usar el elemento pasado, o buscarlo por onclick
   const btn = el || [...document.querySelectorAll('.admin-tab')].find(b=>b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'"+tab+"'"));
   if(btn) btn.classList.add('active');
   if(tab==='productos')    loadProdTable();
   if(tab==='ctacte')       loadCtaCte();
-  if(tab==='estadisticas') { if(typeof loadStats==='function') loadStats(); }
+  if(tab==='estadisticas'){
+    // Si ya hay datos, solo re-renderizar. Si no, cargar primero.
+    if(allOrdersData && allOrdersData.orders && allOrdersData.orders.length > 0){
+      renderStats();
+    } else {
+      loadStats();
+    }
+  }
 }
 
 // ── CTA CTE ─────────────────────────────────────────────────────────────────
@@ -745,7 +752,12 @@ async function loadCtaCte(){
       headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
     });
     const data = await res.json();
-    allClientsData = Array.isArray(data) ? data : [];
+    // Mostrar respuesta cruda si hay error de API
+    if(!Array.isArray(data)){
+      grid.innerHTML='<div class="empty">Error API: '+(data.message||data.error||JSON.stringify(data).slice(0,120))+'</div>';
+      return;
+    }
+    allClientsData = data;
 
     if(!allClientsData.length){
       grid.innerHTML='<div class="empty">No hay clientes registrados aún.<br><small style="color:var(--muted)">Creá clientes desde el POS.</small></div>';
@@ -778,7 +790,11 @@ async function enrichClientSaldos(){
     // Si la vista no tiene datos, saldos quedan en 0
     allClientsData = allClientsData.map(c=>({...c, saldo:0, ultimo_pago:null}));
   }
-  if(!Array.isArray(movs) || !movs.length) return;
+  if(!Array.isArray(movs) || !movs.length) {
+    // Sin movimientos — todos los saldos en 0, continuar
+    allClientsData = allClientsData.map(c=>({...c, saldo: c.saldo||0, ultimo_pago: c.ultimo_pago||null}));
+    return;
+  }
 
   // Agrupar por client_id
   const saldos = {};
@@ -1011,8 +1027,8 @@ function closeCtaCteModal(){
 // ── Load all ──
 async function loadAll(){
   await Promise.all([loadUsers(), loadSettings()]);
-  // loadProducts se llama desde loadSettings — esperar que termine antes de stats
-  await loadStats();
+  // Pre-cargar datos de estadísticas en background (no renderiza hasta abrir el tab)
+  loadStats();
 }
 
 // ── USUARIOS ──
@@ -1299,21 +1315,32 @@ async function loadStats(){
       cartEvts:Array.isArray(cartEvts) ? cartEvts : [],
       profiles:Array.isArray(profiles) ? profiles : []
     };
+    // Diagnóstico visible en pantalla
+    const diag = document.getElementById('statsDiag');
+    if(diag){
+      diag.style.display='block';
+      diag.textContent = 'Datos: orders='+allOrdersData.orders.length+
+        ' | views='+allOrdersData.views.length+
+        ' | cartEvts='+allOrdersData.cartEvts.length+
+        ' | profiles='+allOrdersData.profiles.length;
+    }
     renderStats();
   } catch(err) {
-    console.error('loadStats error:', err);
-    if(statsPanel && statsPanel.classList.contains('active')){
-      document.getElementById('statsCards').innerHTML='<div class="empty">Error al cargar estadísticas</div>';
-    }
+    const diag = document.getElementById('statsDiag');
+    if(diag){ diag.style.display='block'; diag.textContent='ERROR: '+err.message; }
+    const sc = document.getElementById('statsCards');
+    if(sc) sc.innerHTML='<div class="empty">Error al cargar estadísticas: '+err.message+'</div>';
   }
 }
 
 function renderStats(){
   if(!allOrdersData || !allOrdersData.orders){
-    document.getElementById('statsCards').innerHTML='<div class="loading">Cargando estadísticas...</div>';
+    const sc = document.getElementById('statsCards');
+    if(sc) sc.innerHTML='<div class="loading">Cargando estadísticas...</div>';
     return;
   }
   const { orders, views, cartEvts, profiles }=allOrdersData;
+  if(!orders) return;
   const filtOrders=orders.filter(o=>periodFilter(o.created_at));
   const filtViews=views.filter(v=>periodFilter(v.viewed_at));
 
