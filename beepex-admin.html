@@ -170,6 +170,77 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 /* ── Empty & loading ── */
 .empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;}
 .loading{text-align:center;padding:30px;color:var(--muted);font-size:13px;}
+
+/* ── Cta Cte ── */
+.ctacte-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;}
+.client-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:border-color .15s;}
+.client-card:hover{border-color:var(--accent);}
+.client-card.mora{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.04);}
+.client-card-name{font-size:14px;font-weight:800;margin-bottom:4px;}
+.client-card-tel{font-size:11px;color:var(--muted);margin-bottom:8px;}
+.client-card-saldo{font-size:18px;font-weight:800;}
+.client-card-saldo.deuda{color:var(--red);}
+.client-card-saldo.cero{color:var(--green);}
+.client-card-meta{font-size:11px;color:var(--muted);margin-top:4px;}
+.client-card-mora-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);margin-top:6px;}
+
+/* Modal cta cte */
+.ctacte-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
+.ctacte-modal-bg.open{display:flex;}
+.ctacte-modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:560px;display:flex;flex-direction:column;gap:0;animation:slideUp .2s ease;margin:auto;}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.ctacte-modal-hdr{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.ctacte-modal-title{font-size:16px;font-weight:800;}
+.ctacte-modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 6px;}
+.ctacte-modal-close:hover{color:var(--text);}
+.ctacte-modal-body{padding:16px 20px;display:flex;flex-direction:column;gap:14px;}
+.ctacte-saldo-box{background:var(--card);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;}
+.ctacte-saldo-label{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.ctacte-saldo-val{font-size:22px;font-weight:800;}
+.ctacte-saldo-val.deuda{color:var(--red);}
+.ctacte-saldo-val.cero{color:var(--green);}
+
+/* Movimientos */
+.mov-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;}
+.mov-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--card);border-radius:8px;font-size:12px;}
+.mov-icon{font-size:16px;flex-shrink:0;}
+.mov-ref{flex:1;min-width:0;}
+.mov-ref-main{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mov-ref-date{font-size:10px;color:var(--muted);}
+.mov-amount{font-weight:800;flex-shrink:0;}
+.mov-amount.venta{color:var(--red);}
+.mov-amount.pago{color:var(--green);}
+
+/* Registrar pago */
+.pago-form{background:var(--card);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;}
+.pago-form-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.pago-row{display:flex;gap:8px;}
+.pago-inp{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;color:var(--text);font-family:inherit;outline:none;transition:border .2s;}
+.pago-inp:focus{border-color:var(--accent);}
+.pago-sel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13px;font-weight:600;color:var(--text);font-family:inherit;outline:none;cursor:pointer;}
+.pago-btn{background:var(--accent);border:none;border-radius:8px;color:#000;font-size:13px;font-weight:800;padding:9px 18px;cursor:pointer;transition:opacity .15s;white-space:nowrap;}
+.pago-btn:hover{opacity:.85;}
+.pago-btn:disabled{opacity:.4;cursor:not-allowed;}
+.pago-nota{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;resize:none;}
+.pago-nota:focus{border-color:var(--accent);}
+
+/* Ordenes pendientes */
+.orders-pending{display:flex;flex-direction:column;gap:6px;}
+.order-pending-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--card);border-radius:8px;font-size:12px;}
+.order-pending-chk{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);}
+.order-pending-info{flex:1;min-width:0;}
+.order-pending-ticket{font-weight:700;}
+.order-pending-date{font-size:10px;color:var(--muted);}
+.order-pending-total{font-weight:800;color:var(--red);flex-shrink:0;}
+
+/* Búsqueda clientes */
+.client-search-wrap{position:relative;margin-bottom:12px;}
+.client-search-inp{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);font-family:inherit;outline:none;transition:border .2s;}
+.client-search-inp:focus{border-color:var(--accent);}
+.ctacte-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+.ctacte-kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;}
+.ctacte-kpi-val{font-size:20px;font-weight:800;margin-bottom:2px;}
+.ctacte-kpi-lbl{font-size:11px;color:var(--muted);}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:999;pointer-events:none;opacity:0;transition:opacity .3s;}
 .toast.show{opacity:1;}
 .online-dot{width:8px;height:8px;background:var(--green);border-radius:50%;display:inline-block;animation:pulse-dot 1.5s infinite;}
@@ -215,6 +286,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
     <button class="admin-tab" onclick="switchTab('catalogo')">📦 Catálogo</button>
     <button class="admin-tab" onclick="switchTab('productos')">🗂️ Productos</button>
     <button class="admin-tab" onclick="switchTab('estadisticas')">📊 Estadísticas</button>
+    <button class="admin-tab" id="tab-btn-ctacte" onclick="switchTab('ctacte')">💰 Cta Cte</button>
   </div>
 
   <div class="admin-content">
@@ -425,6 +497,85 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
       </div>
     </div>
 
+    <!-- TAB CTA CTE -->
+    <div class="tab-panel" id="tab-ctacte">
+      <!-- KPIs resumen -->
+      <div class="ctacte-summary" id="ctacteSummary">
+        <div class="ctacte-kpi"><div class="ctacte-kpi-val" id="kpiDeudaTotal" style="color:var(--red)">-</div><div class="ctacte-kpi-lbl">Deuda total</div></div>
+        <div class="ctacte-kpi"><div class="ctacte-kpi-val" id="kpiClientesMora" style="color:var(--accent2)">-</div><div class="ctacte-kpi-lbl">En mora</div></div>
+        <div class="ctacte-kpi"><div class="ctacte-kpi-val" id="kpiPagosHoy" style="color:var(--green)">-</div><div class="ctacte-kpi-lbl">Cobrado hoy</div></div>
+      </div>
+
+      <!-- Búsqueda -->
+      <div class="client-search-wrap">
+        <input class="client-search-inp" id="clientSearchInp" type="text"
+          placeholder="Buscar cliente por nombre o teléfono..."
+          oninput="filterClients()">
+      </div>
+
+      <!-- Grid de clientes -->
+      <div class="ctacte-grid" id="ctacteGrid">
+        <div class="loading">Cargando clientes...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal Cta Cte por cliente -->
+<div class="ctacte-modal-bg" id="ctacteModalBg" onclick="if(event.target===this)closeCtaCteModal()">
+  <div class="ctacte-modal" id="ctacteModal">
+    <div class="ctacte-modal-hdr">
+      <div class="ctacte-modal-title" id="ctacteModalTitle">Cuenta Corriente</div>
+      <button class="ctacte-modal-close" onclick="closeCtaCteModal()">✕</button>
+    </div>
+    <div class="ctacte-modal-body">
+      <!-- Saldo -->
+      <div class="ctacte-saldo-box">
+        <div>
+          <div class="ctacte-saldo-label">Saldo actual</div>
+          <div class="ctacte-saldo-val" id="ctacteModalSaldo">$0</div>
+        </div>
+        <div style="text-align:right">
+          <div class="ctacte-saldo-label">Último pago</div>
+          <div style="font-size:13px;font-weight:600;color:var(--muted)" id="ctacteModalUltPago">—</div>
+        </div>
+      </div>
+
+      <!-- Registrar pago -->
+      <div class="pago-form" id="pagoForm">
+        <div class="pago-form-title">💳 Registrar pago</div>
+        <div class="pago-row">
+          <input class="pago-inp" id="pagoMonto" type="number" placeholder="Monto $" min="0" inputmode="numeric">
+          <select class="pago-sel" id="pagoTipo">
+            <option value="efectivo">💵 Efectivo</option>
+            <option value="transferencia">📲 Transfer.</option>
+            <option value="cta_cte">📒 Cta Cte</option>
+          </select>
+          <button class="pago-btn" id="pagoBtn" onclick="registrarPago()">Registrar</button>
+        </div>
+        <textarea class="pago-nota" id="pagoNota" rows="2" placeholder="Nota (opcional)"></textarea>
+
+        <!-- Imputar a órdenes específicas -->
+        <div id="ordenesSection" style="display:none">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
+            Imputar a órdenes (opcional)
+          </div>
+          <div class="orders-pending" id="ordenesPendientes"></div>
+        </div>
+      </div>
+
+      <!-- Movimientos -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+          Movimientos
+        </div>
+        <div class="mov-list" id="movList">
+          <div class="loading">Cargando...</div>
+        </div>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -551,6 +702,263 @@ function switchTab(tab){
   document.getElementById(`tab-${tab}`).classList.add('active');
   event.target.classList.add('active');
   if(tab==='productos') loadProdTable();
+  if(tab==='ctacte') loadCtaCte();
+}
+
+// ── CTA CTE ─────────────────────────────────────────────────────────────────
+let allClientsData = [];
+let activeClientId = null;
+
+async function loadCtaCte(){
+  // Cargar clientes
+  const token = localStorage.getItem('admin_token');
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?select=*&order=nombre`, {
+    headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+  });
+  allClientsData = await res.json();
+  if(!Array.isArray(allClientsData)){ allClientsData=[]; }
+
+  // Calcular saldo de cada cliente via RPC
+  await enrichClientSaldos();
+  renderCtaCteGrid(allClientsData);
+  renderCtaCteKPIs();
+}
+
+async function enrichClientSaldos(){
+  const token = localStorage.getItem('admin_token');
+  // Traer todos los movimientos de account_movements
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/account_movements?select=client_id,monto`, {
+    headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+  });
+  const movs = await res.json();
+  if(!Array.isArray(movs)) return;
+
+  // Agrupar por client_id
+  const saldos = {};
+  movs.forEach(m => {
+    saldos[m.client_id] = (saldos[m.client_id] || 0) + (m.monto || 0);
+  });
+
+  // Traer último pago por cliente
+  const pagosRes = await fetch(`${SUPABASE_URL}/rest/v1/payments?select=client_id,fecha&order=fecha.desc`, {
+    headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+  });
+  const pagos = await pagosRes.json();
+  const ultimoPago = {};
+  if(Array.isArray(pagos)){
+    pagos.forEach(p => { if(!ultimoPago[p.client_id]) ultimoPago[p.client_id] = p.fecha; });
+  }
+
+  allClientsData = allClientsData.map(c => ({
+    ...c,
+    saldo: saldos[c.id] || 0,
+    ultimo_pago: ultimoPago[c.id] || null
+  }));
+}
+
+function renderCtaCteKPIs(){
+  const deudaTotal = allClientsData.reduce((s,c)=>s+(c.saldo>0?c.saldo:0),0);
+  const ahora = new Date();
+  const enMora = allClientsData.filter(c=>{
+    if(c.saldo<=0) return false;
+    if(!c.ultimo_pago) return true;
+    const dias = (ahora - new Date(c.ultimo_pago)) / (1000*60*60*24);
+    return dias > 30;
+  }).length;
+
+  document.getElementById('kpiDeudaTotal').textContent = fmt(deudaTotal);
+  document.getElementById('kpiClientesMora').textContent = enMora;
+
+  // Cobrado hoy
+  const token = localStorage.getItem('admin_token');
+  const hoy = new Date().toISOString().slice(0,10);
+  fetch(`${SUPABASE_URL}/rest/v1/payments?fecha=gte.${hoy}T00:00:00&select=monto`, {
+    headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+  }).then(r=>r.json()).then(data=>{
+    const total = Array.isArray(data) ? data.reduce((s,p)=>s+p.monto,0) : 0;
+    document.getElementById('kpiPagosHoy').textContent = fmt(total);
+  }).catch(()=>{});
+}
+
+function renderCtaCteGrid(clients){
+  const grid = document.getElementById('ctacteGrid');
+  if(!clients.length){
+    grid.innerHTML='<div class="empty">No hay clientes registrados aún.<br>Creá clientes desde el POS.</div>';
+    return;
+  }
+  const ahora = new Date();
+  grid.innerHTML = clients.map(c=>{
+    const saldo = c.saldo || 0;
+    const diasSinPago = c.ultimo_pago
+      ? Math.floor((ahora - new Date(c.ultimo_pago)) / (1000*60*60*24))
+      : null;
+    const mora = saldo > 0 && (diasSinPago === null || diasSinPago > 30);
+    return `
+      <div class="client-card${mora?' mora':''}" onclick="openCtaCteModal('${c.id}')">
+        <div class="client-card-name">${c.nombre}</div>
+        <div class="client-card-tel">${c.telefono||c.email||'Sin contacto'}</div>
+        <div class="client-card-saldo ${saldo>0?'deuda':'cero'}">${fmt(Math.abs(saldo))}</div>
+        <div class="client-card-meta">
+          ${saldo>0?'Debe':'Sin deuda'}
+          ${c.ultimo_pago?' · Últ. pago: '+fmtDate(c.ultimo_pago):''}
+          ${c.limite_credito?` · Límite: ${fmt(c.limite_credito)}`:''}
+        </div>
+        ${mora?'<div class="client-card-mora-badge">⚠️ Mora +30 días</div>':''}
+      </div>`;
+  }).join('');
+}
+
+function filterClients(){
+  const q = document.getElementById('clientSearchInp').value.toLowerCase().trim();
+  const filtered = q
+    ? allClientsData.filter(c =>
+        c.nombre.toLowerCase().includes(q) ||
+        (c.telefono||'').includes(q) ||
+        (c.email||'').toLowerCase().includes(q))
+    : allClientsData;
+  renderCtaCteGrid(filtered);
+}
+
+async function openCtaCteModal(clientId){
+  activeClientId = clientId;
+  const client = allClientsData.find(c=>c.id===clientId);
+  if(!client) return;
+
+  document.getElementById('ctacteModalTitle').textContent = client.nombre;
+  document.getElementById('ctacteModalBg').classList.add('open');
+
+  const saldo = client.saldo || 0;
+  const saldoEl = document.getElementById('ctacteModalSaldo');
+  saldoEl.textContent = fmt(Math.abs(saldo));
+  saldoEl.className = 'ctacte-saldo-val ' + (saldo>0?'deuda':'cero');
+
+  document.getElementById('ctacteModalUltPago').textContent =
+    client.ultimo_pago ? fmtDate(client.ultimo_pago) : 'Sin pagos';
+
+  // Limpiar form pago
+  document.getElementById('pagoMonto').value = saldo > 0 ? Math.round(saldo) : '';
+  document.getElementById('pagoNota').value = '';
+
+  // Cargar movimientos y órdenes pendientes en paralelo
+  await Promise.all([loadMovimientos(clientId), loadOrdenesPendientes(clientId)]);
+}
+
+async function loadMovimientos(clientId){
+  const token = localStorage.getItem('admin_token');
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/account_movements?client_id=eq.${clientId}&order=fecha.desc&limit=50`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+  );
+  const movs = await res.json();
+  const list = document.getElementById('movList');
+  if(!Array.isArray(movs)||!movs.length){
+    list.innerHTML='<div class="empty">Sin movimientos registrados</div>';
+    return;
+  }
+  list.innerHTML = movs.map(m=>{
+    const esVenta = m.tipo==='venta';
+    const monto = Math.abs(m.monto);
+    return `
+      <div class="mov-row">
+        <div class="mov-icon">${esVenta?'🧾':'💳'}</div>
+        <div class="mov-ref">
+          <div class="mov-ref-main">${esVenta?('Ticket '+m.referencia):('Pago · '+m.referencia)}</div>
+          <div class="mov-ref-date">${fmtDate(m.fecha)}</div>
+        </div>
+        <div class="mov-amount ${esVenta?'venta':'pago'}">${esVenta?'+':'-'}${fmt(monto)}</div>
+      </div>`;
+  }).join('');
+}
+
+async function loadOrdenesPendientes(clientId){
+  const token = localStorage.getItem('admin_token');
+  // Órdenes cerradas con saldo pendiente (sin pago completo)
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${clientId}&estado=eq.cerrada&select=id,numero_ticket,ticket_display,fecha,total&order=fecha.desc&limit=20`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+  );
+  const orders = await res.json();
+  const sec = document.getElementById('ordenesSection');
+  const list = document.getElementById('ordenesPendientes');
+
+  if(!Array.isArray(orders)||!orders.length){
+    sec.style.display='none'; return;
+  }
+  sec.style.display='block';
+  list.innerHTML = orders.map(o=>`
+    <div class="order-pending-row">
+      <input type="checkbox" class="order-pending-chk" id="ord-${o.id}" value="${o.id}">
+      <div class="order-pending-info">
+        <div class="order-pending-ticket">#${o.ticket_display}</div>
+        <div class="order-pending-date">${fmtDate(o.fecha)}</div>
+      </div>
+      <div class="order-pending-total">${fmt(o.total)}</div>
+    </div>`).join('');
+}
+
+async function registrarPago(){
+  const monto = parseFloat(document.getElementById('pagoMonto').value);
+  const tipo  = document.getElementById('pagoTipo').value;
+  const nota  = document.getElementById('pagoNota').value.trim();
+  const token = localStorage.getItem('admin_token');
+
+  if(!monto||monto<=0){ showToast('Ingresá un monto válido'); return; }
+  if(!activeClientId){ showToast('No hay cliente seleccionado'); return; }
+
+  const btn = document.getElementById('pagoBtn');
+  btn.disabled=true; btn.textContent='Guardando...';
+
+  try{
+    // 1. Insertar payment
+    const payRes = await fetch(`${SUPABASE_URL}/rest/v1/payments`,{
+      method:'POST',
+      headers:{
+        'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,
+        'Content-Type':'application/json','Prefer':'return=representation'
+      },
+      body:JSON.stringify({client_id:activeClientId,monto,tipo,nota:nota||null})
+    });
+    const payData = await payRes.json();
+    if(!payRes.ok) throw new Error(payData.message||'Error al guardar pago');
+    const payment = Array.isArray(payData)?payData[0]:payData;
+
+    // 2. Imputar a órdenes seleccionadas (si las hay)
+    const selectedOrders = [...document.querySelectorAll('.order-pending-chk:checked')];
+    if(selectedOrders.length && payment?.id){
+      let remaining = monto;
+      for(const chk of selectedOrders){
+        if(remaining<=0) break;
+        const orderId = chk.value;
+        const ordRow = document.querySelector(`#ord-${orderId}`).closest('.order-pending-row');
+        const ordTotal = parseFloat(ordRow.querySelector('.order-pending-total').textContent.replace(/[^0-9.]/g,'').replace(/\./g,''));
+        const aplicado = Math.min(remaining, ordTotal);
+        remaining -= aplicado;
+        await fetch(`${SUPABASE_URL}/rest/v1/payment_allocations`,{
+          method:'POST',
+          headers:{
+            'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,
+            'Content-Type':'application/json','Prefer':'return=minimal'
+          },
+          body:JSON.stringify({payment_id:payment.id,order_id:orderId,monto_aplicado:aplicado})
+        });
+      }
+    }
+
+    showToast('✅ Pago de '+fmt(monto)+' registrado');
+    // Refrescar
+    await loadCtaCte();
+    await openCtaCteModal(activeClientId);
+
+  }catch(err){
+    showToast('Error: '+(err.message||err));
+  }finally{
+    btn.disabled=false; btn.textContent='Registrar';
+  }
+}
+
+function closeCtaCteModal(){
+  document.getElementById('ctacteModalBg').classList.remove('open');
+  activeClientId=null;
 }
 
 // ── Load all ──
