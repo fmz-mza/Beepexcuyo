@@ -1499,13 +1499,13 @@ function onBarcodeDetected(code) {
     status.textContent = `✓ ${product.name}`;
     status.className = 'scanner-status found';
     debug.innerHTML += `<br>✅ Encontrado: ${product.sku}`;
-    addToCart(product.sku);
     if (navigator.vibrate) navigator.vibrate(100);
+    // Cerrar scanner primero, luego agregar al carrito
     setTimeout(() => {
-      status.textContent = 'Apuntá la cámara al código de barras';
-      status.className = 'scanner-status';
-      debug.style.display = 'none';
-    }, 2000);
+      closeScanner();
+      addToCart(product.sku);
+      showToast(`✓ ${product.name} agregado`, 'success');
+    }, 600);
   } else {
     status.textContent = `Código no encontrado en catálogo`;
     status.className = 'scanner-status notfound';
