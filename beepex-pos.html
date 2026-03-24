@@ -354,6 +354,7 @@ input,select,textarea{font-family:inherit;}
           <div class="resumen-box" id="resumenBox"></div>
         </div>
         <button class="confirm-btn" id="confirmBtn" onclick="confirmSale()" disabled>✓ Confirmar venta</button>
+        <button onclick="generarAlertasMora()" style="width:100%;padding:11px;border-radius:10px;background:rgba(239,68,68,.08);color:var(--red);border:1px solid rgba(239,68,68,.2);font-size:12px;font-weight:700;margin-top:8px;letter-spacing:.2px;" id="moraBtnPOS">🔔 Alertar morosos</button>
         <button class="cancel-btn" onclick="cancelOrder()">Cancelar pedido</button>
       </div>
     </div>
@@ -488,7 +489,7 @@ async function initApp(){
   document.getElementById('app').classList.add('ready');
   document.getElementById('hUser').textContent=currentUser.email;
   setOnline(navigator.onLine);
-  await Promise.all([loadProducts(),loadClients()]);
+  await Promise.all([loadProducts(),loadClients(),cargarConfigMora()]);
   cleanExpiredDrafts();
   renderCart(); updateBadge(); updateResumen();
 }
@@ -1052,6 +1053,62 @@ function showToast(msg,type=''){
   const t=document.getElementById('toast');
   t.textContent=msg;t.className='toast show'+(type?' '+type:'');
   clearTimeout(_toastT);_toastT=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ── ALERTAS MORA (POS) ────────────────────────────────────────────────────────
+let _waVendedorPOS = '';
+
+async function cargarConfigMora(){
+  try {
+    const {data} = await _sb.from('settings').select('value').eq('key','pos_whatsapp_vendedor').maybeSingle();
+    _waVendedorPOS = data?.value?.trim() || '';
+  } catch(e){ _waVendedorPOS = ''; }
+}
+
+async function generarAlertasMora(){
+  const btn = document.getElementById('moraBtnPOS');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Generando...'; }
+  try {
+    const {data: mora, error} = await _sb.rpc('clientes_en_mora', {dias: 30});
+    if(error || !mora?.length){ showToast('Sin clientes en mora ✅','ok'); return; }
+
+    // Filtrar ya avisados hoy
+    const hoy = new Date().toISOString().slice(0,10);
+    const {data: alertasHoy} = await _sb.from('debt_alerts')
+      .select('client_id').eq('canal','whatsapp').gte('enviada_at', hoy+'T00:00:00');
+    const yaAvisados = new Set((alertasHoy||[]).map(a=>a.client_id));
+    const pendientes = mora.filter(m => !yaAvisados.has(m.client_id));
+
+    if(!pendientes.length){ showToast('Ya alertados hoy ℹ️','ok'); return; }
+
+    // Mensaje resumen al vendedor
+    if(_waVendedorPOS){
+      let msg = '🐾 *BEEPEX CUYO — Mora*\n';
+      msg += `${pendientes.length} cliente(s) con deuda vencida\n\n`;
+      pendientes.forEach((m,i) => {
+        msg += `${i+1}. *${m.nombre}* · ${fmt(m.saldo)}`;
+        if(m.dias_mora) msg += ` (${m.dias_mora}d)`;
+        msg += '\n';
+      });
+      window.open(`https://wa.me/${_waVendedorPOS}?text=${encodeURIComponent(msg)}`, '_blank');
+      await new Promise(r=>setTimeout(r,600));
+    }
+
+    // Mensajes individuales + registro
+    for(const m of pendientes){
+      const tel = m.telefono_wa || normalizeWA(m.telefono||'');
+      if(tel){
+        let msg = `Hola *${m.nombre}* 👋\n\nTe contactamos de *Beepex Cuyo*.\nTenés una deuda de *${fmt(m.saldo)}*`;
+        if(m.dias_mora) msg += ` vencida hace ${m.dias_mora} días`;
+        msg += `.\n\nComunicate con nosotros para regularizarla 🙏\n\n_Beepex Cuyo_`;
+        window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank');
+        await new Promise(r=>setTimeout(r,500));
+      }
+      await _sb.from('debt_alerts').insert({ client_id: m.client_id, canal: 'whatsapp', dias_mora: m.dias_mora ?? null });
+    }
+    showToast(`${pendientes.length} alerta(s) enviadas ✅`,'ok');
+  } catch(err){ showToast('Error: '+err.message,'err'); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='🔔 Alertar morosos'; } }
 }
 
 checkSession();

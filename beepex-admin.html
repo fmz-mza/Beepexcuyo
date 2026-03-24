@@ -62,6 +62,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .admin-tab{padding:12px 16px;font-size:13px;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:2.5px solid transparent;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;flex-shrink:0;min-height:44px;}
 .admin-tab:hover{color:var(--text);}
 .admin-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-mora-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:9px;margin-left:5px;animation:pulse-dot 1.5s infinite;}
 
 /* ── Content ── */
 .admin-content{flex:1;padding:16px;max-width:900px;width:100%;margin:0 auto;}
@@ -307,7 +308,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <button class="admin-tab" onclick="switchTab('catalogo',this)">📦 Catálogo</button>
     <button class="admin-tab" onclick="switchTab('productos',this)">🗂️ Productos</button>
     <button class="admin-tab" onclick="switchTab('estadisticas',this)">📊 Estadísticas</button>
-    <button class="admin-tab" id="tab-btn-ctacte" onclick="switchTab('ctacte',this)">💰 Cta Cte</button>
+    <button class="admin-tab" id="tab-btn-ctacte" onclick="switchTab('ctacte',this)">💰 Cta Cte<span class="tab-mora-badge" id="moraBadgeTab" style="display:none"></span></button>
   </div>
 
   <div class="admin-content">
@@ -363,6 +364,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
             <div><div class="setting-label">Mensaje de bienvenida</div><div class="setting-sub">Texto en la pantalla de bienvenida</div></div>
             <input class="setting-input" id="settingWelcome" placeholder="Bienvenido al catálogo">
             <button class="setting-btn" onclick="saveSetting('welcome_message','settingWelcome')">Guardar</button>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">WhatsApp vendedor</div><div class="setting-sub">Número para alertas de mora (ej: 5492615551234)</div></div>
+            <input class="setting-input" id="settingWAVendedor" placeholder="5492615551234">
+            <button class="setting-btn" onclick="saveSetting('pos_whatsapp_vendedor','settingWAVendedor')">Guardar</button>
           </div>
         </div>
       </div>
@@ -522,6 +528,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 
     <!-- TAB CTA CTE -->
     <div class="tab-panel" id="tab-ctacte">
+      <!-- Alertas mora -->
+      <div id="moraAlertBar" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:12px 16px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--red);">⚠️ Clientes en mora: <span id="moraCount">0</span></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Deuda vencida hace más de 30 días</div>
+        </div>
+        <button class="setting-btn" style="background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);" onclick="generarAlertasMora()">🔔 Enviar alertas WA</button>
+      </div>
+
       <!-- KPIs resumen -->
       <div class="ctacte-summary" id="ctacteSummary">
         <div class="ctacte-kpi"><div class="ctacte-kpi-val" id="kpiDeudaTotal" style="color:var(--red)">-</div><div class="ctacte-kpi-lbl">Deuda total</div></div>
@@ -742,7 +757,7 @@ function switchTab(tab, el){
   if(btn) btn.classList.add('active');
 
   if(tab==='productos')    loadProdTable();
-  if(tab==='ctacte')       loadCtaCte();
+  if(tab==='ctacte'){ loadCtaCte(); checkMoraBadge(); }
   if(tab==='estadisticas'){
     if(allOrdersData && allOrdersData.orders && allOrdersData.orders.length > 0){
       renderStats();
@@ -1045,6 +1060,7 @@ async function loadAll(){
   await Promise.all([loadUsers(), loadSettings()]);
   // Pre-cargar datos de estadísticas en background (no renderiza hasta abrir el tab)
   loadStats();
+  checkMoraBadge();
 }
 
 // ── USUARIOS ──
@@ -1166,6 +1182,7 @@ async function loadSettings(){
   if(s.catalog_month) document.getElementById('settingMonth').value=s.catalog_month;
   if(s.welcome_message) document.getElementById('settingWelcome').value=s.welcome_message;
   if(s.banner_text) document.getElementById('settingBanner').value=s.banner_text;
+  if(s.pos_whatsapp_vendedor){ const inp=document.getElementById('settingWAVendedor'); if(inp) inp.value=s.pos_whatsapp_vendedor; waVendedor=s.pos_whatsapp_vendedor.trim(); }
   const bannerOn=s.banner_active==='true';
   const toggle=document.getElementById('bannerToggle');
   if(bannerOn) toggle.classList.add('on'); else toggle.classList.remove('on');
@@ -1885,6 +1902,124 @@ async function confirmExcelImport(){
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+
+// ── ALERTAS MORA ─────────────────────────────────────────────────────────────
+let waVendedor = '';
+
+async function checkMoraBadge(){
+  try {
+    const token = localStorage.getItem('admin_token');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/clientes_en_mora`, {
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+      body: JSON.stringify({dias: 30})
+    });
+    const data = await res.json();
+    const mora = Array.isArray(data) ? data : [];
+    const badge  = document.getElementById('moraBadgeTab');
+    const bar    = document.getElementById('moraAlertBar');
+    const count  = document.getElementById('moraCount');
+    if(mora.length > 0){
+      if(badge){ badge.textContent = mora.length; badge.style.display = 'inline-flex'; }
+      if(bar)  { bar.style.display = 'flex'; }
+      if(count){ count.textContent = mora.length; }
+    } else {
+      if(badge) badge.style.display = 'none';
+      if(bar)   bar.style.display   = 'none';
+    }
+    return mora;
+  } catch(e){ return []; }
+}
+
+async function generarAlertasMora(){
+  const token = localStorage.getItem('admin_token');
+  const btn = document.querySelector('[onclick="generarAlertasMora()"]');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Generando...'; }
+
+  try {
+    // 1. Traer clientes en mora
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/clientes_en_mora`, {
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+      body: JSON.stringify({dias: 30})
+    });
+    const mora = await res.json();
+    if(!Array.isArray(mora) || !mora.length){
+      showToast('✅ No hay clientes en mora');
+      return;
+    }
+
+    // 2. Verificar cuáles ya recibieron alerta hoy
+    const hoy = new Date().toISOString().slice(0,10);
+    const alertasRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/debt_alerts?canal=eq.whatsapp&enviada_at=gte.${hoy}T00:00:00&select=client_id`,
+      { headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`} }
+    );
+    const alertasHoy = await alertasRes.json();
+    const yaAvisados = new Set((Array.isArray(alertasHoy)?alertasHoy:[]).map(a=>a.client_id));
+
+    // 3. Filtrar los que NO recibieron alerta hoy
+    const pendientes = mora.filter(m => !yaAvisados.has(m.client_id));
+    if(!pendientes.length){
+      showToast('ℹ️ Todos los morosos ya recibieron alerta hoy');
+      return;
+    }
+
+    // 4. Mensaje resumen al vendedor
+    if(waVendedor){
+      let msgVendedor = '🐾 *BEEPEX CUYO — Clientes en mora*\n';
+      msgVendedor += `📅 ${new Date().toLocaleDateString('es-AR')}\n`;
+      msgVendedor += `⚠️ ${pendientes.length} cliente(s) con deuda vencida > 30 días\n\n`;
+      pendientes.forEach((m, i) => {
+        msgVendedor += `${i+1}. *${m.nombre}*\n`;
+        msgVendedor += `   💰 Deuda: ${fmt(m.saldo)}\n`;
+        if(m.dias_mora) msgVendedor += `   📆 Días: ${m.dias_mora}\n`;
+        if(m.telefono)  msgVendedor += `   📱 ${m.telefono}\n`;
+        msgVendedor += '\n';
+      });
+      msgVendedor += '━━━━━━━━━━━━━━\n_Enviado desde Beepex Admin_';
+      window.open(`https://wa.me/${waVendedor}?text=${encodeURIComponent(msgVendedor)}`, '_blank');
+      await new Promise(r => setTimeout(r, 800));
+    }
+
+    // 5. Mensajes individuales a cada cliente moroso + registro
+    for(const m of pendientes){
+      const tel = m.telefono_wa || normalizarWA(m.telefono||'');
+      if(tel){
+        let msgCliente  = `Hola *${m.nombre}* 👋\n\n`;
+        msgCliente += `Te contactamos de *Beepex Cuyo* para avisarte que tenés una deuda pendiente de *${fmt(m.saldo)}*`;
+        if(m.dias_mora) msgCliente += ` (vencida hace ${m.dias_mora} días)`;
+        msgCliente += `.\n\nComunicate con nosotros para regularizar tu cuenta.\n\n🐾 _Beepex Cuyo_`;
+        window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgCliente)}`, '_blank');
+        await new Promise(r => setTimeout(r, 600));
+      }
+      // Registrar en debt_alerts
+      await fetch(`${SUPABASE_URL}/rest/v1/debt_alerts`, {
+        method:'POST',
+        headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({ client_id: m.client_id, canal: 'whatsapp', dias_mora: m.dias_mora ?? null })
+      });
+    }
+
+    showToast(`✅ ${pendientes.length} alerta(s) WA generadas`, 4000);
+    await checkMoraBadge();
+
+  } catch(err){
+    showToast('❌ Error: '+(err.message||err));
+    console.error(err);
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '🔔 Enviar alertas WA'; }
+  }
+}
+
+function normalizarWA(tel){
+  if(!tel) return '';
+  const d = tel.replace(/\D/g,'');
+  if(d.startsWith('549')) return d;
+  if(d.startsWith('54'))  return '549'+d.slice(2);
+  if(d.startsWith('0'))   return '549'+d.slice(1);
+  return '549'+d;
+}
 
 // Chequear cada 5 minutos
 setInterval(checkAndRefreshToken, 5*60*1000);
