@@ -66,8 +66,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 /* ── Content ── */
 .admin-content{flex:1;padding:16px;max-width:900px;width:100%;margin:0 auto;}
 @media(max-width:600px){.admin-content{padding:12px;}}
-.tab-panel{display:none;}
-.tab-panel.active{display:block;}
+.tab-panel{display:none !important;}
+.tab-panel.active{display:block !important;}
 
 /* ── Section ── */
 .section{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:16px;overflow:hidden;}
@@ -313,7 +313,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
   <div class="admin-content">
 
     <!-- TAB USUARIOS -->
-    <div class="tab-panel active" id="tab-usuarios">
+    <div class="tab-panel active" id="tab-usuarios" style="display:block">
       <div class="stats-grid" id="userStats"></div>
 
       <div class="section">
@@ -719,15 +719,30 @@ async function api(path, opts={}){
 
 // ── Tabs ──
 function switchTab(tab, el){
-  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  // Acotar SOLO a los tab-panel dentro de admin-content
+  const content = document.querySelector('.admin-content');
+  if(!content) return;
+  content.querySelectorAll(':scope > .tab-panel').forEach(p=>{
+    p.classList.remove('active');
+    p.style.display = 'none';
+  });
   document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('tab-'+tab).classList.add('active');
-  const btn = el || [...document.querySelectorAll('.admin-tab')].find(b=>b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'"+tab+"'"));
+
+  const panel = document.getElementById('tab-'+tab);
+  if(panel){
+    panel.classList.add('active');
+    panel.style.display = 'block';
+  }
+
+  const btn = el || [...document.querySelectorAll('.admin-tab')].find(b=>{
+    const oc = b.getAttribute('onclick')||'';
+    return oc.includes("'"+tab+"'");
+  });
   if(btn) btn.classList.add('active');
+
   if(tab==='productos')    loadProdTable();
   if(tab==='ctacte')       loadCtaCte();
   if(tab==='estadisticas'){
-    // Si ya hay datos, solo re-renderizar. Si no, cargar primero.
     if(allOrdersData && allOrdersData.orders && allOrdersData.orders.length > 0){
       renderStats();
     } else {
