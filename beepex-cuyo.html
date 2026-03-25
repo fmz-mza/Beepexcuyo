@@ -2792,22 +2792,25 @@ async function loadUserClientId(){
       {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
     );
     const rows=await res.json();
+    console.log('[Beepex] loadUserClientId rows:', rows);
     userClientId=Array.isArray(rows)&&rows[0]?rows[0].id:null;
+    console.log('[Beepex] userClientId:', userClientId);
     if(userClientId) loadUserSaldo();
-  }catch(e){ userClientId=null; }
+  }catch(e){ console.error('[Beepex] loadUserClientId error:',e); userClientId=null; }
 }
 
 async function loadUserSaldo(){
   if(!userClientId) return;
   const token=localStorage.getItem('sb_access_token');
   try{
-    // Saldo desde account_movements
+    // Saldo via RPC (account_movements es MATERIALIZED VIEW — no soporta RLS directo)
     const res=await fetch(
-      `${SUPABASE_URL}/rest/v1/account_movements?client_id=eq.${userClientId}&select=monto`,
-      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+      `${SUPABASE_URL}/rest/v1/rpc/get_my_saldo`,
+      {method:'POST',headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:'{}'}
     );
-    const movs=await res.json();
-    const saldo=Array.isArray(movs)?movs.reduce((s,m)=>s+(m.monto||0),0):0;
+    const saldoRaw=await res.json();
+    console.log('[Beepex] get_my_saldo raw:', saldoRaw);
+    const saldo=parseFloat(saldoRaw)||0;
     if(saldo<=0){ updateSaldoBadge(0,null); return; }
 
     // Último pago para calcular días
@@ -2816,12 +2819,13 @@ async function loadUserSaldo(){
       {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
     );
     const pagos=await resP.json();
+    console.log('[Beepex] pagos:', pagos);
     let dias=null;
     if(Array.isArray(pagos)&&pagos[0]?.fecha){
       dias=Math.floor((Date.now()-new Date(pagos[0].fecha))/(1000*60*60*24));
     }
     updateSaldoBadge(saldo, dias);
-  }catch(e){ updateSaldoBadge(0,null); }
+  }catch(e){ console.error('[Beepex] loadUserSaldo error:',e); updateSaldoBadge(0,null); }
 }
 
 function updateSaldoBadge(saldo, dias){
