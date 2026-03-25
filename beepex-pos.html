@@ -162,8 +162,12 @@ input,select,textarea{font-family:inherit;}
 .client-sel:focus{border-color:var(--accent);}
 .new-cl-btn{width:48px;height:48px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;font-size:22px;color:var(--muted2);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;}
 .new-cl-btn:active{border-color:var(--accent2);color:var(--accent2);}
-.mora-warn{display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:10px 12px;font-size:12px;font-weight:600;color:var(--red);}
+.mora-warn{display:none;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:600;}
 .mora-warn.show{display:block;}
+.mora-warn.nivel1{background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);color:var(--accent2);}
+.mora-warn.nivel2{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);}
+.mora-warn-titulo{font-size:13px;font-weight:800;margin-bottom:2px;}
+.mora-warn-sub{font-size:11px;font-weight:500;opacity:.85;}
 
 .pay-methods{display:flex;gap:8px;}
 .pay-method{flex:1;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted2);font-size:12px;font-weight:600;transition:all .15s;}
@@ -704,11 +708,47 @@ function renderClientSel(){
 async function onClientChange(){
   const id=document.getElementById('clientSel').value;
   const warn=document.getElementById('moraWarn');
-  warn.classList.remove('show');
+  warn.classList.remove('show','nivel1','nivel2');
+  warn.innerHTML='';
   if(!id){updateConfirmBtn();return;}
-  const {data}=await _sb.rpc('clientes_en_mora',{dias:30});
-  const mora=data?.find(m=>m.client_id===id);
-  if(mora){warn.classList.add('show');warn.textContent='⚠️ Deuda vencida · Saldo: '+fmt(mora.saldo);}
+
+  try{
+    // 1. Saldo del cliente desde account_movements
+    const {data:movs}=await _sb.from('account_movements')
+      .select('monto').eq('client_id',id);
+    const saldo=(movs||[]).reduce((s,m)=>s+(m.monto||0),0);
+
+    if(saldo<=0){updateConfirmBtn();return;}
+
+    // 2. Último pago para calcular días
+    const {data:ultimoPagoRow}=await _sb.from('payments')
+      .select('fecha').eq('client_id',id).order('fecha',{ascending:false}).limit(1).maybeSingle();
+
+    const ahora=new Date();
+    let dias=null;
+    if(ultimoPagoRow?.fecha){
+      dias=Math.floor((ahora-new Date(ultimoPagoRow.fecha))/(1000*60*60*24));
+    }
+
+    // 3. Decidir nivel de aviso
+    const enMora = dias===null || dias>=30;
+
+    if(enMora){
+      // Nivel 2 — mora vencida
+      warn.className='mora-warn nivel2 show';
+      const diasTexto = dias===null ? 'sin pagos registrados' : `vencido hace ${dias} días`;
+      warn.innerHTML=`<div class="mora-warn-titulo">🔴 Cliente en mora</div>
+        <div class="mora-warn-sub">Debe ${fmt(saldo)} · ${diasTexto}</div>`;
+    } else {
+      // Nivel 1 — deuda vigente
+      const diasRestantes = 30-dias;
+      warn.className='mora-warn nivel1 show';
+      warn.innerHTML=`<div class="mora-warn-titulo">💛 Cliente con deuda vigente</div>
+        <div class="mora-warn-sub">Debe ${fmt(saldo)} · vence en ${diasRestantes} día${diasRestantes!==1?'s':''}</div>`;
+    }
+  }catch(e){
+    // Si falla la consulta, silencio — no bloqueamos la venta
+  }
   updateConfirmBtn();
 }
 function openNewClient(){document.getElementById('newClBg').classList.add('open');}
