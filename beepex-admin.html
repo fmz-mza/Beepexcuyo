@@ -524,6 +524,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
           <div class="orders-list" id="allOrders"><div class="loading">Cargando...</div></div>
         </div>
       </div>
+
+      <!-- KPIs POS -->
+      <div class="section" style="margin-top:16px;">
+        <div class="section-header"><span class="section-title">🏪 Ventas POS</span></div>
+        <div class="section-body">
+          <div class="stats-grid" id="posStatsCards" style="margin-bottom:12px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;" class="two-col">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🏆 Top clientes</div>
+              <div class="rank-list" id="posTopClientes"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">📋 Últimas ventas POS</div>
+              <div id="posUltimasVentas"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- TAB CTA CTE -->
@@ -1336,17 +1354,21 @@ async function loadStats(){
     document.getElementById('statsCards').innerHTML='<div class="loading">Cargando estadísticas...</div>';
   }
   try {
-    const [orders, views, cartEvts, profiles]=await Promise.all([
+    const [orders, views, cartEvts, profiles, posOrders, posClients]=await Promise.all([
       api('orders?select=*&order=created_at.desc'),
       api('product_views?select=sku,viewed_at'),
       api('cart_events?select=sku,action,user_id,created_at'),
-      api('profiles?select=id,nombre,approved')
+      api('profiles?select=id,nombre,approved'),
+      api('pos_orders?select=id,ticket_display,fecha,total,estado,client_id&order=fecha.desc&limit=200'),
+      api('clients?select=id,nombre')
     ]);
     allOrdersData={
-      orders:  Array.isArray(orders)   ? orders   : [],
-      views:   Array.isArray(views)    ? views    : [],
-      cartEvts:Array.isArray(cartEvts) ? cartEvts : [],
-      profiles:Array.isArray(profiles) ? profiles : []
+      orders:    Array.isArray(orders)     ? orders     : [],
+      views:     Array.isArray(views)      ? views      : [],
+      cartEvts:  Array.isArray(cartEvts)   ? cartEvts   : [],
+      profiles:  Array.isArray(profiles)   ? profiles   : [],
+      posOrders: Array.isArray(posOrders)  ? posOrders  : [],
+      posClients:Array.isArray(posClients) ? posClients : []
     };
     // Diagnóstico visible en pantalla
     const diag = document.getElementById('statsDiag');
@@ -1437,6 +1459,85 @@ function renderStats(){
 
   // Todos los pedidos
   renderAllOrders(filtOrders);
+
+  // KPIs POS
+  const posOrders = allOrdersData.posOrders || [];
+  const posClients = allOrdersData.posClients || [];
+  const filtPosOrders = posOrders.filter(o => periodFilter(o.fecha || o.created_at));
+  renderPosKPIs(filtPosOrders, posClients);
+}
+
+function renderPosKPIs(posOrders, posClients){
+  // Map clientId -> nombre
+  const clientMap = {};
+  posClients.forEach(cl => { clientMap[cl.id] = cl.nombre; });
+
+  // KPIs cards
+  const totalVentas = posOrders.reduce((s, o) => s + (o.total || 0), 0);
+  const cantTickets = posOrders.length;
+  const ticketProm  = cantTickets > 0 ? totalVentas / cantTickets : 0;
+  const cerradas    = posOrders.filter(o => o.estado === 'cerrada').length;
+
+  const cardsEl = document.getElementById('posStatsCards');
+  if(cardsEl){
+    cardsEl.innerHTML = cantTickets === 0
+      ? '<div class="empty" style="grid-column:1/-1">Sin ventas POS en este período</div>'
+      : `<div class="stat-card"><div class="stat-value" style="color:var(--accent2)">${fmt(totalVentas)}</div><div class="stat-label">Ventas POS</div></div>
+         <div class="stat-card"><div class="stat-value">${cantTickets}</div><div class="stat-label">Tickets</div></div>
+         <div class="stat-card"><div class="stat-value" style="color:var(--green)">${fmt(ticketProm)}</div><div class="stat-label">Ticket promedio</div></div>
+         <div class="stat-card"><div class="stat-value">${cerradas}</div><div class="stat-label">Cerradas</div></div>`;
+  }
+
+  // Top clientes por monto
+  const byClient = {};
+  posOrders.forEach(o => {
+    if(!o.client_id) return;
+    const nombre = clientMap[o.client_id] || o.client_id.slice(0,8);
+    if(!byClient[nombre]) byClient[nombre] = {monto:0, tickets:0};
+    byClient[nombre].monto  += o.total || 0;
+    byClient[nombre].tickets++;
+  });
+  const topCl = Object.entries(byClient).sort((a,b) => b[1].monto - a[1].monto).slice(0,5);
+  const topClEl = document.getElementById('posTopClientes');
+  if(topClEl){
+    if(!topCl.length){ topClEl.innerHTML='<div class="empty">Sin datos</div>'; }
+    else {
+      const max = topCl[0][1].monto;
+      topClEl.innerHTML = topCl.map(([nombre, d], i) => `
+        <div class="rank-row">
+          <span class="rank-pos">${i+1}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;">
+              <span class="rank-name" style="flex:1">${nombre}</span>
+              <span style="font-size:12px;font-weight:700;color:var(--accent2);white-space:nowrap">${fmt(d.monto)}</span>
+            </div>
+            <div class="rank-bar-wrap"><div class="rank-bar" style="width:${Math.round(d.monto/max*100)}%"></div></div>
+            <span style="font-size:10px;color:var(--muted)">${d.tickets} ticket${d.tickets!==1?'s':''}</span>
+          </div>
+        </div>`).join('');
+    }
+  }
+
+  // Últimas ventas POS
+  const ultEl = document.getElementById('posUltimasVentas');
+  if(ultEl){
+    if(!posOrders.length){ ultEl.innerHTML='<div class="empty">Sin ventas en este período</div>'; return; }
+    ultEl.innerHTML = posOrders.slice(0,8).map(o => {
+      const nombre = clientMap[o.client_id] || '—';
+      const fecha  = o.fecha ? new Date(o.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}) : '—';
+      const hora   = o.fecha ? new Date(o.fecha).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : '';
+      return `<div class="order-row" style="margin-bottom:6px;">
+        <div class="order-row-header">
+          <div>
+            <span style="font-size:12px;font-weight:700;">${nombre}</span>
+            ${o.ticket_display ? `<span style="font-size:10px;color:var(--muted);margin-left:6px">#${o.ticket_display}</span>` : ''}
+          </div>
+          <span class="order-total">${fmt(o.total||0)}</span>
+        </div>
+        <div class="order-meta">${fecha} ${hora}</div>
+      </div>`;
+    }).join('');
+  }
 }
 
 function renderAbandoned(containerId, data){
