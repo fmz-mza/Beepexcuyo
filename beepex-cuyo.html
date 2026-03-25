@@ -3457,11 +3457,12 @@ function closeUserMenu(){
 // ── Mi Cuenta drawer ────────────────────────────────────────────────────────
 async function openMiCuenta(){
   if(!userClientId){ showToast('⚠️ No hay cuenta vinculada'); return; }
+  const clientIdSnapshot = userClientId; // capturar valor actual antes de cualquier race condition
   document.getElementById('micuentaOverlay').classList.add('open');
   document.getElementById('micuentaDrawer').classList.add('open');
   document.body.style.overflow='hidden';
   renderMcSaldo();
-  await loadMcMovimientos();
+  await loadMcMovimientos(clientIdSnapshot);
 }
 
 function closeMiCuenta(){
@@ -3492,16 +3493,18 @@ function renderMcSaldo(){
   }
 }
 
-async function loadMcMovimientos(){
+async function loadMcMovimientos(clientId){
+  clientId = clientId || userClientId; // fallback por si se llama directo
   const container=document.getElementById('mcMovItems');
   container.innerHTML='<div class="history-empty">⏳ Cargando movimientos...</div>';
   const token=localStorage.getItem('sb_access_token');
+  console.log('[Beepex] loadMcMovimientos clientId:', clientId);
   try{
     // Compras POS
     const [resOrd, resPag] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${userClientId}&select=id,fecha,created_at,total,estado,ticket_display&order=created_at.desc&limit=30`,
+      fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${clientId}&select=id,fecha,created_at,total,estado,ticket_display&order=created_at.desc&limit=30`,
         {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}),
-      fetch(`${SUPABASE_URL}/rest/v1/payments?client_id=eq.${userClientId}&select=id,fecha,monto,metodo,notas&order=fecha.desc&limit=30`,
+      fetch(`${SUPABASE_URL}/rest/v1/payments?client_id=eq.${clientId}&select=id,fecha,monto,metodo,notas&order=fecha.desc&limit=30`,
         {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}})
     ]);
     const orders=await resOrd.json();
