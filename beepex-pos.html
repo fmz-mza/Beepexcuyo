@@ -173,6 +173,13 @@ input,select,textarea{font-family:inherit;}
 .cobrar-saldo-sec{display:none;background:rgba(0,201,167,.06);border:1px solid rgba(0,201,167,.2);border-radius:10px;padding:10px 12px;}
 .cobrar-saldo-sec.show{display:block;}
 .cobrar-saldo-row{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--accent2);}
+.tel-missing{display:none;background:rgba(74,124,255,.06);border:1px solid rgba(74,124,255,.25);border-radius:10px;padding:10px 12px;}
+.tel-missing.show{display:block;}
+.tel-missing-lbl{font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;}
+.tel-missing-row{display:flex;gap:8px;}
+.tel-missing-inp{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;color:var(--text);font-family:var(--mono);outline:none;transition:border .2s;}
+.tel-missing-inp:focus{border-color:var(--accent);}
+.tel-missing-btn{background:var(--accent);border:none;border-radius:8px;color:#000;font-size:12px;font-weight:800;padding:9px 14px;white-space:nowrap;}
 
 .pay-methods{display:flex;gap:8px;}
 .pay-method{flex:1;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted2);font-size:12px;font-weight:600;transition:all .15s;}
@@ -336,6 +343,15 @@ input,select,textarea{font-family:inherit;}
             <button class="new-cl-btn" onclick="openNewClient()">＋</button>
           </div>
           <div class="mora-warn" id="moraWarn"></div>
+          <div class="tel-missing" id="telMissing">
+            <div class="tel-missing-lbl">📱 Sin teléfono — agregá uno para poder enviar WhatsApp</div>
+            <div class="tel-missing-row">
+              <input class="tel-missing-inp" id="telMissingInp" type="tel"
+                placeholder="Ej: 2614123456" inputmode="numeric"
+                onkeydown="if(event.key==='Enter')guardarTelCliente()">
+              <button class="tel-missing-btn" onclick="guardarTelCliente()">Guardar</button>
+            </div>
+          </div>
         </div>
 
         <!-- Cobrar saldo junto con la venta -->
@@ -745,12 +761,20 @@ function renderClientSel(){
 async function onClientChange(){
   const id=document.getElementById('clientSel').value;
   const warn=document.getElementById('moraWarn');
+  const telBox=document.getElementById('telMissing');
+  const telInp=document.getElementById('telMissingInp');
   warn.classList.remove('show','nivel1','nivel2');
   warn.innerHTML='';
+  telBox.classList.remove('show');
+  telInp.value='';
   clienteSaldoPendiente=0;
   cobrarSaldoJunto=false;
   document.getElementById('cobrarSaldoSec').classList.remove('show');
   if(!id){updateConfirmBtn();updateResumen();return;}
+
+  // Mostrar campo teléfono si el cliente no tiene
+  const cliente=clients.find(c=>c.id===id);
+  if(cliente && !cliente.telefono) telBox.classList.add('show');
 
   try{
     // 1. Saldo desde account_movements
@@ -799,6 +823,24 @@ async function onClientChange(){
 }
 function openNewClient(){document.getElementById('newClBg').classList.add('open');}
 function closeNewClient(){document.getElementById('newClBg').classList.remove('open');}
+async function guardarTelCliente(){
+  const id=document.getElementById('clientSel').value;
+  const telRaw=document.getElementById('telMissingInp').value.trim();
+  if(!id||!telRaw){showToast('Ingresá un número válido','err');return;}
+  const telWA=normalizeWA(telRaw);
+  const {error}=await _sb.from('clients')
+    .update({telefono:telRaw, telefono_wa:telWA})
+    .eq('id',id);
+  if(error){showToast('Error al guardar teléfono','err');return;}
+  // Actualizar en memoria
+  const c=clients.find(c=>c.id===id);
+  if(c){c.telefono=telRaw;c.telefono_wa=telWA;}
+  // Actualizar selector (muestra el tel)
+  renderClientSel();
+  document.getElementById('clientSel').value=id;
+  document.getElementById('telMissing').classList.remove('show');
+  showToast('📱 Teléfono guardado','ok');
+}
 async function saveNewClient(){
   const nombre=document.getElementById('ncNombre').value.trim();
   const tel=document.getElementById('ncTel').value.trim();
@@ -889,7 +931,11 @@ async function confirmSale(){
 
     lastTicket={
       order, items, clientId,
-      totalVenta: total,           // solo la venta
+      subtotal,                    // subtotal sin descuento
+      descMonto: desc||0,          // monto descuento
+      descPct: dt==='pct'?dv:0,   // % si fue porcentual
+      descTipo: dt,                // 'pct' o 'monto'
+      totalVenta: total,           // venta con descuento
       total: totalFinal,           // venta + saldo cobrado
       pagado: montoRecibido,
       payMethod,
@@ -926,6 +972,8 @@ function resetSale(){
   warn.classList.remove('show','nivel1','nivel2');
   warn.innerHTML='';
   document.getElementById('cobrarSaldoSec').classList.remove('show');
+  document.getElementById('telMissing').classList.remove('show');
+  document.getElementById('telMissingInp').value='';
   document.querySelectorAll('.pay-method').forEach(b=>b.classList.remove('active'));
   document.querySelector('[data-type="efectivo"]').classList.add('active');
   payMethod='efectivo';
@@ -1012,6 +1060,12 @@ async function compartirPDF(){
   doc.line(4,y,76,y); y+=4;
 
   // Totales
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  if(t.descMonto > 0){
+    doc.text('Subtotal: '+fmt(t.subtotal), 4, y); y+=4;
+    const descLbl = t.descTipo==='pct' ? 'Descuento ('+t.descPct+'%): -'+fmt(t.descMonto) : 'Descuento: -'+fmt(t.descMonto);
+    doc.text(descLbl, 4, y); y+=4;
+  }
   doc.setFont('helvetica','bold'); doc.setFontSize(10);
   doc.text('Venta: '+fmt(totalVenta), 4, y); y+=4;
   if(saldoAnterior > 0){
@@ -1086,6 +1140,11 @@ function shareWA(){
   });
 
   msg += '━━━━━━━━━━━━━━\n';
+  if(t.descMonto > 0){
+    msg += 'Subtotal: '+fmt(t.subtotal)+'\n';
+    const descLbl = t.descTipo==='pct' ? 'Descuento ('+t.descPct+'%): -'+fmt(t.descMonto) : 'Descuento: -'+fmt(t.descMonto);
+    msg += descLbl+'\n';
+  }
   msg += 'Venta: '+fmt(totalVenta)+'\n';
   if(saldoAnterior > 0){
     msg += 'Saldo anterior: '+fmt(saldoAnterior)+'\n';
