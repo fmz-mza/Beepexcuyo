@@ -168,6 +168,11 @@ input,select,textarea{font-family:inherit;}
 .mora-warn.nivel2{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);}
 .mora-warn-titulo{font-size:13px;font-weight:800;margin-bottom:2px;}
 .mora-warn-sub{font-size:11px;font-weight:500;opacity:.85;}
+.mora-warn-toggle{margin-top:8px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;cursor:pointer;user-select:none;}
+.mora-toggle-chk{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
+.cobrar-saldo-sec{display:none;background:rgba(0,201,167,.06);border:1px solid rgba(0,201,167,.2);border-radius:10px;padding:10px 12px;}
+.cobrar-saldo-sec.show{display:block;}
+.cobrar-saldo-row{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--accent2);}
 
 .pay-methods{display:flex;gap:8px;}
 .pay-method{flex:1;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted2);font-size:12px;font-weight:600;transition:all .15s;}
@@ -332,6 +337,15 @@ input,select,textarea{font-family:inherit;}
           </div>
           <div class="mora-warn" id="moraWarn"></div>
         </div>
+
+        <!-- Cobrar saldo junto con la venta -->
+        <div class="cobrar-saldo-sec" id="cobrarSaldoSec">
+          <div class="cobrar-saldo-row">
+            <span>💳 Saldo a cobrar</span>
+            <span id="cobrarSaldoMonto">$0</span>
+          </div>
+        </div>
+
         <div class="pay-sec">
           <div class="pay-sec-lbl">Método de pago</div>
           <div class="pay-methods">
@@ -358,7 +372,6 @@ input,select,textarea{font-family:inherit;}
           <div class="resumen-box" id="resumenBox"></div>
         </div>
         <button class="confirm-btn" id="confirmBtn" onclick="confirmSale()" disabled>✓ Confirmar venta</button>
-        <button onclick="generarAlertasMora()" style="width:100%;padding:11px;border-radius:10px;background:rgba(239,68,68,.08);color:var(--red);border:1px solid rgba(239,68,68,.2);font-size:12px;font-weight:700;margin-top:8px;letter-spacing:.2px;" id="moraBtnPOS">🔔 Alertar morosos</button>
         <button class="cancel-btn" onclick="cancelOrder()">Cancelar pedido</button>
       </div>
     </div>
@@ -444,6 +457,8 @@ let payMethod = 'efectivo', lastTicket = null;
 let isOnline = navigator.onLine;
 let pendingSync = JSON.parse(localStorage.getItem('pos_pending_sync')||'[]');
 let _lastScanCode = '', _lastScanTime = 0;
+let clienteSaldoPendiente = 0;   // saldo deuda del cliente seleccionado
+let cobrarSaldoJunto = false;    // toggle: cobrar deuda junto con la venta
 
 const fmt = n => '$' + Math.round(n||0).toLocaleString('es-AR');
 const normalizeWA = tel => {
@@ -642,6 +657,21 @@ function getDescMonto(){
   return dt==='pct' ? sub*dv/100 : dv;
 }
 function getTotal(){ return Math.max(0, getSubtotal()-getDescMonto()); }
+function getTotalConSaldo(){ return getTotal() + (cobrarSaldoJunto ? clienteSaldoPendiente : 0); }
+
+function toggleCobrarSaldo(checked){
+  cobrarSaldoJunto=checked;
+  const sec=document.getElementById('cobrarSaldoSec');
+  const montoEl=document.getElementById('cobrarSaldoMonto');
+  if(checked){
+    sec.classList.add('show');
+    montoEl.textContent=fmt(clienteSaldoPendiente);
+  } else {
+    sec.classList.remove('show');
+  }
+  recalcSaldo();
+  updateResumen();
+}
 
 function recalc(){
   const sub=getSubtotal(), desc=getDescMonto(), total=Math.max(0,sub-desc);
@@ -656,24 +686,40 @@ function recalc(){
   document.getElementById('totalRows').innerHTML=html;
   recalcSaldo(); updateConfirmBtn();
 }
+
 function recalcSaldo(){
-  const total=getTotal();
+  const totalFinal=getTotalConSaldo();
   const pagado=payMethod==='cta_cte'?0:(parseFloat(document.getElementById('payAmt').value)||0);
-  const saldo=total-pagado;
+  const diff=totalFinal-pagado;
   const box=document.getElementById('saldoBox');
   if(payMethod==='cta_cte'){
     box.className='saldo-box cta';
-    box.innerHTML='<span>Va a cuenta corriente</span><span>'+fmt(total)+'</span>';
+    box.innerHTML='<span>Va a cuenta corriente</span><span>'+fmt(getTotal())+'</span>';
   } else if(pagado>0){
-    box.className='saldo-box '+(saldo>0?'cta':'ok');
-    box.innerHTML=saldo>0
-      ?'<span>Saldo cta cte</span><span>'+fmt(saldo)+'</span>'
-      :'<span>Vuelto</span><span>'+fmt(Math.abs(saldo))+'</span>';
+    box.className='saldo-box '+(diff>0?'cta':'ok');
+    box.innerHTML=diff>0
+      ?'<span>Queda a cta cte</span><span>'+fmt(diff)+'</span>'
+      :'<span>Vuelto</span><span>'+fmt(Math.abs(diff))+'</span>';
   } else {
     box.className='saldo-box hidden';
   }
   updateConfirmBtn();
 }
+
+function updateResumen(){
+  const sub=getSubtotal(),desc=getDescMonto(),totalVenta=Math.max(0,sub-desc);
+  const items=cart.reduce((s,c)=>s+(c.qty||0),0);
+  let html='<div class="res-row"><span>Productos</span><span>'+items+' items</span></div>';
+  html+='<div class="res-row"><span>Subtotal</span><span>'+fmt(sub)+'</span></div>';
+  if(desc>0) html+='<div class="res-row"><span>Descuento</span><span style="color:var(--accent2)">−'+fmt(desc)+'</span></div>';
+  html+='<div class="res-row"><span>Venta</span><span>'+fmt(totalVenta)+'</span></div>';
+  if(cobrarSaldoJunto && clienteSaldoPendiente>0){
+    html+='<div class="res-row" style="color:var(--accent2)"><span>Saldo cta cte</span><span>'+fmt(clienteSaldoPendiente)+'</span></div>';
+  }
+  html+='<div class="res-row big"><span>TOTAL</span><span>'+fmt(getTotalConSaldo())+'</span></div>';
+  document.getElementById('resumenBox').innerHTML=html;
+}
+
 function updateBadge(){
   const count=cart.reduce((s,c)=>s+(c.qty||0),0);
   const b=document.getElementById('cartBadge');
@@ -683,15 +729,6 @@ function updateBadge(){
 function updateConfirmBtn(){
   const ok=cart.length>0 && document.getElementById('clientSel').value!=='';
   document.getElementById('confirmBtn').disabled=!ok;
-}
-function updateResumen(){
-  const sub=getSubtotal(),desc=getDescMonto(),total=Math.max(0,sub-desc);
-  const items=cart.reduce((s,c)=>s+(c.qty||0),0);
-  let html='<div class="res-row"><span>Productos</span><span>'+items+' items</span></div>';
-  html+='<div class="res-row"><span>Subtotal</span><span>'+fmt(sub)+'</span></div>';
-  if(desc>0) html+='<div class="res-row"><span>Descuento</span><span style="color:var(--accent2)">−'+fmt(desc)+'</span></div>';
-  html+='<div class="res-row big"><span>TOTAL</span><span>'+fmt(total)+'</span></div>';
-  document.getElementById('resumenBox').innerHTML=html;
 }
 
 /* CLIENTES */
@@ -710,15 +747,20 @@ async function onClientChange(){
   const warn=document.getElementById('moraWarn');
   warn.classList.remove('show','nivel1','nivel2');
   warn.innerHTML='';
-  if(!id){updateConfirmBtn();return;}
+  clienteSaldoPendiente=0;
+  cobrarSaldoJunto=false;
+  document.getElementById('cobrarSaldoSec').classList.remove('show');
+  if(!id){updateConfirmBtn();updateResumen();return;}
 
   try{
-    // 1. Saldo del cliente desde account_movements
+    // 1. Saldo desde account_movements
     const {data:movs}=await _sb.from('account_movements')
       .select('monto').eq('client_id',id);
     const saldo=(movs||[]).reduce((s,m)=>s+(m.monto||0),0);
 
-    if(saldo<=0){updateConfirmBtn();return;}
+    if(saldo<=0){updateConfirmBtn();updateResumen();return;}
+
+    clienteSaldoPendiente=saldo;
 
     // 2. Último pago para calcular días
     const {data:ultimoPagoRow}=await _sb.from('payments')
@@ -730,26 +772,30 @@ async function onClientChange(){
       dias=Math.floor((ahora-new Date(ultimoPagoRow.fecha))/(1000*60*60*24));
     }
 
-    // 3. Decidir nivel de aviso
-    const enMora = dias===null || dias>=30;
+    const enMora=dias===null||dias>=30;
 
     if(enMora){
-      // Nivel 2 — mora vencida
       warn.className='mora-warn nivel2 show';
-      const diasTexto = dias===null ? 'sin pagos registrados' : `vencido hace ${dias} días`;
+      const diasTexto=dias===null?'sin pagos registrados':`vencido hace ${dias} días`;
       warn.innerHTML=`<div class="mora-warn-titulo">🔴 Cliente en mora</div>
-        <div class="mora-warn-sub">Debe ${fmt(saldo)} · ${diasTexto}</div>`;
+        <div class="mora-warn-sub">Debe ${fmt(saldo)} · ${diasTexto}</div>
+        <label class="mora-warn-toggle">
+          <input type="checkbox" class="mora-toggle-chk" id="cobrarSaldoChk" onchange="toggleCobrarSaldo(this.checked)">
+          Cobrar saldo junto con esta venta
+        </label>`;
     } else {
-      // Nivel 1 — deuda vigente
-      const diasRestantes = 30-dias;
+      const diasRestantes=30-dias;
       warn.className='mora-warn nivel1 show';
       warn.innerHTML=`<div class="mora-warn-titulo">💛 Cliente con deuda vigente</div>
-        <div class="mora-warn-sub">Debe ${fmt(saldo)} · vence en ${diasRestantes} día${diasRestantes!==1?'s':''}</div>`;
+        <div class="mora-warn-sub">Debe ${fmt(saldo)} · vence en ${diasRestantes} día${diasRestantes!==1?'s':''}</div>
+        <label class="mora-warn-toggle">
+          <input type="checkbox" class="mora-toggle-chk" id="cobrarSaldoChk" onchange="toggleCobrarSaldo(this.checked)">
+          Cobrar saldo junto con esta venta
+        </label>`;
     }
-  }catch(e){
-    // Si falla la consulta, silencio — no bloqueamos la venta
-  }
+  }catch(e){ /* silencio */ }
   updateConfirmBtn();
+  updateResumen();
 }
 function openNewClient(){document.getElementById('newClBg').classList.add('open');}
 function closeNewClient(){document.getElementById('newClBg').classList.remove('open');}
@@ -784,11 +830,20 @@ async function confirmSale(){
   const clientId=document.getElementById('clientSel').value;
   if(!clientId||!cart.length) return;
   const subtotal=getSubtotal(), desc=getDescMonto(), total=getTotal();
+  const totalFinal=getTotalConSaldo();
   const dv=parseFloat(document.getElementById('discVal').value)||0;
   const dt=document.getElementById('discType').value;
-  const pagado=payMethod==='cta_cte'?0:Math.min(parseFloat(document.getElementById('payAmt').value)||total,total);
+  const montoRecibido=payMethod==='cta_cte'?0:(parseFloat(document.getElementById('payAmt').value)||0);
+
+  // Cuánto va a la venta actual vs al saldo pendiente
+  const pagadoVenta = payMethod==='cta_cte' ? 0 : Math.min(montoRecibido, total);
+  const pagadoSaldo = cobrarSaldoJunto && montoRecibido > total
+    ? Math.min(montoRecibido - total, clienteSaldoPendiente)
+    : 0;
+
   const btn=document.getElementById('confirmBtn');
   btn.disabled=true; btn.textContent='Procesando...';
+
   const orderData={
     client_id:clientId, vendedor_id:currentUser.id,
     subtotal, descuento_monto:desc||null,
@@ -802,21 +857,39 @@ async function confirmSale(){
     motivo_precio:c.motivoPrecio||null,
     cantidad:c.qty, subtotal:(c.precioFinal||0)*c.qty
   }));
+
   if(!isOnline){
-    pendingSync.push({orderData,items,pagado,payMethod,ts:Date.now()});
+    pendingSync.push({orderData,items,pagado:pagadoVenta,payMethod,ts:Date.now()});
     localStorage.setItem('pos_pending_sync',JSON.stringify(pendingSync));
-    showSuccess('OFFLINE',total,pagado); resetSale(); return;
+    showSuccess('OFFLINE',totalFinal,montoRecibido); resetSale(); return;
   }
+
   try{
+    // 1. Crear la orden
     const {data:order,error:oErr}=await _sb.from('pos_orders').insert(orderData).select().single();
     if(oErr) throw oErr;
+
+    // 2. Items
     await _sb.from('order_items').insert(items.map(i=>({...i,order_id:order.id})));
-    if(pagado>0){
-      const {data:pay}=await _sb.from('payments').insert({client_id:clientId,monto:pagado,tipo:payMethod}).select().single();
-      if(pay) await _sb.from('payment_allocations').insert({payment_id:pay.id,order_id:order.id,monto_aplicado:pagado});
+
+    // 3. Pago de la venta actual
+    if(pagadoVenta>0){
+      const {data:pay}=await _sb.from('payments')
+        .insert({client_id:clientId,monto:pagadoVenta,tipo:payMethod,nota:'Pago venta #'+order.ticket_display})
+        .select().single();
+      if(pay) await _sb.from('payment_allocations')
+        .insert({payment_id:pay.id,order_id:order.id,monto_aplicado:pagadoVenta});
     }
-    lastTicket={order,items,clientId,total,pagado,payMethod};
-    showSuccess(order.ticket_display,total,pagado); resetSale();
+
+    // 4. Pago parcial/total del saldo pendiente (si cobrarSaldoJunto)
+    if(cobrarSaldoJunto && pagadoSaldo>0){
+      await _sb.from('payments')
+        .insert({client_id:clientId,monto:pagadoSaldo,tipo:payMethod,nota:'Abono saldo cta cte junto venta #'+order.ticket_display});
+    }
+
+    lastTicket={order,items,clientId,total:totalFinal,pagado:montoRecibido,payMethod,saldoCobrado:pagadoSaldo};
+    showSuccess(order.ticket_display,totalFinal,montoRecibido);
+    resetSale();
   }catch(err){
     showToast('Error: '+(err.message||err),'err');
     btn.disabled=false; btn.textContent='✓ Confirmar venta';
@@ -835,10 +908,15 @@ function resetSale(){
     if(pb){pb.style.display='none';pb.textContent='';}
   });
   cart=[];
+  clienteSaldoPendiente=0;
+  cobrarSaldoJunto=false;
   document.getElementById('discVal').value='';
   document.getElementById('payAmt').value='';
   document.getElementById('clientSel').value='';
-  document.getElementById('moraWarn').classList.remove('show');
+  const warn=document.getElementById('moraWarn');
+  warn.classList.remove('show','nivel1','nivel2');
+  warn.innerHTML='';
+  document.getElementById('cobrarSaldoSec').classList.remove('show');
   document.querySelectorAll('.pay-method').forEach(b=>b.classList.remove('active'));
   document.querySelector('[data-type="efectivo"]').classList.add('active');
   payMethod='efectivo';
