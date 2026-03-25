@@ -2832,11 +2832,13 @@ function updateSaldoBadge(saldo, dias){
   const el=document.getElementById('userSaldo');
   if(!el) return;
   if(saldo<=0){ el.style.display='none'; el.textContent=''; return; }
-  const mora=dias===null||dias>=30;
+  // dias===null → sin pagos registrados → pendiente (amarillo, no mora)
+  // mora solo si hay pagos y el último tiene más de 30 días
+  const mora=dias!==null&&dias>=30;
   const fmtSaldo='$'+Math.round(saldo).toLocaleString('es-AR');
   el.style.display='block';
   el.className='user-saldo '+(mora?'mora':'vigente');
-  el.textContent=mora?'Deuda vencida: '+fmtSaldo:'Saldo: '+fmtSaldo;
+  el.textContent=mora?'Deuda vencida: '+fmtSaldo:'Saldo pendiente: '+fmtSaldo;
 }
 
 function updateAuthUI(){
