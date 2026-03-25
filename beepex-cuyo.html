@@ -28,6 +28,10 @@
   .logo-text p{font-size:9px;color:var(--muted);white-space:nowrap;line-height:1.3;overflow:hidden;text-overflow:ellipsis;}
   .logo-text .user-badge{display:none;font-size:10px;font-weight:700;color:var(--accent2);white-space:nowrap;cursor:pointer;padding:2px 7px;border-radius:6px;background:var(--card);border:1px solid var(--border);margin-top:3px;width:fit-content;}
   .logo-text .user-badge:hover{border-color:var(--accent);}
+  .user-saldo{display:none;font-size:9px;font-weight:700;white-space:nowrap;margin-top:2px;cursor:pointer;}
+  .user-saldo.vigente{color:var(--accent2);}
+  .user-saldo.mora{color:var(--red);animation:pulse-saldo 2s infinite;}
+  @keyframes pulse-saldo{0%,100%{opacity:1}50%{opacity:.6}}
   .header-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0;}
   .iva-toggle{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:600;transition:all .2s;white-space:nowrap;user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .iva-toggle:active{transform:scale(.95);}
@@ -567,6 +571,7 @@ let userSalePrices={}; // {sku: price}
       <p id="catalogMonth">Marzo 2026</p>
       <div style="position:relative;">
         <button class="user-badge" id="userBadge" onclick="toggleUserMenu()" style="display:none"></button>
+        <div class="user-saldo" id="userSaldo" onclick="toggleUserMenu()"></div>
         <button class="login-chip" id="loginChip" onclick="openWelcomeLogin()">Iniciar sesión →</button>
         <div class="user-menu" id="userMenu"></div>
       </div>
@@ -2626,6 +2631,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 // ══════════════════════════════════════════════════════════════════════════════
 let authTab='login'; // 'login' | 'register'
 let authPending=null; // función a ejecutar tras login exitoso
+let userClientId=null; // client_id vinculado al profile del usuario logueado
 
 // Refrescar token antes de que expire
 async function refreshSession(){
@@ -2767,12 +2773,66 @@ async function loadProfile(){
   if(userApproved){
     updatePresence();
     await loadSalePrices();
+    // Obtener client_id vinculado para saldo en header
+    loadUserClientId();
     if(saleMode){
       // Precios cargados — destruir cards y re-renderizar con precios de venta
       document.querySelectorAll('#grid .card').forEach(el=>el.remove());
       renderGrid();
     }
   }
+}
+
+async function loadUserClientId(){
+  if(!currentUser) return;
+  const token=localStorage.getItem('sb_access_token');
+  try{
+    const res=await fetch(
+      `${SUPABASE_URL}/rest/v1/clients?profile_id=eq.${currentUser.id}&select=id`,
+      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+    );
+    const rows=await res.json();
+    userClientId=Array.isArray(rows)&&rows[0]?rows[0].id:null;
+    if(userClientId) loadUserSaldo();
+  }catch(e){ userClientId=null; }
+}
+
+async function loadUserSaldo(){
+  if(!userClientId) return;
+  const token=localStorage.getItem('sb_access_token');
+  try{
+    // Saldo desde account_movements
+    const res=await fetch(
+      `${SUPABASE_URL}/rest/v1/account_movements?client_id=eq.${userClientId}&select=monto`,
+      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+    );
+    const movs=await res.json();
+    const saldo=Array.isArray(movs)?movs.reduce((s,m)=>s+(m.monto||0),0):0;
+    if(saldo<=0){ updateSaldoBadge(0,null); return; }
+
+    // Último pago para calcular días
+    const resP=await fetch(
+      `${SUPABASE_URL}/rest/v1/payments?client_id=eq.${userClientId}&select=fecha&order=fecha.desc&limit=1`,
+      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+    );
+    const pagos=await resP.json();
+    let dias=null;
+    if(Array.isArray(pagos)&&pagos[0]?.fecha){
+      dias=Math.floor((Date.now()-new Date(pagos[0].fecha))/(1000*60*60*24));
+    }
+    updateSaldoBadge(saldo, dias);
+  }catch(e){ updateSaldoBadge(0,null); }
+}
+
+function updateSaldoBadge(saldo, dias){
+  const el=document.getElementById('userSaldo');
+  if(!el) return;
+  if(saldo<=0){ el.style.display='none'; el.textContent=''; return; }
+  const mora=dias===null||dias>=30;
+  const fmtSaldo='$'+Math.round(saldo).toLocaleString('es-AR');
+  el.style.display='block';
+  el.className='user-saldo '+(mora?'mora':'vigente');
+  el.textContent=mora?'Deuda vencida: '+fmtSaldo:'Saldo: '+fmtSaldo;
 }
 
 function updateAuthUI(){
@@ -3538,7 +3598,8 @@ async function submitAuth(){
 async function signOut(){
   localStorage.removeItem('sb_access_token');
   localStorage.removeItem('sb_refresh_token');
-  currentUser=null; userApproved=false; isAdmin=false;
+  currentUser=null; userApproved=false; isAdmin=false; userClientId=null;
+  updateSaldoBadge(0,null);
   updateAuthUI();
   renderGrid();
   showToast('👋 Sesión cerrada');
