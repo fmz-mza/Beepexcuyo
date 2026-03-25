@@ -429,7 +429,7 @@ input,select,textarea{font-family:inherit;}
     <div class="suc-ticket" id="sucTicket">#000001</div>
     <div class="suc-sub" id="sucSub"></div>
     <div class="suc-actions">
-      <button class="suc-btn primary" onclick="downloadPDF()">📄 Descargar ticket PDF</button>
+      <button class="suc-btn primary" onclick="compartirPDF()">📤 Compartir Ticket PDF</button>
       <button class="suc-btn wa" onclick="shareWA()">📲 Compartir por WhatsApp</button>
       <button class="suc-btn sec" onclick="newSale()">➕ Nueva venta</button>
     </div>
@@ -887,8 +887,17 @@ async function confirmSale(){
         .insert({client_id:clientId,monto:pagadoSaldo,tipo:payMethod,nota:'Abono saldo cta cte junto venta #'+order.ticket_display});
     }
 
-    lastTicket={order,items,clientId,total:totalFinal,pagado:montoRecibido,payMethod,saldoCobrado:pagadoSaldo};
-    showSuccess(order.ticket_display,totalFinal,montoRecibido);
+    lastTicket={
+      order, items, clientId,
+      totalVenta: total,           // solo la venta
+      total: totalFinal,           // venta + saldo cobrado
+      pagado: montoRecibido,
+      payMethod,
+      saldoCobrado: pagadoSaldo,
+      saldoAnterior: cobrarSaldoJunto ? clienteSaldoPendiente : 0,
+      saldoRestante: cobrarSaldoJunto ? Math.max(0, clienteSaldoPendiente - pagadoSaldo) : 0
+    };
+    showSuccess(order.ticket_display, totalFinal, montoRecibido);
     resetSale();
   }catch(err){
     showToast('Error: '+(err.message||err),'err');
@@ -926,75 +935,184 @@ function resetSale(){
 }
 
 /* SUCCESS */
-function showSuccess(ticket,total,pagado){
-  const saldo=total-pagado;
-  document.getElementById('sucTicket').textContent='#'+ticket;
-  let sub='Total: '+fmt(total);
-  if(payMethod==='cta_cte') sub+=' · Cta cte';
-  else if(saldo>0) sub+=' · Saldo cta cte: '+fmt(saldo);
-  else sub+=' · Pagado ✓';
-  document.getElementById('sucSub').textContent=sub;
+function showSuccess(ticket, total, pagado){
+  document.getElementById('sucTicket').textContent = '#'+ticket;
+  const t = lastTicket;
+  let lines = [];
+
+  if(t?.saldoAnterior > 0){
+    lines.push('Venta: '+fmt(t.totalVenta));
+    lines.push('Saldo anterior: '+fmt(t.saldoAnterior));
+    lines.push('Total cobrado: '+fmt(total));
+    if(pagado > 0 && t.payMethod !== 'cta_cte'){
+      lines.push('Recibido: '+fmt(pagado));
+      if(t.saldoRestante > 0)
+        lines.push('Queda a cta cte: '+fmt(t.saldoRestante));
+      else if(pagado > total)
+        lines.push('Vuelto: '+fmt(pagado - total));
+      else
+        lines.push('Cuenta cancelada ✓');
+    }
+  } else {
+    // flujo normal sin saldo
+    const diff = total - pagado;
+    if(t?.payMethod === 'cta_cte') lines.push('Total a cta cte: '+fmt(total));
+    else if(pagado > 0){
+      lines.push('Total: '+fmt(total));
+      lines.push('Recibido: '+fmt(pagado));
+      if(diff > 0) lines.push('Queda a cta cte: '+fmt(diff));
+      else if(diff < 0) lines.push('Vuelto: '+fmt(Math.abs(diff)));
+      else lines.push('Pagado ✓');
+    } else {
+      lines.push('Total: '+fmt(total));
+    }
+  }
+
+  document.getElementById('sucSub').innerHTML = lines.join('<br>');
   document.getElementById('successBg').classList.add('open');
 }
 function newSale(){document.getElementById('successBg').classList.remove('open');lastTicket=null;}
 
-async function downloadPDF(){
-  if(!lastTicket) return;
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({unit:'mm',format:[80,200]});
-  const {order,items,total,pagado}=lastTicket;
-  const client=clients.find(c=>c.id===lastTicket.clientId);
-  let y=8;
-  doc.setFont('helvetica','bold');doc.setFontSize(13);
-  doc.text('BEEPEX CUYO',40,y,{align:'center'});y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(9);
-  doc.text('Punto de Venta',40,y,{align:'center'});y+=4;
-  doc.setLineWidth(.3);doc.line(4,y,76,y);y+=4;
-  doc.setFont('helvetica','bold');
-  doc.text('Ticket #'+order.ticket_display,4,y);y+=4;
-  doc.setFont('helvetica','normal');
-  doc.text(new Date(order.fecha).toLocaleString('es-AR'),4,y);y+=4;
-  if(client){doc.text('Cliente: '+client.nombre,4,y);y+=4;}
-  doc.line(4,y,76,y);y+=4;
-  items.forEach(i=>{
-    const p=i.precio_modificado??i.precio_unitario;
-    doc.setFontSize(8);
-    const nm=i.nombre.length>30?i.nombre.slice(0,30)+'…':i.nombre;
-    doc.text(nm,4,y);y+=3.5;
-    doc.text('  '+i.cantidad+' x '+fmt(p)+' = '+fmt(p*i.cantidad),4,y);y+=4;
-  });
-  doc.line(4,y,76,y);y+=4;
-  doc.setFont('helvetica','bold');doc.setFontSize(11);
-  doc.text('TOTAL: '+fmt(total),4,y);y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(9);
-  const ml={efectivo:'Efectivo',transferencia:'Transferencia',cta_cte:'Cuenta Corriente'};
-  doc.text('Método: '+(ml[lastTicket.payMethod]||lastTicket.payMethod),4,y);y+=4;
-  if(pagado>0&&lastTicket.payMethod!=='cta_cte'){
-    doc.text('Pagado: '+fmt(pagado),4,y);y+=4;
-    const s=total-pagado;
-    if(s>0){doc.text('Saldo cta cte: '+fmt(s),4,y);y+=4;}
-  }
-  y+=2;doc.line(4,y,76,y);y+=4;
-  doc.setFontSize(8);doc.text('🐾 Beepex Cuyo · ¡Gracias!',40,y,{align:'center'});
-  doc.save('ticket-'+order.ticket_display+'.pdf');
+function buildTicketLines(){
+  // Helper compartido por PDF y WA
+  const t = lastTicket;
+  const client = clients.find(c=>c.id===t.clientId);
+  const ml = {efectivo:'Efectivo', transferencia:'Transferencia', cta_cte:'Cuenta Corriente'};
+  return { t, client, ml };
 }
+
+async function compartirPDF(){
+  if(!lastTicket) return;
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({unit:'mm', format:[80,200]});
+  const {t, client, ml} = buildTicketLines();
+  const {order, items, totalVenta, total, pagado, saldoAnterior, saldoRestante} = t;
+  let y = 8;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('BEEPEX CUYO', 40, y, {align:'center'}); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text('Punto de Venta', 40, y, {align:'center'}); y+=4;
+  doc.setLineWidth(.3); doc.line(4,y,76,y); y+=4;
+  doc.setFont('helvetica','bold');
+  doc.text('Ticket #'+order.ticket_display, 4, y); y+=4;
+  doc.setFont('helvetica','normal');
+  doc.text(new Date(order.fecha).toLocaleString('es-AR'), 4, y); y+=4;
+  if(client){ doc.text('Cliente: '+client.nombre, 4, y); y+=4; }
+  doc.line(4,y,76,y); y+=4;
+
+  // Items
+  items.forEach(i=>{
+    const p = i.precio_modificado ?? i.precio_unitario;
+    doc.setFontSize(8);
+    const nm = i.nombre.length>30 ? i.nombre.slice(0,30)+'…' : i.nombre;
+    doc.text(nm, 4, y); y+=3.5;
+    doc.text('  '+i.cantidad+' x '+fmt(p)+' = '+fmt(p*i.cantidad), 4, y); y+=4;
+  });
+  doc.line(4,y,76,y); y+=4;
+
+  // Totales
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text('Venta: '+fmt(totalVenta), 4, y); y+=4;
+  if(saldoAnterior > 0){
+    doc.text('Saldo anterior: '+fmt(saldoAnterior), 4, y); y+=4;
+    doc.setFontSize(11);
+    doc.text('TOTAL COBRADO: '+fmt(total), 4, y); y+=5;
+  } else {
+    doc.setFontSize(11);
+    doc.text('TOTAL: '+fmt(total), 4, y); y+=5;
+  }
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text('Método: '+(ml[t.payMethod]||t.payMethod), 4, y); y+=4;
+  if(pagado > 0 && t.payMethod !== 'cta_cte'){
+    doc.text('Recibido: '+fmt(pagado), 4, y); y+=4;
+    if(saldoAnterior > 0){
+      if(saldoRestante > 0){
+        doc.text('Saldo restante cta cte: '+fmt(saldoRestante), 4, y); y+=4;
+      } else {
+        doc.setFont('helvetica','bold');
+        doc.text('Cuenta cancelada ✓', 4, y); y+=4;
+        doc.setFont('helvetica','normal');
+      }
+    } else {
+      const diff = total - pagado;
+      if(diff > 0){ doc.text('Queda a cta cte: '+fmt(diff), 4, y); y+=4; }
+      else if(diff < 0){ doc.text('Vuelto: '+fmt(Math.abs(diff)), 4, y); y+=4; }
+    }
+  } else if(t.payMethod === 'cta_cte'){
+    doc.text('Total a cta cte: '+fmt(totalVenta), 4, y); y+=4;
+  }
+
+  y+=2; doc.line(4,y,76,y); y+=4;
+  doc.setFontSize(8);
+  doc.text('Beepex Cuyo - Gracias!', 40, y, {align:'center'});
+
+  const filename = 'ticket-'+order.ticket_display+'.pdf';
+
+  // navigator.share con archivo (mobile) — fallback a descarga
+  if(navigator.canShare){
+    try{
+      const blob = doc.output('blob');
+      const file = new File([blob], filename, {type:'application/pdf'});
+      if(navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title:'Ticket #'+order.ticket_display});
+        return;
+      }
+    }catch(e){
+      if(e.name !== 'AbortError') console.warn('share failed:', e);
+      // AbortError = usuario canceló — no hacer fallback
+      return;
+    }
+  }
+  // Fallback: descarga directa
+  doc.save(filename);
+}
+
 function shareWA(){
   if(!lastTicket) return;
-  const {order,items,total,pagado}=lastTicket;
-  const client=clients.find(c=>c.id===lastTicket.clientId);
-  const saldo=total-pagado;
-  let msg='🐾 *BEEPEX CUYO*\nTicket #'+order.ticket_display+'\n';
-  msg+='📅 '+new Date(order.fecha).toLocaleDateString('es-AR')+'\n';
-  if(client) msg+='👤 '+client.nombre+'\n';
-  msg+='━━━━━━━━━━━━━━\n';
+  const {t, client, ml} = buildTicketLines();
+  const {order, items, totalVenta, total, pagado, saldoAnterior, saldoRestante} = t;
+
+  let msg = '🐾 *BEEPEX CUYO*\n';
+  msg += 'Ticket #'+order.ticket_display+'\n';
+  msg += '📅 '+new Date(order.fecha).toLocaleDateString('es-AR')+'\n';
+  if(client) msg += '👤 '+client.nombre+'\n';
+  msg += '━━━━━━━━━━━━━━\n';
+
   items.forEach(i=>{
-    const p=i.precio_modificado??i.precio_unitario;
-    msg+='• '+i.nombre+'\n  '+i.cantidad+' × '+fmt(p)+' = '+fmt(p*i.cantidad)+'\n';
+    const p = i.precio_modificado ?? i.precio_unitario;
+    msg += '• '+i.nombre+'\n  '+i.cantidad+' × '+fmt(p)+' = '+fmt(p*i.cantidad)+'\n';
   });
-  msg+='━━━━━━━━━━━━━━\n*TOTAL: '+fmt(total)+'*\n';
-  if(saldo>0) msg+='Saldo cta cte: '+fmt(saldo);
-  const wa=client?.telefono_wa||WA_NUMBER;
-  window.open('https://wa.me/'+wa+'?text='+encodeURIComponent(msg),'_blank');
+
+  msg += '━━━━━━━━━━━━━━\n';
+  msg += 'Venta: '+fmt(totalVenta)+'\n';
+  if(saldoAnterior > 0){
+    msg += 'Saldo anterior: '+fmt(saldoAnterior)+'\n';
+    msg += '*TOTAL COBRADO: '+fmt(total)+'*\n';
+  } else {
+    msg += '*TOTAL: '+fmt(total)+'*\n';
+  }
+  msg += 'Método: '+(ml[t.payMethod]||t.payMethod)+'\n';
+  if(pagado > 0 && t.payMethod !== 'cta_cte'){
+    msg += 'Recibido: '+fmt(pagado)+'\n';
+    if(saldoAnterior > 0){
+      if(saldoRestante > 0)
+        msg += '⚠️ Saldo restante cta cte: '+fmt(saldoRestante)+'\n';
+      else
+        msg += '✅ Cuenta cancelada\n';
+    } else {
+      const diff = total - pagado;
+      if(diff > 0) msg += 'Queda a cta cte: '+fmt(diff)+'\n';
+      else if(diff < 0) msg += 'Vuelto: '+fmt(Math.abs(diff))+'\n';
+    }
+  } else if(t.payMethod === 'cta_cte'){
+    msg += 'Total a cta cte: '+fmt(totalVenta)+'\n';
+  }
+
+  const wa = client?.telefono_wa || WA_NUMBER;
+  // location.href — no abre ventana nueva, WhatsApp app en mobile
+  window.location.href = 'https://wa.me/'+wa+'?text='+encodeURIComponent(msg);
 }
 
 /* SCANNER */
