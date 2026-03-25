@@ -3499,7 +3499,7 @@ async function loadMcMovimientos(){
   try{
     // Compras POS
     const [resOrd, resPag] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${userClientId}&select=id,created_at,total,status&order=created_at.desc&limit=30`,
+      fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${userClientId}&select=id,fecha,created_at,total,estado,ticket_display&order=created_at.desc&limit=30`,
         {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}),
       fetch(`${SUPABASE_URL}/rest/v1/payments?client_id=eq.${userClientId}&select=id,fecha,monto,metodo,notas&order=fecha.desc&limit=30`,
         {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}})
@@ -3510,8 +3510,8 @@ async function loadMcMovimientos(){
     // Combinar y ordenar cronológico descendente
     const movs=[
       ...(Array.isArray(orders)?orders:[]).map(o=>({
-        tipo:'compra', fecha:o.created_at, id:o.id,
-        monto:o.total||0, status:o.status
+        tipo:'compra', fecha:o.fecha||o.created_at, id:o.id,
+        monto:o.total||0, estado:o.estado, ticket:o.ticket_display
       })),
       ...(Array.isArray(pagos)?pagos:[]).map(p=>({
         tipo:'pago', fecha:p.fecha, id:p.id,
@@ -3532,7 +3532,7 @@ async function loadMcMovimientos(){
         if(m.tipo==='compra'){
           return `<div class="mc-mov">
             <div class="mc-mov-header">
-              <span class="mc-mov-tipo compra">🛒 Compra</span>
+              <span class="mc-mov-tipo compra">🛒 Compra${m.ticket?' #'+m.ticket:''}</span>
               <span class="mc-mov-fecha">${fecha} ${hora}</span>
             </div>
             <div class="mc-mov-monto compra">${fmtMonto}</div>
@@ -3567,7 +3567,7 @@ async function openMcDetalle(orderId, fecha, total){
   overlay.classList.add('open');
   try{
     const res=await fetch(
-      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=product_name,qty,unit_price`,
+      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=nombre,cantidad,precio_unitario,precio_modificado`,
       {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
     );
     const items=await res.json();
@@ -3576,12 +3576,14 @@ async function openMcDetalle(orderId, fecha, total){
       return;
     }
     body.innerHTML=
-      items.map(i=>`
-        <div class="mc-detail-row">
-          <span class="mc-detail-name">${i.product_name||'Producto'}</span>
-          <span class="mc-detail-qty">${i.qty}×</span>
-          <span class="mc-detail-subtotal">$${Math.round((i.unit_price||0)*i.qty).toLocaleString('es-AR')}</span>
-        </div>`).join('')+
+      items.map(i=>{
+        const p=i.precio_modificado??i.precio_unitario;
+        return `<div class="mc-detail-row">
+          <span class="mc-detail-name">${i.nombre||'Producto'}</span>
+          <span class="mc-detail-qty">${i.cantidad}×</span>
+          <span class="mc-detail-subtotal">$${Math.round((p||0)*i.cantidad).toLocaleString('es-AR')}</span>
+        </div>`;
+      }).join('')+
       `<div class="mc-detail-total-row">
         <span>Total</span>
         <span>$${Math.round(total).toLocaleString('es-AR')}</span>
