@@ -3504,7 +3504,7 @@ async function loadMcMovimientos(clientId){
     const [resOrd, resPag] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${clientId}&select=id,fecha,created_at,total,estado,ticket_display&order=created_at.desc&limit=30`,
         {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}),
-      fetch(`${SUPABASE_URL}/rest/v1/payments?client_id=eq.${clientId}&select=id,fecha,monto,metodo,notas&order=fecha.desc&limit=30`,
+      fetch(`${SUPABASE_URL}/rest/v1/payments?client_id=eq.${clientId}&select=id,fecha,monto,tipo,nota&order=fecha.desc&limit=30`,
         {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}})
     ]);
     const orders=await resOrd.json();
@@ -3518,7 +3518,7 @@ async function loadMcMovimientos(clientId){
       })),
       ...(Array.isArray(pagos)?pagos:[]).map(p=>({
         tipo:'pago', fecha:p.fecha, id:p.id,
-        monto:p.monto||0, metodo:p.metodo, notas:p.notas
+        monto:p.monto||0, metodo:p.tipo, notas:p.nota
       }))
     ].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
 
