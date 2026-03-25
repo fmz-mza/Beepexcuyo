@@ -743,8 +743,13 @@ function updateBadge(){
   b.classList.toggle('hidden',count===0);
 }
 function updateConfirmBtn(){
-  const ok=cart.length>0 && document.getElementById('clientSel').value!=='';
-  document.getElementById('confirmBtn').disabled=!ok;
+  const clientId=document.getElementById('clientSel').value;
+  const tieneVenta=cart.length>0;
+  const tieneSoloPago=clientId && cobrarSaldoJunto && clienteSaldoPendiente>0 && payMethod!=='cta_cte';
+  const ok=clientId && (tieneVenta || tieneSoloPago);
+  const btn=document.getElementById('confirmBtn');
+  btn.disabled=!ok;
+  btn.textContent=tieneVenta?'✓ Confirmar venta':'💳 Confirmar pago';
 }
 
 /* CLIENTES */
@@ -868,9 +873,51 @@ function setPayMethod(btn){
 }
 
 /* CONFIRMAR */
+async function confirmSoloPago(){
+  // Pago de saldo sin venta — no crea pos_order ni order_items
+  const clientId=document.getElementById('clientSel').value;
+  if(!clientId||!cobrarSaldoJunto||!clienteSaldoPendiente) return;
+  const montoRecibido=parseFloat(document.getElementById('payAmt').value)||0;
+  if(montoRecibido<=0){ showToast('Ingresá el monto recibido','err'); return; }
+  const pagadoSaldo=Math.min(montoRecibido, clienteSaldoPendiente);
+  const saldoRestante=Math.max(0, clienteSaldoPendiente-pagadoSaldo);
+
+  const btn=document.getElementById('confirmBtn');
+  btn.disabled=true; btn.textContent='Procesando...';
+
+  try{
+    const {data:pay,error:pErr}=await _sb.from('payments')
+      .insert({client_id:clientId, monto:pagadoSaldo, tipo:payMethod, nota:'Abono saldo cta cte'})
+      .select().single();
+    if(pErr) throw pErr;
+
+    // lastTicket solo-pago (sin order ni items)
+    const client=clients.find(x=>x.id===clientId);
+    lastTicket={
+      soloPago: true,
+      clientId,
+      payMethod,
+      saldoAnterior: clienteSaldoPendiente,
+      saldoCobrado: pagadoSaldo,
+      saldoRestante,
+      pagado: montoRecibido,
+      totalVenta: 0,
+      total: pagadoSaldo,
+      fecha: new Date().toISOString(),
+      payId: pay?.id
+    };
+    showSuccessSoloPago(pagadoSaldo, montoRecibido, saldoRestante);
+    resetSale();
+  }catch(err){
+    showToast('Error: '+(err.message||err),'err');
+    btn.disabled=false; btn.textContent='💳 Confirmar pago';
+  }
+}
+
 async function confirmSale(){
   const clientId=document.getElementById('clientSel').value;
-  if(!clientId||!cart.length) return;
+  if(!clientId) return;
+  if(!cart.length){ confirmSoloPago(); return; }
   const subtotal=getSubtotal(), desc=getDescMonto(), total=getTotal();
   const totalFinal=getTotalConSaldo();
   const dv=parseFloat(document.getElementById('discVal').value)||0;
@@ -983,6 +1030,18 @@ function resetSale(){
 }
 
 /* SUCCESS */
+function showSuccessSoloPago(pagadoSaldo, montoRecibido, saldoRestante){
+  document.getElementById('sucTicket').textContent = '💳 Pago recibido';
+  const lines = [];
+  lines.push('Saldo abonado: '+fmt(pagadoSaldo));
+  lines.push('Recibido: '+fmt(montoRecibido));
+  if(montoRecibido > pagadoSaldo) lines.push('Vuelto: '+fmt(montoRecibido - pagadoSaldo));
+  if(saldoRestante > 0) lines.push('Saldo restante: '+fmt(saldoRestante));
+  else lines.push('✅ Cuenta cancelada');
+  document.getElementById('sucSub').innerHTML = lines.join('<br>');
+  document.getElementById('successBg').classList.add('open');
+}
+
 function showSuccess(ticket, total, pagado){
   document.getElementById('sucTicket').textContent = '#'+ticket;
   const t = lastTicket;
@@ -1031,6 +1090,7 @@ function buildTicketLines(){
 
 async function compartirPDF(){
   if(!lastTicket) return;
+  if(lastTicket.soloPago){ compartirPDFSoloPago(); return; }
   const {jsPDF} = window.jspdf;
   const doc = new jsPDF({unit:'mm', format:[80,200]});
   const {t, client, ml} = buildTicketLines();
@@ -1123,8 +1183,60 @@ async function compartirPDF(){
   doc.save(filename);
 }
 
+async function compartirPDFSoloPago(){
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({unit:'mm', format:[80,160]});
+  const t = lastTicket;
+  const client = clients.find(x=>x.id===t.clientId);
+  const ml = {efectivo:'Efectivo', transferencia:'Transferencia', cta_cte:'Cuenta Corriente'};
+  let y = 8;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('BEEPEX CUYO', 40, y, {align:'center'}); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text('Comprobante de Pago', 40, y, {align:'center'}); y+=4;
+  doc.setLineWidth(.3); doc.line(4,y,76,y); y+=4;
+
+  doc.setFont('helvetica','bold');
+  doc.text('PAGO DE CUENTA CORRIENTE', 4, y); y+=4;
+  doc.setFont('helvetica','normal');
+  doc.text(new Date(t.fecha).toLocaleString('es-AR'), 4, y); y+=4;
+  if(client){ doc.text('Cliente: '+client.nombre, 4, y); y+=4; }
+  doc.line(4,y,76,y); y+=4;
+
+  doc.setFontSize(9);
+  doc.text('Saldo anterior: '+fmt(t.saldoAnterior), 4, y); y+=4;
+  doc.text('Abono recibido: '+fmt(t.saldoCobrado), 4, y); y+=4;
+  doc.text('Método: '+(ml[t.payMethod]||t.payMethod), 4, y); y+=4;
+  if(t.pagado > t.saldoCobrado){ doc.text('Recibido: '+fmt(t.pagado), 4, y); y+=4; doc.text('Vuelto: '+fmt(t.pagado - t.saldoCobrado), 4, y); y+=4; }
+  doc.line(4,y,76,y); y+=4;
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  if(t.saldoRestante > 0){
+    doc.text('Saldo restante: '+fmt(t.saldoRestante), 4, y); y+=5;
+  } else {
+    doc.text('CUENTA CANCELADA ✓', 4, y); y+=5;
+  }
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.line(4,y,76,y); y+=4;
+  doc.text('Beepex Cuyo - Gracias!', 40, y, {align:'center'});
+
+  const filename = 'pago-'+(client?.nombre||'cliente').replace(/\s+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.pdf';
+  if(navigator.canShare){
+    try{
+      const blob = doc.output('blob');
+      const file = new File([blob], filename, {type:'application/pdf'});
+      if(navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title:'Comprobante de Pago'});
+        return;
+      }
+    }catch(e){ if(e.name !== 'AbortError') console.warn('share failed:', e); return; }
+  }
+  doc.save(filename);
+}
+
 function shareWA(){
   if(!lastTicket) return;
+  if(lastTicket.soloPago){ shareWASoloPago(); return; }
   const {t, client, ml} = buildTicketLines();
   const {order, items, totalVenta, total, pagado, saldoAnterior, saldoRestante} = t;
 
@@ -1171,6 +1283,30 @@ function shareWA(){
 
   const wa = client?.telefono_wa || WA_NUMBER;
   // location.href — no abre ventana nueva, WhatsApp app en mobile
+  window.location.href = 'https://wa.me/'+wa+'?text='+encodeURIComponent(msg);
+}
+
+function shareWASoloPago(){
+  const t = lastTicket;
+  const client = clients.find(x=>x.id===t.clientId);
+  const ml = {efectivo:'Efectivo', transferencia:'Transferencia', cta_cte:'Cuenta Corriente'};
+
+  let msg = '🐾 *BEEPEX CUYO*\n';
+  msg += 'Comprobante de Pago\n';
+  msg += '📅 '+new Date(t.fecha).toLocaleDateString('es-AR')+'\n';
+  if(client) msg += '👤 '+client.nombre+'\n';
+  msg += '━━━━━━━━━━━━━━\n';
+  msg += 'Saldo anterior: '+fmt(t.saldoAnterior)+'\n';
+  msg += 'Abono recibido: '+fmt(t.saldoCobrado)+'\n';
+  msg += 'Método: '+(ml[t.payMethod]||t.payMethod)+'\n';
+  if(t.pagado > t.saldoCobrado) msg += 'Vuelto: '+fmt(t.pagado - t.saldoCobrado)+'\n';
+  msg += '━━━━━━━━━━━━━━\n';
+  if(t.saldoRestante > 0)
+    msg += '⚠️ Saldo restante: '+fmt(t.saldoRestante)+'\n';
+  else
+    msg += '✅ *Cuenta cancelada*\n';
+
+  const wa = client?.telefono_wa || client?.telefono || WA_NUMBER;
   window.location.href = 'https://wa.me/'+wa+'?text='+encodeURIComponent(msg);
 }
 
