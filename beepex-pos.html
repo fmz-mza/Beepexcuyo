@@ -873,6 +873,28 @@ function setPayMethod(btn){
 }
 
 /* CONFIRMAR */
+// ── Stock Movements ─────────────────────────────────────────────────────────
+async function registrarMovimientosStock(items, orderId, clientId){
+  // Registra un movimiento de tipo 'venta' por cada item
+  // No modifica el campo stock — base para futuro módulo de inventario
+  try{
+    const movs = items.map(i => ({
+      sku:        i.sku,
+      tipo:       'venta',
+      cantidad:   i.cantidad ?? i.qty ?? 1,
+      order_id:   orderId || null,
+      client_id:  clientId || null,
+      vendedor_id:currentUser?.id || null,
+      nota:       'Venta POS' + (orderId ? ' orden '+orderId : '')
+    }));
+    const { error } = await _sb.from('stock_movements').insert(movs);
+    if(error) console.warn('[POS] stock_movements insert error:', error.message);
+  } catch(e){
+    // No cortar el flujo de venta si falla el registro de stock
+    console.warn('[POS] registrarMovimientosStock error:', e.message);
+  }
+}
+
 async function confirmSoloPago(){
   // Pago de saldo sin venta — no crea pos_order ni order_items
   const clientId=document.getElementById('clientSel').value;
@@ -975,6 +997,9 @@ async function confirmSale(){
       await _sb.from('payments')
         .insert({client_id:clientId,monto:pagadoSaldo,tipo:payMethod,nota:'Abono saldo cta cte junto venta #'+order.ticket_display});
     }
+
+    // 5. Registrar movimientos de stock (fire & forget — no bloquea la venta)
+    registrarMovimientosStock(items, order.id, clientId);
 
     lastTicket={
       order, items, clientId,
@@ -1463,6 +1488,8 @@ async function syncPending(){
       const {data:order}=await _sb.from('pos_orders').insert(sale.orderData).select().single();
       if(order){
         await _sb.from('order_items').insert(sale.items.map(i=>({...i,order_id:order.id})));
+        // Registrar movimientos de stock para ventas offline sincronizadas
+        registrarMovimientosStock(sale.items, order.id, sale.orderData.client_id);
         if(sale.pagado>0){
           const {data:pay}=await _sb.from('payments').insert({client_id:sale.orderData.client_id,monto:sale.pagado,tipo:sale.payMethod}).select().single();
           if(pay) await _sb.from('payment_allocations').insert({payment_id:pay.id,order_id:order.id,monto_aplicado:sale.pagado});
