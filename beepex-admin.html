@@ -1217,14 +1217,20 @@ async function loadSettings(){
 let allProducts=[];
 async function loadProducts(){
   try{
-    const res=await fetch('beepex-cuyo.html');
-    const text=await res.text();
-    const match=text.match(/const products=(\[[\s\S]*?\]);/);
-    if(!match) return;
-    allProducts=JSON.parse(match[1]);
+    const token=localStorage.getItem('admin_token');
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/products?select=sku,name,brand,price,pvp,iva,stock&order=brand.asc,name.asc`,{
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    if(!Array.isArray(data)||!data.length) throw new Error('Sin datos');
+    allProducts=data;
     window.allProducts=allProducts;
     renderProducts(allProducts);
-  } catch(e){ document.getElementById('productsList').innerHTML='<div class="empty">Error al cargar productos</div>'; }
+  } catch(e){
+    console.error('[Admin] loadProducts error:', e);
+    document.getElementById('productsList').innerHTML='<div class="empty">Error al cargar productos: '+e.message+'</div>';
+  }
 }
 
 function filterProducts(){
@@ -1246,8 +1252,9 @@ function renderProducts(list){
       <tbody>${list.map(p=>{
         const isDisabled=disabled.has(p.sku);
         return `<tr style="${isDisabled?'opacity:.5':''}">
-          <td style="color:var(--muted)">${p.sku}</td>
+          <td style="color:var(--muted);font-size:11px">${p.sku}</td>
           <td>${p.name}</td>
+          <td style="color:var(--muted);font-size:11px">${p.brand||'—'}</td>
           <td><button class="product-toggle ${isDisabled?'inactive':'active'}" onclick="toggleProduct('${p.sku}')">${isDisabled?'⚫ Inactivo':'🟢 Activo'}</button></td>
         </tr>`;
       }).join('')}</tbody>
