@@ -1246,19 +1246,16 @@ function renderProducts(list){
   const disabled=window._disabledSkus||new Set();
   document.getElementById('disabledCount').textContent=disabled.size>0?`${disabled.size} desactivado${disabled.size!==1?'s':''}`:'' ;
   if(!list.length){ document.getElementById('productsList').innerHTML='<div class="empty">Sin resultados</div>'; return; }
-  document.getElementById('productsList').innerHTML=`
-    <table class="products-table">
-      <thead><tr><th>SKU</th><th>Nombre</th><th>Marca</th><th>Estado</th></tr></thead>
-      <tbody>${list.map(p=>{
-        const isDisabled=disabled.has(p.sku);
-        return `<tr style="${isDisabled?'opacity:.5':''}">
-          <td style="color:var(--muted);font-size:11px">${p.sku}</td>
-          <td>${p.name}</td>
-          <td style="color:var(--muted);font-size:11px">${p.brand||'—'}</td>
-          <td><button class="product-toggle ${isDisabled?'inactive':'active'}" onclick="toggleProduct('${p.sku}')">${isDisabled?'⚫ Inactivo':'🟢 Activo'}</button></td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table>`;
+  document.getElementById('productsList').innerHTML=list.map(p=>{
+    const isDisabled=disabled.has(p.sku);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);opacity:${isDisabled?'.45':'1'}">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:1px">${p.sku}</div>
+      </div>
+      <button class="product-toggle ${isDisabled?'inactive':'active'}" style="flex-shrink:0" onclick="toggleProduct('${p.sku}')">${isDisabled?'⚫ Inactivo':'🟢 Activo'}</button>
+    </div>`;
+  }).join('');
 }
 
 async function toggleProduct(sku){
