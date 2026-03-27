@@ -852,31 +852,53 @@ async function enrichClientSaldos(){
   });
 
   // Traer último pago por cliente
-  const pagosRes = await fetch(`${SUPABASE_URL}/rest/v1/payments?select=client_id,fecha&order=fecha.desc`, {
-    headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
-  });
+  const [pagosRes, ordersRes] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/payments?select=client_id,fecha&order=fecha.desc`, {
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    }),
+    fetch(`${SUPABASE_URL}/rest/v1/pos_orders?select=client_id,fecha&estado=eq.cerrada&order=fecha.asc`, {
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    })
+  ]);
   const pagos = await pagosRes.json();
+  const orders = await ordersRes.json();
+
   const ultimoPago = {};
   if(Array.isArray(pagos)){
     pagos.forEach(p => { if(!ultimoPago[p.client_id]) ultimoPago[p.client_id] = p.fecha; });
+  }
+  // Primera venta cerrada por cliente (para calcular mora cuando no hay pagos)
+  const primeraVenta = {};
+  if(Array.isArray(orders)){
+    orders.forEach(o => { if(!primeraVenta[o.client_id]) primeraVenta[o.client_id] = o.fecha; });
   }
 
   allClientsData = allClientsData.map(c => ({
     ...c,
     saldo: saldos[c.id] || 0,
-    ultimo_pago: ultimoPago[c.id] || null
+    ultimo_pago: ultimoPago[c.id] || null,
+    primera_venta: primeraVenta[c.id] || null
   }));
+}
+
+// Helper: calcular si un cliente está en mora
+// Usa ultimo_pago si existe, sino primera_venta como referencia
+function calcMora(cliente, diasLimite=30){
+  const ahora = new Date();
+  const saldo = cliente.saldo || 0;
+  if(saldo <= 0) return {mora:false, dias:0};
+  const ref = cliente.ultimo_pago
+    ? new Date(cliente.ultimo_pago)
+    : (cliente.primera_venta ? new Date(cliente.primera_venta) : null);
+  if(!ref) return {mora:false, dias:0}; // sin venta ni pago → no es mora aún
+  const dias = Math.floor((ahora - ref) / (1000*60*60*24));
+  return {mora: dias > diasLimite, dias};
 }
 
 function renderCtaCteKPIs(){
   const deudaTotal = allClientsData.reduce((s,c)=>s+(c.saldo>0?c.saldo:0),0);
   const ahora = new Date();
-  const enMora = allClientsData.filter(c=>{
-    if(c.saldo<=0) return false;
-    if(!c.ultimo_pago) return true;
-    const dias = (ahora - new Date(c.ultimo_pago)) / (1000*60*60*24);
-    return dias > 30;
-  }).length;
+  const enMora = allClientsData.filter(c => calcMora(c, 30).mora).length;
 
   document.getElementById('kpiDeudaTotal').textContent = fmt(deudaTotal);
   document.getElementById('kpiClientesMora').textContent = enMora;
@@ -901,10 +923,7 @@ function renderCtaCteGrid(clients){
   const ahora = new Date();
   grid.innerHTML = clients.map(c=>{
     const saldo = c.saldo || 0;
-    const diasSinPago = c.ultimo_pago
-      ? Math.floor((ahora - new Date(c.ultimo_pago)) / (1000*60*60*24))
-      : null;
-    const mora = saldo > 0 && (diasSinPago === null || diasSinPago > 30);
+    const {mora, dias: diasSinPago} = calcMora(c, 30);
     return `
       <div class="client-card${mora?' mora':''}" onclick="openCtaCteModal('${c.id}')">
         <div class="client-card-name">${c.nombre}</div>
@@ -915,7 +934,7 @@ function renderCtaCteGrid(clients){
           ${c.ultimo_pago?' · Últ. pago: '+fmtDate(c.ultimo_pago):''}
           ${c.limite_credito?` · Límite: ${fmt(c.limite_credito)}`:''}
         </div>
-        ${mora?'<div class="client-card-mora-badge">⚠️ Mora +30 días</div>':''}
+        ${mora?`<div class="client-card-mora-badge">⚠️ Mora ${diasSinPago>0?'+'+diasSinPago+' días':'+30 días'}</div>`:''}
       </div>`;
   }).join('');
 }
