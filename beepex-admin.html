@@ -1573,7 +1573,39 @@ const IMG_BASE_ADMIN = 'https://fmz-mza.github.io/Beepexcuyo/images/SKU_';
 
 function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMonto, total){
   const {jsPDF} = window.jspdf;
-  const pageH = Math.max(160, 60 + items.length * 22 + 40);
+  const ANCHO = 72; // ancho útil en mm (80 - 4 margen cada lado)
+
+  // ── Paso 1: calcular altura real antes de crear el doc ──
+  // Estimamos height mínima para calcular luego; usamos doc temporal
+  let yCalc = 8;
+  yCalc += 5 + 4 + 4; // header
+  if(numero) yCalc += 4;
+  yCalc += 4; // fecha
+  if(cliente) yCalc += 4;
+  yCalc += 4; // separador
+
+  // Pre-calcular líneas de cada item para altura exacta
+  const tmpDoc = new jsPDF({unit:'mm', format:[80, 400]});
+  const itemLines = items.map(i => {
+    const nombre = i.nombre || i.name || '';
+    tmpDoc.setFontSize(8);
+    const lines = tmpDoc.splitTextToSize(nombre, ANCHO);
+    return lines;
+  });
+  itemLines.forEach((lines, idx) => {
+    yCalc += lines.length * 3.8; // líneas de nombre
+    if(items[idx].sku) yCalc += 3.5; // SKU
+    yCalc += 4.5; // qty x precio
+  });
+
+  yCalc += 4; // separador items
+  yCalc += 4; // cant productos
+  if(descMonto > 0) yCalc += 8;
+  yCalc += 5 + 4 + 6; // total + separador + pie
+
+  const pageH = Math.ceil(yCalc) + 6; // margen inferior
+
+  // ── Paso 2: crear doc con tamaño exacto ──
   const doc = new jsPDF({unit:'mm', format:[80, pageH]});
   let y = 8;
 
@@ -1584,30 +1616,39 @@ function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMont
   doc.text(titulo, 40, y, {align:'center'}); y+=4;
   doc.setLineWidth(.3); doc.line(4,y,76,y); y+=4;
 
-  // Datos encabezado
+  // Encabezado
   doc.setFont('helvetica','bold');
-  if(numero) { doc.text((titulo.includes('POS')?'Ticket #':'Pedido #')+numero, 4, y); y+=4; }
+  if(numero){ doc.text((titulo.includes('POS')?'Ticket #':'Pedido #')+numero, 4, y); y+=4; }
   doc.setFont('helvetica','normal');
   if(fecha){ doc.text(new Date(fecha).toLocaleString('es-AR'), 4, y); y+=4; }
   if(cliente){ doc.text('Cliente: '+cliente, 4, y); y+=4; }
   doc.line(4,y,76,y); y+=4;
 
-  // Items
-  items.forEach(i => {
-    const p = i.precio_modificado ?? i.precio_unitario ?? i.price ?? 0;
+  // Items — nombres completos con wrap automático
+  items.forEach((i, idx) => {
+    const p   = i.precio_modificado ?? i.precio_unitario ?? i.price ?? 0;
     const qty = i.cantidad ?? i.qty ?? 1;
-    const nombre = (i.nombre || i.name || '').slice(0,32);
     const sku = i.sku || '';
+    const nombreLines = itemLines[idx];
+
     doc.setFont('helvetica','normal'); doc.setFontSize(8);
-    doc.text(nombre, 4, y); y+=3.5;
-    if(sku){ doc.setFontSize(7); doc.setTextColor(120,120,140); doc.text('SKU: '+sku, 4, y); doc.setTextColor(0,0,0); doc.setFontSize(8); y+=3.5; }
+    nombreLines.forEach(line => { doc.text(line, 4, y); y+=3.8; });
+    if(sku){
+      doc.setFontSize(7); doc.setTextColor(120,120,140);
+      doc.text('SKU: '+sku, 4, y);
+      doc.setTextColor(0,0,0); doc.setFontSize(8); y+=3.5;
+    }
     doc.text('  '+qty+' x '+fmtN(p)+' = '+fmtN(p*qty), 4, y); y+=4.5;
   });
 
   doc.line(4,y,76,y); y+=4;
 
-  // Totales
+  // Cantidad total de productos
+  const totalUnidades = items.reduce((s,i)=>s+(i.cantidad??i.qty??1),0);
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text(`${items.length} producto${items.length!==1?'s':''} · ${totalUnidades} unidad${totalUnidades!==1?'es':''}`, 4, y); y+=4;
+
+  // Totales
   if(descMonto > 0){
     doc.text('Subtotal: '+fmtN(subtotal), 4, y); y+=4;
     doc.text('Descuento: -'+fmtN(descMonto), 4, y); y+=4;
