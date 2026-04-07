@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
@@ -1024,6 +1025,7 @@ async function loadOrdenesPendientes(clientId){
         <div class="order-pending-date">${fmtDate(o.fecha)}</div>
       </div>
       <div class="order-pending-total">${fmt(o.total)}</div>
+      <button onclick="descargarTicketPOS('${o.id}','${o.ticket_display}','${o.fecha}',${o.total})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;flex-shrink:0;" title="Descargar PDF">📄</button>
     </div>`).join('');
 }
 
@@ -1555,12 +1557,126 @@ function renderPosKPIs(posOrders, posClients){
             <span style="font-size:12px;font-weight:700;">${nombre}</span>
             ${o.ticket_display ? `<span style="font-size:10px;color:var(--muted);margin-left:6px">#${o.ticket_display}</span>` : ''}
           </div>
-          <span class="order-total">${fmt(o.total||0)}</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="order-total">${fmt(o.total||0)}</span>
+            <button onclick="descargarTicketPOS('${o.id}','${o.ticket_display||''}','${o.fecha||''}',${o.total||0})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar PDF">📄</button>
+          </div>
         </div>
         <div class="order-meta">${fecha} ${hora}</div>
       </div>`;
     }).join('');
   }
+}
+
+// ── Tickets PDF Admin ────────────────────────────────────────────────────────
+const IMG_BASE_ADMIN = 'https://fmz-mza.github.io/Beepexcuyo/images/SKU_';
+
+function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMonto, total){
+  const {jsPDF} = window.jspdf;
+  const pageH = Math.max(160, 60 + items.length * 22 + 40);
+  const doc = new jsPDF({unit:'mm', format:[80, pageH]});
+  let y = 8;
+
+  // Header
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('BEEPEX CUYO', 40, y, {align:'center'}); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text(titulo, 40, y, {align:'center'}); y+=4;
+  doc.setLineWidth(.3); doc.line(4,y,76,y); y+=4;
+
+  // Datos encabezado
+  doc.setFont('helvetica','bold');
+  if(numero) { doc.text((titulo.includes('POS')?'Ticket #':'Pedido #')+numero, 4, y); y+=4; }
+  doc.setFont('helvetica','normal');
+  if(fecha){ doc.text(new Date(fecha).toLocaleString('es-AR'), 4, y); y+=4; }
+  if(cliente){ doc.text('Cliente: '+cliente, 4, y); y+=4; }
+  doc.line(4,y,76,y); y+=4;
+
+  // Items
+  items.forEach(i => {
+    const p = i.precio_modificado ?? i.precio_unitario ?? i.price ?? 0;
+    const qty = i.cantidad ?? i.qty ?? 1;
+    const nombre = (i.nombre || i.name || '').slice(0,32);
+    const sku = i.sku || '';
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    doc.text(nombre, 4, y); y+=3.5;
+    if(sku){ doc.setFontSize(7); doc.setTextColor(120,120,140); doc.text('SKU: '+sku, 4, y); doc.setTextColor(0,0,0); doc.setFontSize(8); y+=3.5; }
+    doc.text('  '+qty+' x '+fmtN(p)+' = '+fmtN(p*qty), 4, y); y+=4.5;
+  });
+
+  doc.line(4,y,76,y); y+=4;
+
+  // Totales
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  if(descMonto > 0){
+    doc.text('Subtotal: '+fmtN(subtotal), 4, y); y+=4;
+    doc.text('Descuento: -'+fmtN(descMonto), 4, y); y+=4;
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('TOTAL: '+fmtN(total), 4, y); y+=5;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.line(4,y,76,y); y+=4;
+  doc.text('Beepex Cuyo', 40, y, {align:'center'});
+
+  return doc;
+}
+
+function fmtN(n){ return '$'+(Math.round(n)||0).toLocaleString('es-AR'); }
+
+async function descargarTicketPOS(orderId, ticket, fecha, total){
+  const token = localStorage.getItem('admin_token');
+  try{
+    // Cargar items de la orden
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=nombre,cantidad,precio_unitario,precio_modificado,sku`,
+      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+    );
+    const items = await res.json();
+    if(!Array.isArray(items)||!items.length){ showToast('Sin items para esta venta'); return; }
+
+    // Buscar nombre del cliente
+    const orderRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&select=client_id,subtotal,descuento_monto`,
+      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+    );
+    const orderData = await orderRes.json();
+    const order = Array.isArray(orderData) ? orderData[0] : null;
+    const clientId = order?.client_id;
+    let clienteNombre = '';
+    if(clientId){
+      const clRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/clients?id=eq.${clientId}&select=nombre`,
+        {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+      );
+      const clData = await clRes.json();
+      clienteNombre = Array.isArray(clData)&&clData[0] ? clData[0].nombre : '';
+    }
+
+    const subtotal = order?.subtotal || total;
+    const descMonto = order?.descuento_monto || 0;
+    const doc = buildAdminPDF('Punto de Venta', ticket, fecha, clienteNombre, items, subtotal, descMonto, total);
+    doc.save('ticket-'+ticket+'.pdf');
+    showToast('📄 Ticket #'+ticket+' descargado');
+  }catch(e){ showToast('Error: '+e.message); }
+}
+
+async function descargarPedidoCatalogo(order){
+  try{
+    const items = Array.isArray(order.items) ? order.items : [];
+    if(!items.length){ showToast('Sin items en este pedido'); return; }
+    // Mapear campos del catálogo (items jsonb tiene: name, qty, price, sku)
+    const mappedItems = items.map(i=>({
+      nombre: i.name || i.nombre || '',
+      sku: i.sku || '',
+      cantidad: i.qty || i.cantidad || 1,
+      precio_unitario: i.price || i.precio_unitario || 0,
+      precio_modificado: null
+    }));
+    const doc = buildAdminPDF('Pedido Catálogo', order.id?.slice(0,8), order.created_at, order.nombre_cliente, mappedItems, order.total, 0, order.total);
+    doc.save('pedido-'+(order.nombre_cliente||'cliente').replace(/\s+/g,'-')+'-'+new Date(order.created_at).toISOString().slice(0,10)+'.pdf');
+    showToast('📄 Pedido descargado');
+  }catch(e){ showToast('Error: '+e.message); }
 }
 
 function renderAbandoned(containerId, data){
@@ -1653,7 +1769,10 @@ function renderAllOrders(orders){
           <span style="font-size:13px;font-weight:700;">${o.nombre_cliente||'Sin nombre'}</span>
           <span class="order-via ${via}" style="margin-left:8px;">${via==='pdf'?'📄 PDF':'💬 WhatsApp'}</span>
         </div>
-        <span class="order-total">${fmt(o.total)}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="order-total">${fmt(o.total)}</span>
+          <button onclick="descargarPedidoCatalogo(${JSON.stringify(o).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar PDF">📄</button>
+        </div>
       </div>
       <div class="order-meta">${fmtDateTime(o.created_at)} · ${items.length} producto${items.length!==1?'s':''}</div>
       <div class="order-items" style="margin-top:4px;">${itemsStr}</div>
