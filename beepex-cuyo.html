@@ -1023,7 +1023,9 @@ async function loadProducts(){
       price: r.price,
       pvp:   r.pvp||0,
       iva:   parseFloat(r.iva)||21,
-      stock: r.stock||'STOCK'
+      stock: r.stock||'STOCK',
+      rubro: r.rubro||null,
+      ean:   r.ean||''
     }));
     productMeta = {};
     rows.forEach(r=>{
@@ -1031,6 +1033,8 @@ async function loadProducts(){
       productMeta[String(r.sku)] = { desc: r.description||'', tags: tags };
     });
     productMap = Object.fromEntries(products.map(p=>[p.sku,p]));
+    // Renderizar chips de rubros después de tener los datos
+    renderRubros();
   } catch(e){
     console.error('loadProducts error:', e);
     products = [];
