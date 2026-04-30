@@ -1045,7 +1045,7 @@ async function loadProducts(){
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 let cart={}, includeIVA=false, activeBrand='ALL', activeStock='ALL', activeRubro='ALL', activeSort='default', descActiveSku=null, newSkus=new Set(), showNoStock=false;
-const PAGE_SIZE=40; // cards por página en mobile
+const PAGE_SIZE=20; // cards por página en mobile
 let _pagedList=[], _pagedIdx=0, _loadingMore=false;
 let preSaleBrand='ALL'; // guarda filtro de marca antes de entrar a modo venta
 let renderTimer=null;
@@ -1434,11 +1434,9 @@ function createCard(p){
   // Cargar imagen: directo si hay cache, lazy si no
   const imgEl=div.querySelector(`#img-${p.sku}`);
   if(imgEl){
-    if(imgCache[p.sku] && imgCache[p.sku]!=='error'){
-      tryLoadImg(imgEl, p.sku);
-    } else {
-      imgObserver.observe(imgEl);
-    }
+    // Siempre intentar cargar — el observer se encarga de no recargar si ya cargó
+    tryLoadImg(imgEl, p.sku);
+    imgObserver.observe(imgEl);
   }
   // ── Efecto 1: registrar card para animación al entrar en viewport ────────────
   div.style.opacity = '0';
