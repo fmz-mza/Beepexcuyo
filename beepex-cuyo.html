@@ -1045,6 +1045,8 @@ async function loadProducts(){
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 let cart={}, includeIVA=false, activeBrand='ALL', activeStock='ALL', activeRubro='ALL', activeSort='default', descActiveSku=null, newSkus=new Set(), showNoStock=false;
+const PAGE_SIZE=40; // cards por página en mobile
+let _pagedList=[], _pagedIdx=0, _loadingMore=false;
 let preSaleBrand='ALL'; // guarda filtro de marca antes de entrar a modo venta
 let renderTimer=null;
 // Último listado filtrado renderizado
@@ -1296,78 +1298,97 @@ function renderGrid(){
   // Ocultar siempre el mensaje de sin resultados cuando hay resultados
   grid.querySelectorAll('.no-results').forEach(el=>el.style.display='none');
 
-  const visibleSkus=new Set(sortedList.map(p=>p.sku));
-  const groups={};
-  // Primero los disponibles agrupados por marca, luego sin stock en grupo propio
-  listAvail.forEach((p,i)=>{ const k=p.brand||'Sin marca'; (groups[k]=groups[k]||[]).push({p,i}); });
-  if(listNoStock.length>0 && activeStock!=='NOSTOCK'){
-    groups['__nostock__']=listNoStock.map((p,i)=>({p,i}));
-  } else if(listNoStock.length>0){
-    listNoStock.forEach((p,i)=>{ const k=p.brand||'Sin marca'; (groups[k]=groups[k]||[]).push({p,i}); });
+  // Guardar lista completa para paginación progresiva
+  _pagedList = sortedList;
+  _pagedIdx  = 0;
+
+  // Limpiar cards existentes del DOM (liberamos memoria de la lista anterior)
+  grid.querySelectorAll('.card[id^="card-"], .section-title').forEach(el=>el.remove());
+
+  // Limpiar sentinel anterior
+  const oldSentinel = document.getElementById('grid-sentinel');
+  if(oldSentinel) oldSentinel.remove();
+
+  // Renderizar primera página
+  _renderPage(grid, sortedList, listNoStock, 0, Math.min(PAGE_SIZE, sortedList.length));
+  _pagedIdx = Math.min(PAGE_SIZE, sortedList.length);
+
+  // Si quedan más, agregar sentinel para infinite scroll
+  if(_pagedIdx < sortedList.length){
+    const sentinel = document.createElement('div');
+    sentinel.id = 'grid-sentinel';
+    sentinel.style.cssText = 'grid-column:1/-1;height:40px;';
+    grid.appendChild(sentinel);
+    _sentinelObserver.observe(sentinel);
   }
-  const keys=Object.keys(groups);
-  const showTitles=keys.length>1||activeBrand==='ALL'||listNoStock.length>0;
+}
 
-  // Ocultar todos los títulos primero
-  grid.querySelectorAll('.section-title').forEach(el=>el.classList.add('hidden'));
+// Renderiza un rango de la lista paginada
+function _renderPage(grid, sortedList, listNoStock, from, to){
+  const slice = sortedList.slice(from, to);
+  const groups={};
+  const availSkus = new Set(listNoStock.map(p=>p.sku));
 
-  // Calcular el orden de cada item: título de marca justo antes de sus cards
-  let orderIdx=0;
+  // Agrupar por marca respetando el orden original
+  slice.forEach(p=>{
+    const isNoStock = availSkus.has(p.sku) && activeStock!=='NOSTOCK';
+    const k = isNoStock ? '__nostock__' : (p.brand||'Sin marca');
+    (groups[k]=groups[k]||[]).push(p);
+  });
+
+  const keys = [...new Set(slice.map(p=>{
+    const isNoStock = availSkus.has(p.sku) && activeStock!=='NOSTOCK';
+    return isNoStock ? '__nostock__' : (p.brand||'Sin marca');
+  }))];
+
+  const showTitles = new Set(sortedList.map(p=>p.brand)).size>1 || activeBrand==='ALL' || listNoStock.length>0;
+  const sentinel = document.getElementById('grid-sentinel');
+
   keys.forEach(brand=>{
-    // Section title
-    let titleEl=grid.querySelector(`.section-title[data-brand="${brand}"]`);
-    if(!titleEl){
+    // Solo crear título si no existe ya
+    let titleEl = grid.querySelector(`.section-title[data-brand="${brand}"]`);
+    if(!titleEl && showTitles){
       titleEl=document.createElement('div');
       titleEl.className='section-title';
       titleEl.dataset.brand=brand;
       if(brand==='__nostock__'){
         titleEl.innerHTML='<span style="color:var(--red);opacity:.7">❌ Sin stock</span>';
         titleEl.style.marginTop='12px';
+      } else if(brand==='BEEPAW'){
+        titleEl.innerHTML=`<img src="https://favicon.im/beepex.com.ar?larger=true" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;border-radius:4px;margin-right:6px;" onerror="this.replaceWith('🐾')"> ${brand}`;
       } else {
-        if(brand==='BEEPAW'){
-          titleEl.innerHTML=`<img src="https://favicon.im/beepex.com.ar?larger=true" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;border-radius:4px;margin-right:6px;" onerror="this.replaceWith('🐾')"> ${brand}`;
-        } else {
-          titleEl.textContent=`📦 ${brand}`;
-        }
+        titleEl.textContent=`📦 ${brand}`;
       }
-      grid.appendChild(titleEl);
+      if(sentinel) grid.insertBefore(titleEl, sentinel);
+      else grid.appendChild(titleEl);
     }
-    if(showTitles) titleEl.classList.remove('hidden'); else titleEl.classList.add('hidden');
-    titleEl.style.order=orderIdx++;
-
-    groups[brand].forEach(({p})=>{
-      // Card: crear si no existe, parchear si existe
-      let cardEl=document.getElementById(`card-${p.sku}`);
-      if(!cardEl){
-        cardEl=createCard(p);
-        grid.appendChild(cardEl);
-      }
-      // Mostrar/ocultar con display:none via clase hidden
-      if(visibleSkus.has(p.sku)){
-        cardEl.classList.remove('hidden');
-        // Si ya fue animada antes, asegurar que esté visible
-        if(cardEl.dataset.entered){
-          cardEl.style.opacity='';
-          cardEl.style.transform='';
-        }
-        // Si la imagen aun no cargo, intentar ahora que es visible
-        const imgEl=cardEl.querySelector('img');
-        if(imgEl && !imgEl.src && imgEl.dataset.sku){
-          tryLoadImg(imgEl, imgEl.dataset.sku);
-        }
-      } else {
-        cardEl.classList.add('hidden');
-      }
-      cardEl.style.order=orderIdx++;
+    (groups[brand]||[]).forEach(p=>{
+      if(document.getElementById(`card-${p.sku}`)) return; // ya existe
+      const cardEl = createCard(p);
+      if(sentinel) grid.insertBefore(cardEl, sentinel);
+      else grid.appendChild(cardEl);
     });
   });
-
-  // Ocultar cards de productos que no están en ningún grupo visible
-  grid.querySelectorAll('.card[id^="card-"]').forEach(el=>{
-    const sku=el.id.replace('card-','');
-    if(!visibleSkus.has(sku)) el.classList.add('hidden');
-  });
 }
+
+// Observer para infinite scroll
+const _sentinelObserver = new IntersectionObserver((entries)=>{
+  if(!entries[0].isIntersecting || _loadingMore) return;
+  if(_pagedIdx >= _pagedList.length) return;
+  _loadingMore = true;
+  requestAnimationFrame(()=>{
+    const grid = document.getElementById('grid');
+    const listNoStock = _pagedList.filter(p=>stockType(p.stock)==='NOSTOCK');
+    const next = Math.min(_pagedIdx + PAGE_SIZE, _pagedList.length);
+    _renderPage(grid, _pagedList, listNoStock, _pagedIdx, next);
+    _pagedIdx = next;
+    if(_pagedIdx >= _pagedList.length){
+      const s = document.getElementById('grid-sentinel');
+      if(s) s.remove();
+    }
+    _loadingMore = false;
+  });
+}, {rootMargin:'200px'});
 
 // Crear una card nueva completa
 function createCard(p){
