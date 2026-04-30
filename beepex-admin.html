@@ -396,6 +396,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
               <span id="margenToggleLabel" style="font-size:12px;color:var(--muted);">Inactivo</span>
             </div>
           </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Mostrar productos NOSTOCK</div><div class="setting-sub">Por defecto ocultos en el catálogo mayorista</div></div>
+            <div class="toggle-wrap">
+              <button class="toggle" id="nostockToggle" onclick="toggleNostock()"></button>
+              <span id="nostockToggleLabel" style="font-size:12px;color:var(--muted);">Oculto</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1230,6 +1237,11 @@ async function loadSettings(){
   const margenToggle=document.getElementById('margenToggle');
   if(margenOn) margenToggle.classList.add('on'); else margenToggle.classList.remove('on');
   document.getElementById('margenToggleLabel').textContent=margenOn?'Activo':'Inactivo';
+
+  const nostockOn=s.catalog_show_nostock==='true';
+  const nostockToggle=document.getElementById('nostockToggle');
+  if(nostockOn) nostockToggle.classList.add('on'); else nostockToggle.classList.remove('on');
+  document.getElementById('nostockToggleLabel').textContent=nostockOn?'Visible':'Oculto';
   // Cargar productos
   try{ window._disabledSkus=new Set(JSON.parse(s.disabled_skus||'[]')); } catch(e){ window._disabledSkus=new Set(); }
   await loadProducts();
@@ -1304,6 +1316,21 @@ async function saveSetting(key, inputId){
   });
   if(res.ok||res.status===204) showToast('✅ Guardado');
   else showToast('❌ Error al guardar');
+}
+
+async function toggleNostock(){
+  const toggle=document.getElementById('nostockToggle');
+  const isOn=toggle.classList.contains('on');
+  const newVal=isOn?'false':'true';
+  const res=await api('settings?key=eq.catalog_show_nostock',{
+    method:'POST', headers:{'Prefer':'resolution=merge-duplicates'},
+    body:JSON.stringify({key:'catalog_show_nostock',value:newVal})
+  });
+  if(res.ok){
+    if(newVal==='true'){ toggle.classList.add('on'); document.getElementById('nostockToggleLabel').textContent='Visible'; }
+    else { toggle.classList.remove('on'); document.getElementById('nostockToggleLabel').textContent='Oculto'; }
+    showToast(newVal==='true'?'👁 NOSTOCK visible en catálogo':'🙈 NOSTOCK oculto en catálogo');
+  }
 }
 
 async function toggleMargen(){
