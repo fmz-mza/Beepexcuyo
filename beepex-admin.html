@@ -1322,14 +1322,19 @@ async function toggleNostock(){
   const toggle=document.getElementById('nostockToggle');
   const isOn=toggle.classList.contains('on');
   const newVal=isOn?'false':'true';
-  const res=await api('settings?key=eq.catalog_show_nostock',{
-    method:'POST', headers:{'Prefer':'resolution=merge-duplicates'},
-    body:JSON.stringify({key:'catalog_show_nostock',value:newVal})
+  const token=localStorage.getItem('admin_token');
+  const headers={'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};
+  // Upsert directo — funciona tanto si la key existe como si no
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/settings`,{
+    method:'POST', headers, body:JSON.stringify({key:'catalog_show_nostock',value:newVal})
   });
-  if(res.ok){
+  if(res.ok||res.status===201||res.status===204){
     if(newVal==='true'){ toggle.classList.add('on'); document.getElementById('nostockToggleLabel').textContent='Visible'; }
     else { toggle.classList.remove('on'); document.getElementById('nostockToggleLabel').textContent='Oculto'; }
     showToast(newVal==='true'?'👁 NOSTOCK visible en catálogo':'🙈 NOSTOCK oculto en catálogo');
+  } else {
+    const err=await res.text();
+    showToast('❌ Error: '+err);
   }
 }
 
@@ -2071,45 +2076,64 @@ async function handleExcelUpload(event){
       return null;
     }
 
-    // Leer BEEPAW
-    if(wb.SheetNames.includes('BEEPAW')){
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets['BEEPAW'],{defval:null});
+    // Leer hoja única (nuevo formato) o hojas separadas (formato viejo)
+    const sheetName = wb.SheetNames.includes('BEEPAW') ? null  // hojas separadas
+      : wb.SheetNames[0]; // hoja única
+
+    if(sheetName !== null){
+      // Nuevo formato: hoja única con columna MARCA
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{defval:null});
       rows.forEach(r=>{
         const sku = getSku(r);
         if(!sku) return;
         const price = getPrice(r,'PRECIO EN PESOS','PRECIO EN $','precio');
         if(!price) return;
-        incoming.push({
-          sku,
-          name:(r['PRODUCTO']||'').toString().trim(),
-          brand:'BEEPAW',
-          price:Math.round(price),
-          pvp:Math.round(r['PRECIO VENTA PUBLICO']||0),
-          iva:parseIva(r['IVA']),
-          stock:parseStock(r['STOCK']),
-          description:(r['DESCRIPCIÓN']||'').toString().replace(/\n/g,' ').trim(),
-          ean:(r['CODIGO EAN']?String(Math.round(r['CODIGO EAN'])):'')
-        });
-      });
-    }
-    // Leer GENERICOS
-    if(wb.SheetNames.includes('GENERICOS')){
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets['GENERICOS'],{defval:null});
-      rows.forEach(r=>{
-        const sku = getSku(r);
-        if(!sku) return;
-        const price = getPrice(r,'PRECIO EN $','PRECIO EN PESOS','precio');
-        if(!price) return;
+        const marca = (r['MARCA']||'').toString().trim().toUpperCase()||'GENERICO';
+        // STOCK puede contener fecha ej: "PREVENTA (06/05/2026)" — se conserva completo
+        const stockRaw = (r['STOCK']||'').toString().trim();
+        const pvpRaw = r['PRECIO VENTA PUBLICO'];
+        let pvp = 0;
+        if(pvpRaw && String(pvpRaw).toUpperCase()!=='SIN PVP'){
+          pvp = Math.round(parseFloat(String(pvpRaw).replace(/[.$\s]/g,'').replace(',','.'))||0);
+        }
         incoming.push({
           sku,
           name:(r['PRODUCTO']||'').toString().replace(/\n/g,' ').trim(),
-          brand:'GENERICO',
+          brand:marca,
           price:Math.round(price),
-          pvp:0,
+          pvp,
           iva:parseIva(r['IVA']),
-          stock:parseStock(r['STOCK']),
+          stock:stockRaw||'STOCK',
           description:(r['DESCRIPCIÓN']||'').toString().replace(/\n/g,' ').trim(),
-          ean:(r['CODIGO EAN']?String(Math.round(r['CODIGO EAN'])):'')
+          ean:(r['CODIGO EAN']?String(r['CODIGO EAN']).split('.')[0].trim():''),
+          rubro:(r['RUBRO']||'').toString().trim().toUpperCase(),
+          stock_ingreso:(r['STOCK/INGRESO']||'').toString().trim(),
+          ingresos:(r['INGRESOS']||'').toString().trim(),
+          stock_ingresos:(r['STOCK INGRESOS']||'').toString().trim(),
+        });
+      });
+    } else {
+      // Formato viejo: hojas BEEPAW y GENERICOS separadas
+      ['BEEPAW','GENERICOS'].forEach(sheet=>{
+        if(!wb.SheetNames.includes(sheet)) return;
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet],{defval:null});
+        rows.forEach(r=>{
+          const sku = getSku(r);
+          if(!sku) return;
+          const price = getPrice(r,'PRECIO EN PESOS','PRECIO EN $','precio');
+          if(!price) return;
+          incoming.push({
+            sku,
+            name:(r['PRODUCTO']||'').toString().replace(/\n/g,' ').trim(),
+            brand:sheet==='BEEPAW'?'BEEPAW':'GENERICO',
+            price:Math.round(price),
+            pvp:Math.round(r['PRECIO VENTA PUBLICO']||0),
+            iva:parseIva(r['IVA']),
+            stock:parseStock(r['STOCK']),
+            description:(r['DESCRIPCIÓN']||'').toString().replace(/\n/g,' ').trim(),
+            ean:(r['CODIGO EAN']?String(Math.round(r['CODIGO EAN'])):''),
+            rubro:'', stock_ingreso:'', ingresos:'', stock_ingresos:''
+          });
         });
       });
     }
@@ -2123,7 +2147,7 @@ async function handleExcelUpload(event){
     const actualizados = incoming.filter(p=>{
       const c=currentMap[p.sku];
       if(!c) return false;
-      return c.price!==p.price||c.pvp!==p.pvp||c.stock!==p.stock||c.iva!==p.iva||c.name!==p.name;
+      return c.price!==p.price||c.pvp!==p.pvp||c.stock!==p.stock||c.iva!==p.iva||c.name!==p.name||c.rubro!==p.rubro||c.brand!==p.brand;
     });
     const faltantes = prodData.filter(p=>!incomingSkus.has(p.sku)&&p.stock!=='NOSTOCK');
 
