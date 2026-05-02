@@ -96,34 +96,35 @@ def process_image(drive_id, sku):
     bucket_name = "fotos_demo"
     file_path = f"{sku}.webp"
     
-    # Fuentes de imagen (Priority: Drive -> Fallback GitHub Pages)
+    # Fuentes de imagen (Priority: Direct URL -> Drive -> Fallback GitHub Repos)
     source_urls = []
-    if drive_id and drive_id.lower() != "prueba" and len(drive_id) > 5:
+    
+    # 1. Si drive_id ya es una URL completa (desde Spreadsheet)
+    if drive_id and (drive_id.startswith("http://") or drive_id.startswith("https://")):
+        source_urls.append(drive_id)
+    
+    # 2. Si es un ID de Google Drive
+    elif drive_id and drive_id.lower() != "prueba" and len(drive_id) > 5:
         source_urls.extend([
             f"https://drive.google.com/thumbnail?id={drive_id}&sz=w1200",
             f"https://lh3.googleusercontent.com/d/{drive_id}=w1000",
             f"https://drive.google.com/uc?id={drive_id}&export=download"
         ])
     
-    # Fuentes de imagen (Priority: Drive -> Fallback GitHub Repos)
-    source_urls = []
-    if drive_id and drive_id.lower() != "prueba" and len(drive_id) > 5:
-        source_urls.extend([
-            f"https://drive.google.com/thumbnail?id={drive_id}&sz=w1200",
-            f"https://lh3.googleusercontent.com/d/{drive_id}=w1000",
-            f"https://drive.google.com/uc?id={drive_id}&export=download"
-        ])
+    # 3. Repositorios GitHub
+    repos = [
+        "https://raw.githubusercontent.com/fmz-mza/Beepexcuyo/main/images",
+        "https://raw.githubusercontent.com/fmz-mza/beepaw/main/images"
+    ]
     
-    # Repositorios GitHub (Beepexcuyo y Beepaw/Netlify Style)
-    repo_base = "https://raw.githubusercontent.com/fmz-mza/Beepexcuyo/main/images"
-    
-    # Patrones de nombre: [Con prefijo (Beepexcuyo), Sin prefijo (Beepaw/Netlify)]
+    # Patrones de nombre: [Con prefijo (Beepexcuyo), Sin prefijo (Beepaw/Netlify/General)]
     naming_patterns = [f"SKU_{sku}", f"{sku}"]
-    extensions = [".jpg", ".png", ".JPG", ".jpeg"]
+    extensions = [".jpg", ".png", ".JPG", ".jpeg", ".PNG"]
 
-    for pattern in naming_patterns:
-        for ext in extensions:
-            source_urls.append(f"{repo_base}/{pattern}{ext}")
+    for repo in repos:
+        for pattern in naming_patterns:
+            for ext in extensions:
+                source_urls.append(f"{repo}/{pattern}{ext}")
 
     img_data = None
     used_url = ""
