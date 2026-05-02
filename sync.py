@@ -161,11 +161,20 @@ def process_image(drive_id, sku):
         buffer.seek(0)
 
         # Upload
-        supabase.storage.from_(bucket_name).upload(
-            path=file_path,
-            file=buffer.read(),
-            file_options={"content-type": "image/webp", "x-upsert": "true"}
-        )
+        try:
+            supabase.storage.from_(bucket_name).upload(
+                path=file_path,
+                file=buffer.read(),
+                file_options={"content-type": "image/webp", "upsert": True}
+            )
+        except Exception as upload_err:
+            # Si ya existe y upsert falló por RLS, intentamos capturarlo suavemente
+            if "already exists" in str(upload_err).lower():
+                pass # Ignoramos si ya existe y no pudimos sobrescribir
+            else:
+                print(f"❌ Error Storage en {sku}: {upload_err}")
+                # No retornamos None si el archivo ya existe (aunque no lo hayamos podido actualizar)
+                # para que el link público siga funcionando en la DB.
         
         return supabase.storage.from_(bucket_name).get_public_url(file_path)
     except Exception as e:
@@ -240,7 +249,7 @@ def run_sync():
         # Upsert en Supabase (Tabla productos_demo para el piloto)
         product_data = {
             "codigo": sku,
-            "producto": nombre,
+            "PRODUCTO": nombre,
             "descripcion": descripcion,
             "iva": iva,
             "precio_pesos": precio_pesos,
@@ -248,7 +257,7 @@ def run_sync():
             "stock_estado": estado_stock,
             "stock_fisico": stock_fisico,
             "ean": str(row.get("EAN", "")).replace('/', '').strip(),
-            "rubro": str(row.get("RUBRO", "")).strip(),
+            "RUBRO": str(row.get("RUBRO", "")).strip(),
             "marca": str(row.get("MARCA", "")).strip(),
             "ingresos": fecha_ingreso,
             "stock_ingresos": stock_ingresos,
