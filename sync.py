@@ -93,46 +93,45 @@ def get_drive_ids_from_netlify():
 
 def process_image(drive_id, sku):
     """Descarga, optimiza y sube la imagen a Supabase Storage"""
-    if not drive_id or drive_id.lower() == "prueba":
-        return None
-
-    bucket_name = "fotos_demo" # Usar fotos_demo para el piloto
+    bucket_name = "fotos_demo"
     file_path = f"{sku}.webp"
     
-    # Verificar si ya existe para ahorrar procesamiento
-    try:
-        # Intento rápido de ver si existe
-        res = supabase.storage.from_(bucket_name).get_public_url(file_path)
-        # Podríamos hacer un head request si quisiéramos ser seguros, 
-        # pero para el piloto asumimos que si está en la tabla con URL, ya está.
-    except:
-        pass
-
-    # Fallbacks de URLs de Drive
-    drive_urls = [
-        f"https://drive.google.com/thumbnail?id={drive_id}&sz=w1200",
-        f"https://lh3.googleusercontent.com/d/{drive_id}=w1000",
-        f"https://drive.google.com/uc?id={drive_id}&export=download"
-    ]
+    # Fuentes de imagen (Priority: Drive -> Fallback GitHub Pages)
+    source_urls = []
+    if drive_id and drive_id.lower() != "prueba" and len(drive_id) > 5:
+        source_urls.extend([
+            f"https://drive.google.com/thumbnail?id={drive_id}&sz=w1200",
+            f"https://lh3.googleusercontent.com/d/{drive_id}=w1000",
+            f"https://drive.google.com/uc?id={drive_id}&export=download"
+        ])
+    
+    # Fallback a tu repositorio Beepexcuyo (URL RAW para descarga directa)
+    repo_base = "https://raw.githubusercontent.com/fmz-mza/Beepexcuyo/main/images"
+    source_urls.append(f"{repo_base}/{sku}.jpg")
+    source_urls.append(f"{repo_base}/{sku}.png")
+    source_urls.append(f"{repo_base}/{sku}.JPG") # Algunos archivos podrían estar en mayúsculas
 
     img_data = None
-    for url in drive_urls:
+    used_url = ""
+    for url in source_urls:
         try:
-            res = requests.get(url, timeout=15, stream=True)
-            if res.status_code == 200 and len(res.content) > 2000:
+            res = requests.get(url, timeout=10, stream=True)
+            if res.status_code == 200 and len(res.content) > 1000:
                 img_data = res.content
+                used_url = url
                 break
         except:
             continue
 
     if not img_data:
+        print(f"❌ No se encontró imagen para SKU {sku} en ninguna fuente.")
         return None
 
     try:
-        # Procesamiento con Pillow
+        print(f"📷 Procesando {sku} desde {used_url[:50]}...")
         img = Image.open(BytesIO(img_data))
         
-        # Convertir a RGB (manejar transparencias)
+        # Convertir a RGB
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGBA")
             bg = Image.new("RGB", img.size, (255, 255, 255))
@@ -141,15 +140,13 @@ def process_image(drive_id, sku):
         else:
             img = img.convert("RGB")
 
-        # Redimensionar (Max 1024px)
         img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
         
-        # Guardar en buffer como WebP
         buffer = BytesIO()
-        img.save(buffer, format="WEBP", quality=80)
+        img.save(buffer, format="WEBP", quality=75) # Calidad 75 para máximo ahorro
         buffer.seek(0)
 
-        # Subir a Supabase
+        # Upload
         supabase.storage.from_(bucket_name).upload(
             path=file_path,
             file=buffer.read(),
@@ -158,7 +155,7 @@ def process_image(drive_id, sku):
         
         return supabase.storage.from_(bucket_name).get_public_url(file_path)
     except Exception as e:
-        print(f"Error procesando imagen para SKU {sku}: {e}")
+        print(f"⚠️ Error procesando {sku}: {e}")
         return None
 
 def run_sync():
