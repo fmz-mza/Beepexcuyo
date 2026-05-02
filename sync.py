@@ -165,7 +165,7 @@ def process_image(drive_id, sku):
             supabase.storage.from_(bucket_name).upload(
                 path=file_path,
                 file=buffer.read(),
-                file_options={"content-type": "image/webp", "upsert": True}
+                file_options={"content-type": "image/webp", "x-upsert": "true"}
             )
         except Exception as upload_err:
             # Si ya existe y upsert falló por RLS, intentamos capturarlo suavemente
@@ -249,7 +249,7 @@ def run_sync():
         # Upsert en Supabase (Tabla productos_demo para el piloto)
         product_data = {
             "codigo": sku,
-            "PRODUCTO": nombre,
+            "producto": nombre,
             "descripcion": descripcion,
             "iva": iva,
             "precio_pesos": precio_pesos,
@@ -257,7 +257,7 @@ def run_sync():
             "stock_estado": estado_stock,
             "stock_fisico": stock_fisico,
             "ean": str(row.get("EAN", "")).replace('/', '').strip(),
-            "RUBRO": str(row.get("RUBRO", "")).strip(),
+            "rubro": str(row.get("RUBRO", "")).strip(),
             "marca": str(row.get("MARCA", "")).strip(),
             "ingresos": fecha_ingreso,
             "stock_ingresos": stock_ingresos,
