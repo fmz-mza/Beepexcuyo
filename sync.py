@@ -105,11 +105,25 @@ def process_image(drive_id, sku):
             f"https://drive.google.com/uc?id={drive_id}&export=download"
         ])
     
-    # Fallback a tu repositorio Beepexcuyo (URL RAW para descarga directa)
+    # Fuentes de imagen (Priority: Drive -> Fallback GitHub Repos)
+    source_urls = []
+    if drive_id and drive_id.lower() != "prueba" and len(drive_id) > 5:
+        source_urls.extend([
+            f"https://drive.google.com/thumbnail?id={drive_id}&sz=w1200",
+            f"https://lh3.googleusercontent.com/d/{drive_id}=w1000",
+            f"https://drive.google.com/uc?id={drive_id}&export=download"
+        ])
+    
+    # Repositorios GitHub (Beepexcuyo y Beepaw/Netlify Style)
     repo_base = "https://raw.githubusercontent.com/fmz-mza/Beepexcuyo/main/images"
-    source_urls.append(f"{repo_base}/SKU_{sku}.jpg")
-    source_urls.append(f"{repo_base}/SKU_{sku}.png")
-    source_urls.append(f"{repo_base}/SKU_{sku}.JPG") # Algunos archivos podrían estar en mayúsculas
+    
+    # Patrones de nombre: [Con prefijo (Beepexcuyo), Sin prefijo (Beepaw/Netlify)]
+    naming_patterns = [f"SKU_{sku}", f"{sku}"]
+    extensions = [".jpg", ".png", ".JPG", ".jpeg"]
+
+    for pattern in naming_patterns:
+        for ext in extensions:
+            source_urls.append(f"{repo_base}/{pattern}{ext}")
 
     img_data = None
     used_url = ""
