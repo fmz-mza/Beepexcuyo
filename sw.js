@@ -19,7 +19,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   // Solo cachear el HTML principal — imágenes y fonts siempre de red
-  if (e.request.url.includes('beepex-cuyo.html')) {
+  if (e.request.method === 'GET' && e.request.url.includes('beepex-cuyo.html')) {
     e.respondWith(
       fetch(e.request)
         .then(res => {
