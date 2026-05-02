@@ -895,19 +895,28 @@ let userSalePrices={}; // {sku: price}
 <script>
 // ── Configuración ────────────────────────────────────────────────────────────
 const GITHUB_USER='fmz-mza', GITHUB_REPO='Beepexcuyo', GITHUB_BRANCH='main';
-const EXTENSIONS=['jpg','jpeg','png','webp','JPG','PNG'];
+const EXTENSIONS=['webp','jpg','jpeg','png','JPG','PNG']; // webp primero
 const WA_NUMBER='5492616220850';
+const BUCKET_URL='https://mmerrzniuxbrjryhcsda.supabase.co/storage/v1/object/public/fotos_demo';
 
 // ── Cache de imágenes ────────────────────────────────────────────────────────
 const imgCache = {}; // sku → url exitosa | 'error'
-function imgBase(sku){ return `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/images/SKU_${sku}`; }
+function imgBase(sku, ext='webp'){ 
+  if(ext==='webp') return `${BUCKET_URL}/${sku}.webp`;
+  return `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/images/SKU_${sku}.${ext}`; 
+}
 function tryLoadImg(el, sku, i=0){
   if(imgCache[sku]==='error') return;
   if(imgCache[sku]){ el.src=imgCache[sku]; el.onload=()=>onImgLoaded(el); return; }
+  
   if(i>=EXTENSIONS.length){ imgCache[sku]='error'; onImgError(sku); return; }
+  
+  const ext = EXTENSIONS[i];
+  const url = imgBase(sku, ext);
+  
   el.onerror=()=>tryLoadImg(el,sku,i+1);
-  el.onload=()=>{ imgCache[sku]=el.src; onImgLoaded(el); };
-  el.src=`${imgBase(sku)}.${EXTENSIONS[i]}`;
+  el.onload=()=>{ imgCache[sku]=url; onImgLoaded(el); };
+  el.src=url;
 }
 function onImgLoaded(el){
   el.classList.add('visible');
@@ -1000,7 +1009,7 @@ let productMap = {};
 async function loadProducts(){
   try{
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/products?select=sku,name,brand,price,pvp,iva,stock,description,rubro,ean&order=brand.asc,name.asc`,
+      `${SUPABASE_URL}/rest/v1/productos_demo?select=sku,name:producto,brand:marca,price:precio_pesos,pvp,iva,stock:stock_estado,description:descripcion,rubro,ean&order=brand.asc,name.asc&limit=1`,
       { headers:{
           'apikey': SUPABASE_ANON,
           'Authorization': `Bearer ${SUPABASE_ANON}`,
