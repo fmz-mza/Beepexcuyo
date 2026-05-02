@@ -1,59 +1,46 @@
 import os
 import requests
-import json
 from io import BytesIO
 from PIL import Image
-from supabase import create_client, Client
+from supabase import create_client
 from datetime import datetime
 
-# --- CONFIGURACIÓN ---
-# Las variables se toman de los Secrets de GitHub
+# Configuración desde Secrets de GitHub
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 
-# Inicializar Supabase
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-def send_discord_log(message):
-    if DISCORD_WEBHOOK_URL:
-        requests.post(DISCORD_WEBHOOK_URL, json={"content": message})
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def process_image(drive_id, sku):
-    """Prueba múltiples fuentes y patrones para encontrar la imagen"""
+    """Descarga, optimiza y sube la imagen a Supabase Storage"""
     bucket_name = "fotos_demo"
     file_path = f"{sku}.webp"
-    sku_clean = str(sku).strip()
     
-    # Lista de fuentes potenciales
+    # Fuentes de imagen (Priority: Drive -> Fallback GitHub Repos)
     source_urls = []
-    
-    # 1. Drive (si existe ID)
-    if drive_id and drive_id.lower() != "prueba" and len(str(drive_id)) > 5:
+    if drive_id and drive_id.lower() != "prueba" and len(drive_id) > 5:
         source_urls.extend([
             f"https://drive.google.com/thumbnail?id={drive_id}&sz=w1200",
-            f"https://lh3.googleusercontent.com/d/{drive_id}=w1000"
+            f"https://lh3.googleusercontent.com/d/{drive_id}=w1000",
+            f"https://drive.google.com/uc?id={drive_id}&export=download"
         ])
     
-    # 2. GitHub Repos (Beepexcuyo y Beepaw)
+    # Repositorios GitHub (Beepexcuyo y Beepaw/Netlify Style)
     repo_base = "https://raw.githubusercontent.com/fmz-mza/Beepexcuyo/main/images"
-    patterns = [f"SKU_{sku_clean}", sku_clean]
-    extensions = [".jpg", ".png", ".JPG", ".jpeg", ".webp"]
+    naming_patterns = [f"SKU_{sku}", f"{sku}"]
+    extensions = [".jpg", ".png", ".JPG", ".jpeg"]
 
-    for p in patterns:
+    for pattern in naming_patterns:
         for ext in extensions:
-            source_urls.append(f"{repo_base}/{p}{ext}")
+            source_urls.append(f"{repo_base}/{pattern}{ext}")
 
     img_data = None
-    used_url = None
-    
-    print(f"🔍 Buscando imagen para SKU {sku_clean}...")
-    
+    used_url = ""
     for url in source_urls:
         try:
-            # Timeout corto para no ralentizar el proceso
-            res = requests.get(url, timeout=5)
+            res = requests.get(url, timeout=10, stream=True)
             if res.status_code == 200 and len(res.content) > 1000:
                 img_data = res.content
                 used_url = url
@@ -62,28 +49,28 @@ def process_image(drive_id, sku):
             continue
 
     if not img_data:
-        # Silencioso en consola para no inundar logs, pero reportamos el fallo
         return None
 
     try:
-        print(f"✅ Encontrada: {used_url} | Procesando...")
+        print(f"📷 Procesando {sku} desde {used_url[:50]}...")
         img = Image.open(BytesIO(img_data))
         
-        # Optimización
+        # Convertir a RGB
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGBA")
             bg = Image.new("RGB", img.size, (255, 255, 255))
-            bg.paste(img, mask=img.split()[3])
+            bg.paste(img, (0,0), img)
             img = bg
         else:
             img = img.convert("RGB")
 
-        img.thumbnail((1000, 1000), Image.Resampling.LANCZOS)
+        img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+        
         buffer = BytesIO()
         img.save(buffer, format="WEBP", quality=75)
         buffer.seek(0)
 
-        # Intento de subida
+        # Subida con manejo de error 403
         try:
             supabase.storage.from_(bucket_name).upload(
                 path=file_path,
@@ -91,98 +78,77 @@ def process_image(drive_id, sku):
                 file_options={"content-type": "image/webp", "x-upsert": "true"}
             )
         except Exception as storage_err:
-            # Si el error es que ya existe, no importa, recuperamos la URL
-            if "already exists" not in str(storage_err).lower():
+            if "already exists" in str(storage_err):
+                pass # Si ya existe, no importa
+            else:
                 print(f"❌ Error Storage en {sku}: {storage_err}")
                 return None
         
         return supabase.storage.from_(bucket_name).get_public_url(file_path)
     except Exception as e:
-        print(f"⚠️ Error general en {sku}: {e}")
+        print(f"⚠️ Error procesando {sku}: {e}")
         return None
 
 def run_sync():
-    stats = {"nuevos": 0, "actualizados": 0, "precios_cambiados": 0, "fotos_procesadas": 0}
-    logs = []
-    
     print("🚀 Iniciando Sincronización...")
+    stats = {"nuevos": 0, "actualizados": 0, "fotos_procesadas": 0}
     
-    # Leer Google Sheets
-    SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv"
-    res = requests.get(SHEET_URL)
-    if res.status_code != 200:
-        send_discord_log("❌ Error: No se pudo acceder al Spreadsheet. Revisa el SPREADSHEET_ID.")
-        return
-
-    lines = res.text.splitlines()
+    # Leer Spreadsheet (vía export CSV para simplicidad sin API compleja)
+    csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv"
+    response = requests.get(csv_url)
+    lines = response.text.splitlines()
+    
     import csv
-    reader = csv.reader(lines)
-    header = next(reader) # Saltar cabecera
-
+    reader = csv.DictReader(lines)
+    
     for row in reader:
-        if not row or len(row) < 5: continue
-        
-        sku = row[0].strip()
-        nombre = row[1].strip()
-        try:
-            precio_pesos = float(row[4].replace(',', '').replace('$', ''))
-        except:
-            precio_pesos = 0
-            
-        foto_id = row[15] if len(row) > 15 else ""
-        
-        # 1. Verificar si ya existe para ver si procesamos foto
-        existing = {}
-        try:
-            res_db = supabase.table("productos_demo").select("img_url", "precio_pesos").eq("codigo", sku).execute()
-            if res_db.data:
-                existing = res_db.data[0]
-                stats["actualizados"] += 1
-            else:
-                stats["nuevos"] += 1
-        except:
-            pass
+        sku = row.get("CODIGO") or row.get("sku")
+        nombre = row.get("NOMBRE") or row.get("nombre")
+        precio_pesos = float(row.get("PRECIO") or 0)
+        stock = int(row.get("STOCK") or 0)
+        foto_id = row.get("FOTO") or ""
+        categoria = row.get("CATEGORIA") or "General"
 
+        if not sku: continue
+
+        # Datos base
         product_data = {
             "codigo": sku,
             "nombre": nombre,
-            "marca": row[2].strip(),
-            "categoria": row[3].strip(),
             "precio_pesos": precio_pesos,
-            "stock": row[5].strip() if len(row) > 5 else "S/D",
+            "stock": stock,
+            "categoria": categoria,
             "updated_at": datetime.now().isoformat()
         }
 
-        # Solo procesamos la imagen si el producto NO tiene img_url ya guardada
-        if not existing.get("img_url"):
-            new_img_url = process_image(foto_id, sku)
-            if new_img_url:
-                product_data["img_url"] = new_img_url
-                stats["fotos_procesadas"] += 1
-        
-        # Alertas de precio
-        if existing and existing.get("precio_pesos") != precio_pesos:
-            stats["precios_cambiados"] += 1
-            logs.append(f"💰 {sku}: ${existing['precio_pesos']} -> ${precio_pesos}")
+        # Lógica de Imagen (Solo si no tiene ya una URL válida en BD)
+        try:
+            existing = supabase.table("productos_demo").select("img_url").eq("codigo", sku).execute()
+            if not existing.data or not existing.data[0].get("img_url"):
+                img_url = process_image(foto_id, sku)
+                if img_url:
+                    product_data["img_url"] = img_url
+                    stats["fotos_procesadas"] += 1
+        except:
+            pass
 
         # Upsert
-        supabase.table("productos_demo").upsert(product_data).execute()
+        try:
+            supabase.table("productos_demo").upsert(product_data).execute()
+            stats["actualizados"] += 1
+        except Exception as e:
+            print(f"❌ Error guardando {sku}: {e}")
 
-    # Resumen Final
-    summary = (
-        f"**Sincronización Finalizada** 🔄\n"
-        f"✨ Nuevos: {stats['nuevos']}\n"
-        f"🔄 Actualizados: {stats['actualizados']}\n"
-        f"📈 Cambios precio: {stats['precios_cambiados']}\n"
-        f"📸 Fotos procesadas: {stats['fotos_procesadas']}"
+    # Notificación Discord
+    msg = (
+        "✅ **Sincronización Piloto Finalizada**\n"
+        f"📦 Productos procesados: {stats['actualizados']}\n"
+        f"🖼️ Fotos nuevas en Supabase: {stats['fotos_procesadas']}\n"
+        "---"
     )
-    
-    if logs:
-        summary += "\n\n**Detalles:**\n" + "\n".join(logs[:10])
-        if len(logs) > 10: summary += "\n*...y más*"
-
-    send_discord_log(summary)
-    print("✅ Proceso completado.")
+    if DISCORD_WEBHOOK_URL:
+        requests.post(DISCORD_WEBHOOK_URL, json={"content": msg})
+    print("Terminado.")
 
 if __name__ == "__main__":
     run_sync()
