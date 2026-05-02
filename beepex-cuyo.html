@@ -1009,7 +1009,7 @@ let productMap = {};
 async function loadProducts(){
   try{
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/productos_demo?select=sku,name:producto,brand:marca,price:precio_pesos,pvp,iva,stock:stock_estado,description:descripcion,rubro,ean&order=brand.asc,name.asc&limit=1`,
+      `${SUPABASE_URL}/rest/v1/productos_demo?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,description:descripcion,rubro,ean&order=brand.asc,name.asc&codigo=eq.11307`,
       { headers:{
           'apikey': SUPABASE_ANON,
           'Authorization': `Bearer ${SUPABASE_ANON}`,
