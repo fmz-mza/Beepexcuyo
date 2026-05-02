@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuración
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE") or os.getenv("VITE_SUPABASE_ANON_KEY")
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "16CTx8wJkiY45VDO9ft2r1VZZjsPyh5t_YGmhTOgQtrU")
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK_URL")
 
@@ -51,20 +51,32 @@ def normalizar_iva(val):
         return s
 
 def limpiar_precio(val):
+    """
+    Limpia y convierte a entero strings de precios con formatos variados:
+    $11,899.00 -> 11899
+    $11.899,00 -> 11899
+    1.899 -> 1899
+    21499 -> 21499
+    """
     if pd.isna(val) or val is None: return 0
     s = str(val).replace('$', '').strip()
     if s.upper() == "SIN PVP": return 0
-    # Limpieza agresiva de caracteres no numéricos
-    s = re.sub(r'[^\d.,]', '', s)
-    if not s: return 0
+    
+    # 1. Quitar espacios
+    s = s.replace(' ', '')
+    
+    # 2. Manejar decimales .00 o ,00 al final
+    # Si termina en ,XX o .XX, lo consideramos decimal y lo removemos
+    # (Ya que para este catálogo manejamos precios enteros en pesos)
+    if re.search(r'[,.]\d{2}$', s):
+        s = s[:-3]
+    
+    # 3. Eliminar cualquier separador de miles o caracteres no numéricos restantes
+    s = re.sub(r'[^\d]', '', s)
+    
     try:
-        # Manejar formatos como 11.899,00 o 11,899.00
-        # Intentamos una conversión simple
-        s_clean = s.replace('.', '').replace(',', '.')
-        if s_clean.count('.') > 1: # caso 11.899.000
-             s_clean = s_clean.replace('.', '', s_clean.count('.') - 1)
-        return int(float(s_clean))
-    except:
+        return int(s) if s else 0
+    except Exception:
         return 0
 
 def get_drive_ids_from_netlify():
