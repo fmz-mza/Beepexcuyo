@@ -500,7 +500,7 @@
   .sale-mode .card .tag.t-preventa{display:none;}
   .sale-mode .card .tag.t-nostock{display:none;}
   .sale-mode .desc-modal-price-note{display:none!important;}
-  .back-top{position:fixed;bottom:24px;right:16px;width:40px;height:40px;background:rgba(28,31,42,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.07);border-radius:50%;color:rgba(240,242,255,.4);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:150;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .25s,transform .25s,color .15s,background .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+  .back-top{position:fixed;bottom:24px;right:16px;width:40px;height:40px;background:rgba(28,31,42,0.85);border:1px solid rgba(255,255,255,.07);border-radius:50%;color:rgba(240,242,255,.4);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:150;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .25s,transform .25s,color .15s,background .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .back-top:hover{background:rgba(28,31,42,.8);color:rgba(240,242,255,.9);}
   .back-top.visible{opacity:1;pointer-events:auto;transform:translateY(0);}
   .sale-select-bar.visible~.back-top, body:has(.sale-select-bar.visible) .back-top{bottom:130px;}
@@ -1398,16 +1398,17 @@ function _checkSentinelScroll(){
     _loadingMore=false;
   }
 }
-// Throttling para scroll
+// Throttling y bloqueo para scroll
 let _scrollTimeout = null;
+let _blockScrollLoad = false;
 window.addEventListener('scroll', ()=>{
-  if(_scrollTimeout) return;
+  if(_scrollTimeout || _blockScrollLoad) return;
   _scrollTimeout = setTimeout(()=>{
     _scrollTimeout = null;
-    if(!_loadingMore && _pagedIdx < _pagedList.length){
+    if(!_loadingMore && _pagedIdx < _pagedList.length && !_blockScrollLoad){
       _checkSentinelScroll();
     }
-  }, 100);
+  }, 150);
 },{passive:true});
 
 // Observer para infinite scroll
@@ -2392,14 +2393,34 @@ function openLightbox(sku){
   document.body.dataset.lbScrollY=sy;
 }
 function closeLightbox(){
-  document.getElementById('lightbox').classList.remove('open');
-  if(document.body.style.position==='fixed'){
-    const sy=parseInt(document.body.dataset.lbScrollY||'0');
-    document.body.style.position='';
-    document.body.style.top='';
-    document.body.style.width='';
-    window.scrollTo(0,sy);
-  }
+  const lb = document.getElementById('lightbox');
+  if(!lb || !lb.classList.contains('open')) return;
+  
+  lb.classList.remove('open');
+  
+  // Limpiar imagen y bloquear scroll de carga
+  const lbImg = document.getElementById('lightboxImg');
+  if(lbImg) lbImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+  if(typeof _blockScrollLoad !== 'undefined') _blockScrollLoad = true;
+
+  // Esperar a que la transición termine antes de tocar el body
+  setTimeout(() => {
+    if(document.body.style.position==='fixed'){
+      const sy=parseInt(document.body.dataset.lbScrollY||'0');
+      document.body.style.position='';
+      document.body.style.top='';
+      document.body.style.width='';
+      document.body.style.overflow='';
+      
+      requestAnimationFrame(() => {
+        window.scrollTo(0,sy);
+        setTimeout(() => { if(typeof _blockScrollLoad !== 'undefined') _blockScrollLoad = false; }, 300);
+      });
+    } else {
+      if(typeof _blockScrollLoad !== 'undefined') _blockScrollLoad = false;
+    }
+  }, 200);
 }
 function openDesc(sku){
   const p=productMap[sku]; if(!p) return;
@@ -2685,29 +2706,44 @@ function closeDescBtn(e){
   const overlay = document.getElementById('descOverlay');
   if(!overlay || !overlay.classList.contains('open')) return;
   
+  // Bloquear carga de productos
+  _blockScrollLoad = true;
+  
+  // 1. Cerrar visualmente el modal inmediatamente
   overlay.classList.remove('open');
+  
+  // Limpiar imagen para liberar memoria inmediatamente
+  const imgEl = document.getElementById('descModalImg');
+  if(imgEl) imgEl.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
   const sp=document.getElementById('sharePricePanel');
   if(sp){ sp.style.display='none'; }
   const sb=document.getElementById('descShareBtn');
   if(sb) sb.classList.remove('open');
 
-  // Restaurar scroll body de forma segura
-  if(document.body.style.position==='fixed'){
-    const sy=parseInt(document.body.dataset.descScrollY||'0');
-    
-    document.body.style.position='';
-    document.body.style.top='';
-    document.body.style.width='';
-    document.body.style.overflow='';
-    
-    descActiveSku = null;
+  // 2. Esperar a que la transición visual termine o se asiente antes de tocar el body
+  setTimeout(() => {
+    if(document.body.style.position === 'fixed'){
+      const sy = parseInt(document.body.dataset.descScrollY || '0');
+      
+      // Restaurar estilos de body
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      
+      descActiveSku = null;
 
-    // Usar setTimeout para mover el scroll fuera del frame de animación de cierre
-    // Esto previene bloqueos en iOS/Safari y otros motores webkit
-    setTimeout(()=>{
-      window.scrollTo(0, sy);
-    }, 10);
-  }
+      // 3. Restaurar scroll en un frame separado
+      requestAnimationFrame(() => {
+        window.scrollTo(0, sy);
+        // Desbloquear carga de productos un poco después
+        setTimeout(() => { _blockScrollLoad = false; }, 300);
+      });
+    } else {
+      _blockScrollLoad = false;
+    }
+  }, 150); // Delay para permitir que el modal se oculte sin stress gráfico
 }
 
 // ── Tecla Escape cierra modales ──────────────────────────────────────────────
