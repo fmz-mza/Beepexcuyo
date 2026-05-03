@@ -462,7 +462,9 @@ input,select,textarea{font-family:inherit;}
 const SUPABASE_URL  = 'https://mmerrzniuxbrjryhcsda.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_oJzr70DjfOZsK4mjFX5rRw_5hc03thM';
 const WA_NUMBER     = '5492616531533';
-const IMG_BASE      = 'https://fmz-mza.github.io/Beepexcuyo/images/SKU_';
+const GITHUB_USER='fmz-mza', GITHUB_REPO='Beepexcuyo', GITHUB_BRANCH='main';
+const EXTENSIONS=['webp','jpg','jpeg','png','JPG','PNG'];
+const BUCKET_URL='https://mmerrzniuxbrjryhcsda.supabase.co/storage/v1/object/public/fotos';
 
 const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth:{ autoRefreshToken:true, persistSession:true, detectSessionInUrl:false }
@@ -539,35 +541,53 @@ function goTab(name){
 }
 
 /* PRODUCTOS */
+const imgCache = {};
+function imgBase(sku, ext='webp'){ 
+  if(ext==='webp') return `${BUCKET_URL}/${sku}.webp`;
+  return `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/images/SKU_${sku}.${ext}`; 
+}
+function tryLoadImg(el, sku, i=0){
+  if(imgCache[sku]==='error') return;
+  if(imgCache[sku]){ el.src=imgCache[sku]; return; }
+  if(i>=EXTENSIONS.length){ imgCache[sku]='error'; return; }
+  const ext = EXTENSIONS[i];
+  const url = imgBase(sku, ext);
+  el.onerror=()=>tryLoadImg(el,sku,i+1);
+  el.onload=()=>{ imgCache[sku]=url; };
+  el.src=url;
+}
+
 async function loadProducts(){
-  const {data}=await _sb.from('products').select('*').order('name');
+  const {data}=await _sb.from('productos').select('*').order('producto');
   products=data||[]; renderProds(products);
 }
 function renderProds(list){
   const g=document.getElementById('prodGrid');
   if(!list.length){g.innerHTML='<div class="grid-empty">😿 Sin resultados</div>';return;}
   g.innerHTML=list.map(p=>{
-    const item=cart.find(c=>c.product.sku===p.sku);
-    const noStock=!p.stock||p.stock==='NOSTOCK';
-    return `<div class="prod-card${noStock?' no-stock':''}${item?' in-cart':''}" id="pc-${p.sku}" onclick="addToCart('${p.sku}')">
-      <div class="prod-qty-badge" id="pb-${p.sku}"${item?'':' style="display:none"'}>${item?item.qty:''}</div>
-      <div class="prod-img-box">📦<img src="${IMG_BASE}${p.sku}.jpg" onerror="this.remove()" loading="lazy"></div>
+    const item=cart.find(c=>c.product.codigo===p.codigo);
+    const noStock=!p.stock_estado||p.stock_estado==='NOSTOCK';
+    return `<div class="prod-card${noStock?' no-stock':''}${item?' in-cart':''}" id="pc-${p.codigo}" onclick="addToCart('${p.codigo}')">
+      <div class="prod-qty-badge" id="pb-${p.codigo}"${item?'':' style="display:none"'}>${item?item.qty:''}</div>
+      <div class="prod-img-box">📦<img data-sku="${p.codigo}" src="" onerror="this.remove()" loading="lazy"></div>
       <div class="prod-info">
-        <div class="prod-brand">${p.brand||''}</div>
-        <div class="prod-name">${p.name}</div>
-        <div style="font-size:9px;color:var(--muted);font-weight:600;margin-top:1px;letter-spacing:.3px;">${p.sku}</div>
-        <div class="prod-price">${fmt(p.price)}</div>
+        <div class="prod-brand">${p.marca||''}</div>
+        <div class="prod-name">${p.producto}</div>
+        <div style="font-size:9px;color:var(--muted);font-weight:600;margin-top:1px;letter-spacing:.3px;">${p.codigo}</div>
+        <div class="prod-price">${fmt(p.precio_pesos)}</div>
       </div>
     </div>`;
   }).join('');
+  // Cargar imágenes
+  document.querySelectorAll('#prodGrid img[data-sku]').forEach(img=>tryLoadImg(img, img.dataset.sku));
 }
 function filterProds(){
   const q=document.getElementById('searchInp').value.toLowerCase().trim();
   document.getElementById('searchClear').classList.toggle('show',q.length>0);
   renderProds(q ? products.filter(p=>
-    p.name.toLowerCase().includes(q)||
-    String(p.sku).includes(q)||
-    (p.brand||'').toLowerCase().includes(q)||
+    p.producto.toLowerCase().includes(q)||
+    String(p.codigo).includes(q)||
+    (p.marca||'').toLowerCase().includes(q)||
     String(p.ean||'').includes(q)
   ) : products);
 }
@@ -579,21 +599,21 @@ function clearSearch(){
 
 /* CARRITO */
 function addToCart(sku){
-  const p=products.find(x=>x.sku===sku); if(!p) return;
-  const ex=cart.find(c=>c.product.sku===sku);
+  const p=products.find(x=>x.codigo===sku); if(!p) return;
+  const ex=cart.find(c=>c.product.codigo===sku);
   if(ex) ex.qty++;
   else{
-    cart.push({product:p,qty:1,precioFinal:p.price,precioModificado:null,motivoPrecio:''});
-    if(!p.stock||p.stock==='NOSTOCK') showToast('⚠️ '+p.name+' sin stock — se agrega igual','err');
+    cart.push({product:p,qty:1,precioFinal:p.precio_pesos,precioModificado:null,motivoPrecio:''});
+    if(!p.stock_estado||p.stock_estado==='NOSTOCK') showToast('⚠️ '+p.producto+' sin stock — se agrega igual','err');
   }
   const pc=document.getElementById('pc-'+sku);
   const pb=document.getElementById('pb-'+sku);
   if(pc) pc.classList.add('in-cart');
-  if(pb){pb.style.display='flex';pb.textContent=cart.find(c=>c.product.sku===sku).qty;}
+  if(pb){pb.style.display='flex';pb.textContent=cart.find(c=>c.product.codigo===sku).qty;}
   renderCart(); updateBadge();
 }
 function removeFromCart(sku){
-  cart=cart.filter(c=>c.product.sku!==sku);
+  cart=cart.filter(c=>c.product.codigo!==sku);
   const pc=document.getElementById('pc-'+sku);
   const pb=document.getElementById('pb-'+sku);
   if(pc) pc.classList.remove('in-cart');
@@ -601,7 +621,7 @@ function removeFromCart(sku){
   renderCart(); updateBadge();
 }
 function changeQty(sku,d){
-  const item=cart.find(c=>c.product.sku===sku); if(!item) return;
+  const item=cart.find(c=>c.product.codigo===sku); if(!item) return;
   item.qty=Math.max(1,item.qty+d);
   const pb=document.getElementById('pb-'+sku);
   if(pb) pb.textContent=item.qty;
@@ -613,18 +633,18 @@ function clearCart(){
   if(!cart.length) return;
   if(!confirm('¿Vaciar el pedido?')) return;
   cart.forEach(c=>{
-    const pc=document.getElementById('pc-'+c.product.sku);
-    const pb=document.getElementById('pb-'+c.product.sku);
+    const pc=document.getElementById('pc-'+c.product.codigo);
+    const pb=document.getElementById('pb-'+c.product.codigo);
     if(pc) pc.classList.remove('in-cart');
     if(pb){pb.style.display='none';pb.textContent='';}
   });
   cart=[]; renderCart(); updateBadge();
 }
 function onPriceChange(sku,val){
-  const item=cart.find(c=>c.product.sku===sku); if(!item) return;
-  const np=parseFloat(val)||item.product.price;
+  const item=cart.find(c=>c.product.codigo===sku); if(!item) return;
+  const np=parseFloat(val)||item.product.precio_pesos;
   item.precioFinal=np;
-  item.precioModificado=np!==item.product.price?np:null;
+  item.precioModificado=np!==item.product.precio_pesos?np:null;
   const inp=document.getElementById('cpi-'+sku);
   if(inp) inp.classList.toggle('modified',!!item.precioModificado);
   const mot=document.getElementById('cmot-'+sku);
@@ -632,7 +652,7 @@ function onPriceChange(sku,val){
   recalc();
 }
 function onMotivoChange(sku,val){
-  const item=cart.find(c=>c.product.sku===sku);
+  const item=cart.find(c=>c.product.codigo===sku);
   if(item) item.motivoPrecio=val;
 }
 function renderCart(){
@@ -645,27 +665,29 @@ function renderCart(){
     const p=item.product;
     return `<div class="cart-item">
       <div class="ci-top">
-        <img class="ci-img" src="${IMG_BASE}${p.sku}.jpg" onerror="this.src=''">
-        <div class="ci-info"><div class="ci-name">${p.name}</div><div class="ci-sku">SKU ${p.sku}</div></div>
-        <button class="ci-del" onclick="removeFromCart('${p.sku}')">🗑</button>
+        <img class="ci-img" src="" data-sku="${p.codigo}" onerror="this.src=''">
+        <div class="ci-info"><div class="ci-name">${p.producto}</div><div class="ci-sku">SKU ${p.codigo}</div></div>
+        <button class="ci-del" onclick="removeFromCart('${p.codigo}')">🗑</button>
       </div>
       <div class="ci-bottom">
         <div class="ci-price-wrap">
           <span class="ci-price-prefix">$</span>
-          <input type="number" class="ci-price${item.precioModificado?' modified':''}" id="cpi-${p.sku}"
-            value="${item.precioFinal}" oninput="onPriceChange('${p.sku}',this.value)" inputmode="numeric">
+          <input type="number" class="ci-price${item.precioModificado?' modified':''}" id="cpi-${p.codigo}"
+            value="${item.precioFinal}" oninput="onPriceChange('${p.codigo}',this.value)" inputmode="numeric">
         </div>
         <div class="ci-qty">
-          <button class="ci-qty-btn" onclick="changeQty('${p.sku}',-1)">−</button>
-          <div class="ci-qty-val" id="cqv-${p.sku}">${item.qty}</div>
-          <button class="ci-qty-btn" onclick="changeQty('${p.sku}',1)">+</button>
+          <button class="ci-qty-btn" onclick="changeQty('${p.codigo}',-1)">−</button>
+          <div class="ci-qty-val" id="cqv-${p.codigo}">${item.qty}</div>
+          <button class="ci-qty-btn" onclick="changeQty('${p.codigo}',1)">+</button>
         </div>
       </div>
-      <input type="text" class="ci-motivo${item.precioModificado?' show':''}" id="cmot-${p.sku}"
+      <input type="text" class="ci-motivo${item.precioModificado?' show':''}" id="cmot-${p.codigo}"
         placeholder="Motivo del precio modificado..." value="${item.motivoPrecio||''}"
-        onchange="onMotivoChange('${p.sku}',this.value)">
+        onchange="onMotivoChange('${p.codigo}',this.value)">
     </div>`;
   }).join('');
+  // Cargar imágenes del carrito
+  area.querySelectorAll('img[data-sku]').forEach(img=>tryLoadImg(img, img.dataset.sku));
   recalc();
 }
 
@@ -966,8 +988,8 @@ async function confirmSale(){
     total, estado:'cerrada', expires_at:null
   };
   const items=cart.map(c=>({
-    sku:c.product.sku, nombre:c.product.name,
-    precio_unitario:c.product.price,
+    sku:c.product.codigo, nombre:c.product.producto,
+    precio_unitario:c.product.precio_pesos,
     precio_modificado:c.precioModificado||null,
     motivo_precio:c.motivoPrecio||null,
     cantidad:c.qty, subtotal:(c.precioFinal||0)*c.qty
@@ -1444,18 +1466,18 @@ function onScan(code,format){
     String(p.ean||'').trim()===codeStr||
     '0'+String(p.ean||'').trim()===codeStr||
     String(p.ean||'').trim()==='0'+codeStr||
-    String(p.sku||'').trim()===codeStr
+    String(p.codigo||'').trim()===codeStr
   );
   if(product){
     status.className='scan-status ok';
-    status.textContent='✓ '+product.name;
-    debug.textContent+=' · ✅ '+product.sku;
+    status.textContent='✓ '+product.producto;
+    debug.textContent+=' · ✅ '+product.codigo;
     if(navigator.vibrate) navigator.vibrate(80);
     setTimeout(()=>{
       const fromCart=document.getElementById('scanOverlay').dataset.fromCart==='1';
       closeScanner();
-      addToCart(product.sku);
-      showToast('✓ '+product.name+' agregado','ok');
+      addToCart(product.codigo);
+      showToast('✓ '+product.producto+' agregado','ok');
       if(fromCart) goTab('Carrito');
     },500);
   }else{
