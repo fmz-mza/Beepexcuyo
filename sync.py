@@ -105,6 +105,18 @@ def get_drive_ids_from_netlify():
         print(f"Error scraping Netlify: {e}")
         return {}
 
+def limpiar_stock(val):
+    if pd.isna(val) or val is None: return 0
+    s = str(val).replace(',', '.').strip()
+    try:
+        # Intentar buscar el primer número que parezca un decimal o entero
+        match = re.search(r'(\d+\.?\d*)', s)
+        if match:
+            return float(match.group(1))
+    except:
+        pass
+    return 0
+
 def process_image(drive_id, sku):
     """Descarga, optimiza y sube la imagen a Supabase Storage"""
     bucket_name = FOTOS_BUCKET
@@ -248,19 +260,9 @@ def run_sync():
 
         # Stock
         stock_raw = str(row.get("STOCK/INGRESO", "0")).upper()
-        stock_fisico = 0
-        try:
-            val_clean = re.sub(r'[^\d]', '', stock_raw)
-            stock_fisico = float(val_clean) if val_clean else 0
-        except: 
-            pass
-
-        stock_ingresos = 0
-        try: 
-            inc_val = re.sub(r'[^\d]', '', str(row.get("STOCK INGRESOS", "0")))
-            stock_ingresos = float(inc_val) if inc_val else 0
-        except: 
-            pass
+        stock_fisico = limpiar_stock(stock_raw)
+        
+        stock_ingresos = limpiar_stock(row.get("STOCK INGRESOS", "0"))
 
         fecha_ingreso = str(row.get("INGRESOS", "")).strip()
         if fecha_ingreso.lower() == "none" or fecha_ingreso == "0": 
