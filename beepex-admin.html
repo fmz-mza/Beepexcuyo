@@ -2063,8 +2063,8 @@ async function downloadExcelClientes(){
     headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A7CFF' } };
     headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
 
-    data.forEach((p, index) => {
-      const row = sheet.addRow({
+    data.forEach((p) => {
+      sheet.addRow({
         brand: p.brand,
         sku: p.sku,
         name: p.name,
@@ -2074,29 +2074,73 @@ async function downloadExcelClientes(){
         iva: p.iva + '%',
         stock: p.stock
       });
-
-      row.height = 80; // Altura generosa para que la imagen dinámica se vea bien
-      row.alignment = { vertical: 'middle', horizontal: 'center' };
-      row.getCell('name').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-      row.getCell('description').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true, font: { size: 9, color: { argb: 'FF8B90A8' } } };
-      
-      row.getCell('price').numFmt = '"$"#,##0';
-      row.getCell('pvp').numFmt = '"$"#,##0';
-      row.getCell('sku').font = { bold: true };
-
-      // Configurar fórmula IMAGE para carga dinámica + Hyperlink de respaldo
-      const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/fotos/${p.sku}.webp`;
-      
-      // La fórmula IMAGE es soportada por Excel 365 y Google Sheets
-      row.getCell('foto').value = {
-        formula: `=IMAGE("${imgUrl}")`,
-        hyperlink: imgUrl,
-        tooltip: 'Haz clic para ver la foto si no carga automáticamente'
-      };
-      
-      // Estilo para la celda de la foto
-      row.getCell('foto').font = { color: { argb: 'FF4A7CFF' }, underline: true, size: 9 };
     });
+
+    // Ajustes de filas
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        row.height = 85;
+        row.alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell('name').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        row.getCell('description').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true, font: { size: 9, color: { argb: 'FF8B90A8' } } };
+        row.getCell('price').numFmt = '"$"#,##0';
+        row.getCell('pvp').numFmt = '"$"#,##0';
+        row.getCell('sku').font = { bold: true };
+      }
+    });
+
+    // Procesar imágenes de forma secuencial para evitar bloqueos
+    for (let i = 0; i < data.length; i++) {
+      const p = data[i];
+      const rowIndex = i + 2;
+      try {
+        const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/fotos/${p.sku}.webp`;
+        const imgResp = await fetch(imgUrl);
+        if (imgResp.ok) {
+          const buffer = await imgResp.arrayBuffer();
+          const blob = new Blob([buffer]);
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = url;
+          });
+
+          // Redimensionar para que el Excel sea liviano
+          const canvas = document.createElement('canvas');
+          const size = 110; 
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = "white";
+          ctx.fillRect(0, 0, size, size);
+          
+          const scale = Math.min(size / img.width, size / img.height);
+          const x = (size / 2) - (img.width / 2) * scale;
+          const y = (size / 2) - (img.height / 2) * scale;
+          ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+          const pngBlob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.7));
+          const pngBuffer = await pngBlob.arrayBuffer();
+          URL.revokeObjectURL(url);
+
+          const imageId = workbook.addImage({
+            buffer: pngBuffer,
+            extension: 'png',
+          });
+
+          sheet.addImage(imageId, {
+            tl: { col: 0, row: rowIndex - 1 },
+            ext: { width: 105, height: 105 },
+            editAs: 'oneCell'
+          });
+        }
+      } catch (err) {
+        console.warn('Salteando imagen para SKU:', p.sku);
+      }
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
