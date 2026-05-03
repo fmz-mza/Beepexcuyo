@@ -737,7 +737,7 @@ let userSalePrices={}; // {sku: price}
     <div class="desc-modal-body">
       <div class="desc-modal-header-row">
         <div class="desc-modal-name" id="descModalName"></div>
-        <button class="desc-modal-close-top" onclick="closeDescBtn(event)" aria-label="Cerrar">✕</button>
+        <button type="button" class="desc-modal-close-top" onclick="closeDescBtn(event)" aria-label="Cerrar">✕</button>
       </div>
       <div class="desc-modal-sku" id="descModalSku"></div>
       <div class="desc-modal-price" id="descModalPrice"></div>
@@ -2677,7 +2677,11 @@ function roundRect(ctx,x,y,w,h,r){
 }
 
 function closeDescBtn(e){
-  if(e) e.stopPropagation();
+  if(e) {
+    if(typeof e.preventDefault === 'function') e.preventDefault();
+    if(typeof e.stopPropagation === 'function') e.stopPropagation();
+  }
+  
   const overlay = document.getElementById('descOverlay');
   if(!overlay || !overlay.classList.contains('open')) return;
   
@@ -2687,17 +2691,22 @@ function closeDescBtn(e){
   const sb=document.getElementById('descShareBtn');
   if(sb) sb.classList.remove('open');
 
-  // Restaurar scroll body
+  // Restaurar scroll body de forma segura
   if(document.body.style.position==='fixed'){
     const sy=parseInt(document.body.dataset.descScrollY||'0');
+    
     document.body.style.position='';
     document.body.style.top='';
     document.body.style.width='';
+    document.body.style.overflow='';
+    
     descActiveSku = null;
-    // Usar setTimeout para alejar del frame actual de animación y evitar crashes en browsers mobile
+
+    // Usar setTimeout para mover el scroll fuera del frame de animación de cierre
+    // Esto previene bloqueos en iOS/Safari y otros motores webkit
     setTimeout(()=>{
-      window.scrollTo({top: sy, behavior: 'instant'});
-    }, 0);
+      window.scrollTo(0, sy);
+    }, 10);
   }
 }
 
