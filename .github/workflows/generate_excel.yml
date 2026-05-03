@@ -29,3 +29,38 @@ jobs:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: python generate_excel.py
+
+    - name: Notificar a Discord (Éxito)
+      if: success()
+      run: |
+        curl -H "Content-Type: application/json" \
+             -d '{
+               "username": "Beepex Bot",
+               "embeds": [{
+                 "title": "✅ Excel de Clientes Generado",
+                 "description": "La lista de precios con fotos ha sido actualizada exitosamente en Supabase Storage.",
+                 "color": 4881663,
+                 "fields": [
+                   { "name": "Archivo", "value": "Beepex.xlsx", "inline": true },
+                   { "name": "Servidor", "value": "GitHub Actions", "inline": true }
+                 ],
+                 "footer": { "text": "Beepex Automation System" },
+                 "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+               }]
+             }' \
+             ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+    - name: Notificar a Discord (Error)
+      if: failure()
+      run: |
+        curl -H "Content-Type: application/json" \
+             -d '{
+               "username": "Beepex Bot",
+               "embeds": [{
+                 "title": "❌ Error en Generación de Excel",
+                 "description": "Hubo un problema al generar o subir el archivo Beepex.xlsx. Por favor, revisa los logs en GitHub Actions.",
+                 "color": 16711680,
+                 "footer": { "text": "Beepex Automation System" }
+               }]
+             }' \
+             ${{ secrets.DISCORD_WEBHOOK_URL }}
