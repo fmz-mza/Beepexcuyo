@@ -425,6 +425,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
           <h3 style="margin:0;font-size:15px;">🗂️ Gestión de Productos</h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn-sm" onclick="downloadProductsExcel()">⬇️ Descargar Excel</button>
+            <button class="btn-sm" style="background:var(--accent2);color:#fff;" onclick="downloadExcelClientes()">💎 Excel Clientes (Fotos)</button>
             <label class="btn-sm" style="cursor:pointer;">
               ⬆️ Subir Excel
               <input type="file" id="excelUploadInput" accept=".xlsx,.xls" style="display:none;">
@@ -2018,6 +2019,157 @@ async function downloadProductsExcel(){
     XLSX.writeFile(wb, `BEEPEX_productos_${new Date().toISOString().slice(0,10)}.xlsx`);
     showToast('✅ Excel descargado');
   } catch(e){ showToast('❌ Error: '+e.message); }
+}
+
+// ── Excel para Clientes con Fotos (ExcelJS) ───────────────────────────────────
+async function downloadExcelClientes(){
+  showToast('⏳ Generando Excel con fotos (este proceso puede tardar)...');
+  try {
+    if(!window.ExcelJS){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+        s.onload=res; s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+
+    const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,description:descripcion,ean,stock_fisico,ingresos,stock_ingresos,rubro&order=marca.asc,producto.asc`,{
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    const data = await resp.json();
+    if(!Array.isArray(data)) throw new Error(data.message || 'Error al descargar productos');
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('LISTA DE PRECIOS');
+
+    sheet.columns = [
+      { header: 'FOTO', key: 'foto', width: 15 },
+      { header: 'MARCA', key: 'brand', width: 14 },
+      { header: 'CÓDIGO', key: 'sku', width: 12 },
+      { header: 'PRODUCTO', key: 'name', width: 45 },
+      { header: 'DESCRIPCIÓN', key: 'description', width: 35 },
+      { header: 'PRECIO PESOS', key: 'price', width: 15 },
+      { header: 'PVP', key: 'pvp', width: 15 },
+      { header: 'IVA', key: 'iva', width: 8 },
+      { header: 'ESTADO', key: 'stock', width: 15 }
+    ];
+
+    // Estilo cabecera
+    const headerRow = sheet.getRow(1);
+    headerRow.height = 30;
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A7CFF' } };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    let rowIndex = 2;
+    for (const p of data) {
+      const row = sheet.addRow({
+        brand: p.brand,
+        sku: p.sku,
+        name: p.name,
+        description: p.description || '',
+        price: p.price,
+        pvp: p.pvp || '',
+        iva: p.iva + '%',
+        stock: p.stock
+      });
+
+      row.height = 90;
+      row.alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell('name').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+      row.getCell('description').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true, font: { size: 9, color: { argb: 'FF8B90A8' } } };
+      
+      row.getCell('price').numFmt = '"$"#,##0';
+      row.getCell('pvp').numFmt = '"$"#,##0';
+      row.getCell('sku').font = { bold: true, family: 2 };
+
+      // Lógica de imágenes
+      try {
+        const sku = p.sku;
+        // Intentamos obtener la imagen (webp es el estándar que estamos usando)
+        const extensions = ['webp', 'jpg', 'png'];
+        let buffer = null;
+        let extFound = '';
+
+        for(const ext of extensions){
+          const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/fotos/${sku}.${ext}`;
+          try {
+            const imgResp = await fetch(imgUrl);
+            if(imgResp.ok){
+              buffer = await imgResp.arrayBuffer();
+              extFound = ext;
+              break;
+            }
+          } catch(e) {}
+        }
+
+        if(buffer){
+          try {
+            // Convertimos la imagen a PNG usando un canvas para asegurar compatibilidad total con Excel
+            const blob = new Blob([buffer], { type: `image/${extFound}` });
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            
+            await new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = reject;
+              img.src = url;
+            });
+
+            const canvas = document.createElement('canvas');
+            const size = 120; // Tamaño fijo para miniatura
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Proporciones para centrar
+            const scale = Math.min(size / img.width, size / img.height);
+            const x = (size / 2) - (img.width / 2) * scale;
+            const y = (size / 2) - (img.height / 2) * scale;
+            ctx.fillStyle = "white"; // Fondo blanco para transparencia
+            ctx.fillRect(0, 0, size, size);
+            ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+            const pngBlob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.8));
+            const pngBuffer = await pngBlob.arrayBuffer();
+            URL.revokeObjectURL(url);
+
+            const imageId = workbook.addImage({
+              buffer: pngBuffer,
+              extension: 'png',
+            });
+            
+            sheet.addImage(imageId, {
+              tl: { col: 0, row: rowIndex - 1 },
+              ext: { width: 110, height: 110 },
+              editAs: 'oneCell'
+            });
+          } catch(err) {
+            console.warn('Fallo conversión de imagen para:', p.sku, err);
+          }
+        }
+      } catch (err) {
+        console.warn('No se pudo cargar foto para:', p.sku);
+      }
+      rowIndex++;
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `BEEPEX_Lista_Clientes_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    showToast('✅ Excel para clientes generado con éxito');
+  } catch (e) {
+    console.error(e);
+    showToast('❌ Error: ' + e.message);
+  }
 }
 
 // ── Upload Excel y preview ────────────────────────────────────────────────────
