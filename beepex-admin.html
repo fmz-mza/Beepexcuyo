@@ -1918,7 +1918,7 @@ async function loadProdTable(){
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr>';
   try{
     const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=sku,name,brand,price,pvp,iva,stock&order=brand.asc,name.asc`,{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado&order=marca.asc,producto.asc`,{
       headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
     });
     prodData = await res.json();
@@ -1988,7 +1988,7 @@ async function downloadProductsExcel(){
       });
     }
     const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/products?select=sku,name,brand,price,pvp,iva,stock,description,ean&order=brand.asc,name.asc`,{
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,description,ean&order=marca.asc,producto.asc`,{
       headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
     });
     const data = await resp.json();
@@ -2107,7 +2107,7 @@ async function handleExcelUpload(event){
           description:(r['DESCRIPCIÓN']||'').toString().replace(/\n/g,' ').trim(),
           ean:(r['CODIGO EAN']?String(r['CODIGO EAN']).split('.')[0].trim():''),
           rubro:(r['RUBRO']||'').toString().trim().toUpperCase(),
-          stock_ingreso:(r['STOCK/INGRESO']||'').toString().trim(),
+          stock_fisico:(r['STOCK/INGRESO']||'').toString().trim(),
           ingresos:(r['INGRESOS']||'').toString().trim(),
           stock_ingresos:(r['STOCK INGRESOS']||'').toString().trim(),
         });
@@ -2132,7 +2132,7 @@ async function handleExcelUpload(event){
             stock:parseStock(r['STOCK']),
             description:(r['DESCRIPCIÓN']||'').toString().replace(/\n/g,' ').trim(),
             ean:(r['CODIGO EAN']?String(Math.round(r['CODIGO EAN'])):''),
-            rubro:'', stock_ingreso:'', ingresos:'', stock_ingresos:''
+            rubro:'', stock_fisico:'', ingresos:'', stock_ingresos:''
           });
         });
       });
@@ -2216,18 +2216,35 @@ async function confirmExcelImport(){
 
   try{
     // Upsert todos los productos del Excel
+    // Mapear a nombres de base de datos
+    const toDb = p => ({
+      codigo: p.sku,
+      producto: p.name,
+      marca: p.brand,
+      precio_pesos: p.price,
+      precio_pvp: p.pvp,
+      iva: p.iva.toString(),
+      stock_estado: p.stock,
+      descripcion: p.description,
+      ean: p.ean,
+      rubro: p.rubro,
+      stock_fisico: p.stock_fisico,
+      ingresos: p.ingresos,
+      stock_ingresos: p.stock_ingresos
+    });
+
     const CHUNK = 50;
     for(let i=0;i<incoming.length;i+=CHUNK){
-      const chunk = incoming.slice(i,i+CHUNK);
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/products`,{
-        method:'POST', headers, body:JSON.stringify(chunk)
+      const dbChunk = incoming.slice(i,i+CHUNK).map(toDb);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/productos`,{
+        method:'POST', headers, body:JSON.stringify(dbChunk)
       });
       if(!res.ok){ const err=await res.text(); throw new Error(err); }
     }
     // Pasar faltantes a NOSTOCK
     for(const p of faltantes){
-      await fetch(`${SUPABASE_URL}/rest/v1/products?sku=eq.${p.sku}`,{
-        method:'PATCH', headers, body:JSON.stringify({stock:'NOSTOCK'})
+      await fetch(`${SUPABASE_URL}/rest/v1/productos?codigo=eq.${p.sku}`,{
+        method:'PATCH', headers, body:JSON.stringify({stock_estado:'NOSTOCK'})
       });
     }
     excelPendingImport = null;
