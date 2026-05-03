@@ -1456,7 +1456,7 @@ function createCard(p){
       ${!isNoStock ? `
         <div class="stock-chip ${isPrev ? 'preventa' : ''}">
           ${isPrev ? '📦' : '✅'} 
-          ${isPrev ? (p.stock_ingresos || 0) : (p.stock_fisico || 0)} UN.
+          ${Math.round(isPrev ? (p.stock_ingresos || 0) : (p.stock_fisico || 0))} UN.
         </div>
       ` : ''}
       <div class="info-chip" onclick="event.stopPropagation();openDesc('${p.sku}')">+ info</div>
