@@ -17,6 +17,10 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE") o
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "16CTx8wJkiY45VDO9ft2r1VZZjsPyh5t_YGmhTOgQtrU")
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK_URL")
 
+# Nombres de recursos (Cambiar para salir de piloto)
+PRODUCT_TABLE = "productos_demo"
+FOTOS_BUCKET = "fotos_demo"
+
 # URLs de origen
 BEEPAW_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=1686576198"
 NETLIFY_SRC_URL = "https://beepawmayorista.netlify.app/ailen-l2.html"
@@ -63,15 +67,13 @@ def limpiar_precio(val):
     if s.upper() == "SIN PVP": return 0
     
     # 1. Quitar espacios
-    s = s.replace(' ', '')
+    s = s.replace(' ', '').replace('\xa0', '')
     
     # 2. Manejar decimales .00 o ,00 al final
-    # Si termina en ,XX o .XX, lo consideramos decimal y lo removemos
-    # (Ya que para este catálogo manejamos precios enteros en pesos)
     if re.search(r'[,.]\d{2}$', s):
         s = s[:-3]
     
-    # 3. Eliminar cualquier separador de miles o caracteres no numéricos restantes
+    # 3. Eliminar caracteres no numéricos
     s = re.sub(r'[^\d]', '', s)
     
     try:
@@ -105,7 +107,7 @@ def get_drive_ids_from_netlify():
 
 def process_image(drive_id, sku):
     """Descarga, optimiza y sube la imagen a Supabase Storage"""
-    bucket_name = "fotos_demo"
+    bucket_name = FOTOS_BUCKET
     file_path = f"{sku}.webp"
     
     # Fuentes de imagen (Priority: Direct URL -> Drive -> Fallback GitHub Repos)
@@ -210,38 +212,64 @@ def run_sync():
 
     for _, row in df.iterrows():
         sku = str(row.get("CODIGO", "")).strip()
-        if not sku or sku == "12333": continue # Saltar prueba
-        
         nombre = str(row.get("NOMBRE", "")).replace('_', ' ').strip()
+        
+        # Saltar si no hay SKU o es de prueba
+        if not sku or sku == "0" or "PRUEBA" in nombre.upper() or "TEST" in nombre.upper():
+            continue
+        
         descripcion = str(row.get("DESCRIPCION", "")).strip()
         iva = normalizar_iva(row.get("IVA"))
         
-        # Precios
+        # PRECIOS: Lógica de Identidad entre listas
         precio_pvp = limpiar_precio(row.get("PVP"))
-        precio_pesos = limpiar_precio(row.get("LISTA BASE"))
+        precio_lista_base = limpiar_precio(row.get("LISTA BASE"))
+        precio_14_20 = limpiar_precio(row.get("LISTA 14/20"))
+        precio_20_30 = limpiar_precio(row.get("LISTA 20/30"))
         
-        # Regla SKU >= 11432
-        try:
-            if int(sku) >= 11432 and precio_pvp > 0:
+        # REGLA DEFINITIVA: 
+        # Si LISTA BASE == LISTA 14/20 == LISTA 20/30, significa que es un precio no calculado.
+        # En ese caso, si hay PVP, calculamos PVP / 2.
+        
+        precio_pesos = precio_lista_base
+        
+        if precio_lista_base > 0 and precio_lista_base == precio_14_20 == precio_20_30:
+            if precio_pvp > 0:
                 precio_pesos = int(precio_pvp / 2)
-        except: pass
+        
+        # Fallback histórico para SKUs nuevos sin lista base
+        if precio_pesos <= 0:
+            try:
+                val_sku = int(sku)
+                if val_sku >= 11432 and precio_pvp > 0:
+                    precio_pesos = int(precio_pvp / 2)
+            except:
+                pass
 
         # Stock
+        stock_raw = str(row.get("STOCK/INGRESO", "0")).upper()
         stock_fisico = 0
-        try: stock_fisico = float(str(row.get("STOCK/INGRESO", "0")).replace(',', '.'))
-        except: pass
+        try:
+            val_clean = re.sub(r'[^\d]', '', stock_raw)
+            stock_fisico = float(val_clean) if val_clean else 0
+        except: 
+            pass
 
         stock_ingresos = 0
-        try: stock_ingresos = float(str(row.get("STOCK INGRESOS", "0")).replace(',', '.'))
-        except: pass
+        try: 
+            inc_val = re.sub(r'[^\d]', '', str(row.get("STOCK INGRESOS", "0")))
+            stock_ingresos = float(inc_val) if inc_val else 0
+        except: 
+            pass
 
         fecha_ingreso = str(row.get("INGRESOS", "")).strip()
-        if fecha_ingreso.lower() == "none" or fecha_ingreso == "0": fecha_ingreso = ""
+        if fecha_ingreso.lower() == "none" or fecha_ingreso == "0": 
+            fecha_ingreso = ""
 
-        if stock_fisico > 0:
+        if stock_fisico > 0 or "STOCK" in stock_raw or "DISPONIBLE" in stock_raw:
             estado_stock = "STOCK"
-        elif stock_ingresos > 0:
-            estado_stock = f"PREVENTA ({fecha_ingreso})"
+        elif stock_ingresos > 0 or "PREVENTA" in stock_raw:
+            estado_stock = f"PREVENTA ({fecha_ingreso})" if fecha_ingreso else "PREVENTA"
         else:
             estado_stock = "NOSTOCK"
 
@@ -253,7 +281,7 @@ def run_sync():
         # 2. Verificar existencia y datos previos para evitar re-procesamiento innecesario
         existing = {}
         try:
-            res_existing = supabase.table("productos_demo").select("precio_pesos", "img_url").eq("codigo", sku).execute()
+            res_existing = supabase.table(PRODUCT_TABLE).select("precio_pesos", "img_url").eq("codigo", sku).execute()
             if res_existing.data:
                 existing = res_existing.data[0]
         except:
@@ -299,7 +327,7 @@ def run_sync():
                 logs.append(f"🆕 NUEVO: {sku} - {nombre}")
 
             # Intentar upsert sin columnas conflictivas si el cache está sucio
-            supabase.table("productos_demo").upsert(product_data).execute()
+            supabase.table(PRODUCT_TABLE).upsert(product_data).execute()
         except Exception as e:
             print(f"❌ Error guardando {sku}: {e}")
 
