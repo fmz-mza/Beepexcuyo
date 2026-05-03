@@ -1251,7 +1251,7 @@ let allProducts=[];
 async function loadProducts(){
   try{
     const token=localStorage.getItem('admin_token');
-    const res=await fetch(`${SUPABASE_URL}/rest/v1/products?select=sku,name,brand,price,pvp,iva,stock&order=brand.asc,name.asc`,{
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado&order=marca.asc,producto.asc`,{
       headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
     });
     if(!res.ok) throw new Error('HTTP '+res.status);
@@ -1269,8 +1269,9 @@ async function loadProducts(){
 function filterProducts(){
   const q=document.getElementById('searchProducts').value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
   const filtered=allProducts.filter(p=>{
-    const name=(p.name||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-    return name.includes(q)||p.sku.includes(q)||(p.brand||'').toLowerCase().includes(q);
+    const name=(p.producto||p.name||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const sku = p.codigo || p.sku || '';
+    return name.includes(q)||sku.includes(q)||(p.marca||p.brand||'').toLowerCase().includes(q);
   });
   renderProducts(filtered);
 }
@@ -1280,13 +1281,15 @@ function renderProducts(list){
   document.getElementById('disabledCount').textContent=disabled.size>0?`${disabled.size} desactivado${disabled.size!==1?'s':''}`:'' ;
   if(!list.length){ document.getElementById('productsList').innerHTML='<div class="empty">Sin resultados</div>'; return; }
   document.getElementById('productsList').innerHTML=list.map(p=>{
-    const isDisabled=disabled.has(p.sku);
+    const sku = p.codigo || p.sku;
+    const name = p.producto || p.name;
+    const isDisabled=disabled.has(sku);
     return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);opacity:${isDisabled?'.45':'1'}">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:1px">${p.sku}</div>
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:1px">${sku}</div>
       </div>
-      <button class="product-toggle ${isDisabled?'inactive':'active'}" style="flex-shrink:0" onclick="toggleProduct('${p.sku}')">${isDisabled?'⚫ Inactivo':'🟢 Activo'}</button>
+      <button class="product-toggle ${isDisabled?'inactive':'active'}" style="flex-shrink:0" onclick="toggleProduct('${sku}')">${isDisabled?'⚫ Inactivo':'🟢 Activo'}</button>
     </div>`;
   }).join('');
 }
@@ -1988,7 +1991,7 @@ async function downloadProductsExcel(){
       });
     }
     const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,description:descripcion,ean&order=marca.asc,producto.asc`,{
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,description:descripcion,ean,stock_fisico,ingresos,stock_ingresos,rubro&order=marca.asc,producto.asc`,{
       headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
     });
     const data = await resp.json();
@@ -1996,18 +1999,22 @@ async function downloadProductsExcel(){
     console.log('Productos descargados:', data.length);
 
     const wb = XLSX.utils.book_new();
-    // Hoja BEEPAW
-    const beepaw = data.filter(p=>p.brand==='BEEPAW').map(p=>({
-      'CÓDIGO':p.sku,'PRODUCTO':p.name,'DESCRIPCIÓN':p.description,
-      'IVA':p.iva,'PRECIO EN PESOS':p.price,'PRECIO VENTA PUBLICO':p.pvp||'','STOCK':p.stock,'CODIGO EAN':p.ean
+    const mapped = data.map(p=>({
+      'MARCA': p.brand,
+      'CÓDIGO': p.sku,
+      'PRODUCTO': p.name,
+      'RUBRO': p.rubro || '',
+      'DESCRIPCIÓN': p.description || '',
+      'PRECIO PESOS': p.price,
+      'PVP': p.pvp || '',
+      'IVA': p.iva,
+      'ESTADO STOCK': p.stock,
+      'STOCK FÍSICO': p.stock_fisico || 0,
+      'FECHA INGRESO': p.ingresos || '',
+      'STOCK INGRESOS': p.stock_ingresos || 0,
+      'CÓDIGO EAN': p.ean || ''
     }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(beepaw), 'BEEPAW');
-    // Hoja GENERICOS
-    const gen = data.filter(p=>p.brand!=='BEEPAW').map(p=>({
-      'CÓDIGO':p.sku,'PRODUCTO':p.name,'DESCRIPCIÓN':p.description,
-      'IVA':p.iva,'PRECIO EN $':p.price,'STOCK':p.stock,'CODIGO EAN':p.ean
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gen), 'GENERICOS');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mapped), 'PRODUCTOS');
     XLSX.writeFile(wb, `BEEPEX_productos_${new Date().toISOString().slice(0,10)}.xlsx`);
     showToast('✅ Excel descargado');
   } catch(e){ showToast('❌ Error: '+e.message); }
