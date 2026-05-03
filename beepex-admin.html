@@ -2021,137 +2021,29 @@ async function downloadProductsExcel(){
   } catch(e){ showToast('❌ Error: '+e.message); }
 }
 
-// ── Excel para Clientes (Enlaces a Fotos) ───────────────────────────────────
+// ── Excel para Clientes (Pre-generado en Storage) ───────────────────────────
 async function downloadExcelClientes(){
-  showToast('⏳ Generando Excel para clientes...');
+  showToast('⏳ Iniciando descarga de lista de precios...');
   try {
-    if(!window.ExcelJS){
-      await new Promise((res,rej)=>{
-        const s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
-        s.onload=res; s.onerror=rej;
-        document.head.appendChild(s);
-      });
-    }
-
-    const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,description:descripcion,ean,stock_fisico,ingresos,stock_ingresos,rubro&order=marca.asc,producto.asc`,{
-      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
-    });
-    const data = await resp.json();
-    if(!Array.isArray(data)) throw new Error(data.message || 'Error al descargar productos');
-
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('LISTA DE PRECIOS');
-
-    sheet.columns = [
-      { header: 'VER FOTO 🔗', key: 'foto', width: 20 },
-      { header: 'MARCA', key: 'brand', width: 14 },
-      { header: 'CÓDIGO', key: 'sku', width: 12 },
-      { header: 'PRODUCTO', key: 'name', width: 45 },
-      { header: 'DESCRIPCIÓN', key: 'description', width: 35 },
-      { header: 'PRECIO PESOS', key: 'price', width: 15 },
-      { header: 'PVP', key: 'pvp', width: 15 },
-      { header: 'IVA', key: 'iva', width: 8 },
-      { header: 'ESTADO', key: 'stock', width: 15 }
-    ];
-
-    // Estilo cabecera
-    const headerRow = sheet.getRow(1);
-    headerRow.height = 30;
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
-    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A7CFF' } };
-    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-
-    data.forEach((p) => {
-      sheet.addRow({
-        brand: p.brand,
-        sku: p.sku,
-        name: p.name,
-        description: p.description || '',
-        price: p.price,
-        pvp: p.pvp || '',
-        iva: p.iva + '%',
-        stock: p.stock
-      });
-    });
-
-    // Ajustes de filas
-    sheet.eachRow((row, rowNumber) => {
-      if (rowNumber > 1) {
-        row.height = 85;
-        row.alignment = { vertical: 'middle', horizontal: 'center' };
-        row.getCell('name').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-        row.getCell('description').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true, font: { size: 9, color: { argb: 'FF8B90A8' } } };
-        row.getCell('price').numFmt = '"$"#,##0';
-        row.getCell('pvp').numFmt = '"$"#,##0';
-        row.getCell('sku').font = { bold: true };
-      }
-    });
-
-    // Procesar imágenes de forma secuencial para evitar bloqueos
-    for (let i = 0; i < data.length; i++) {
-      const p = data[i];
-      const rowIndex = i + 2;
-      try {
-        const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/fotos/${p.sku}.webp`;
-        const imgResp = await fetch(imgUrl);
-        if (imgResp.ok) {
-          const buffer = await imgResp.arrayBuffer();
-          const blob = new Blob([buffer]);
-          const url = URL.createObjectURL(blob);
-          const img = new Image();
-          
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = url;
-          });
-
-          // Redimensionar para que el Excel sea liviano
-          const canvas = document.createElement('canvas');
-          const size = 110; 
-          canvas.width = size;
-          canvas.height = size;
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = "white";
-          ctx.fillRect(0, 0, size, size);
-          
-          const scale = Math.min(size / img.width, size / img.height);
-          const x = (size / 2) - (img.width / 2) * scale;
-          const y = (size / 2) - (img.height / 2) * scale;
-          ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-
-          const pngBlob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.7));
-          const pngBuffer = await pngBlob.arrayBuffer();
-          URL.revokeObjectURL(url);
-
-          const imageId = workbook.addImage({
-            buffer: pngBuffer,
-            extension: 'png',
-          });
-
-          sheet.addImage(imageId, {
-            tl: { col: 0, row: rowIndex - 1 },
-            ext: { width: 105, height: 105 },
-            editAs: 'oneCell'
-          });
-        }
-      } catch (err) {
-        console.warn('Salteando imagen para SKU:', p.sku);
-      }
-    }
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    // Apuntamos al archivo central generado por el script de automatización
+    const fileUrl = `${SUPABASE_URL}/storage/v1/object/public/reportes/Beepex.xlsx?t=${Date.now()}`;
+    
+    const res = await fetch(fileUrl);
+    if(!res.ok) throw new Error('El archivo Beepex.xlsx no se encontró en el servidor. Asegúrate de que el script de automatización haya corrido.');
+    
+    const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `BEEPEX_Lista_Clientes_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    // Nombre dinámico solicitado: Beepex-(Fecha).xlsx
+    const fecha = new Date().toISOString().slice(0, 10);
+    a.download = `Beepex-${fecha}.xlsx`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 
-    showToast('✅ Excel para clientes generado con éxito');
+    showToast('✅ Lista descargada con éxito');
   } catch (e) {
     console.error(e);
     showToast('❌ Error: ' + e.message);
