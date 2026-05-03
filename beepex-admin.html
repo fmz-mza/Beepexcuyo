@@ -1988,11 +1988,12 @@ async function downloadProductsExcel(){
       });
     }
     const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,description,ean&order=marca.asc,producto.asc`,{
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,description:descripcion,ean&order=marca.asc,producto.asc`,{
       headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
     });
     const data = await resp.json();
-    console.log('Productos descargados:', data.length, 'BEEPAW:', data.filter(p=>p.brand==='BEEPAW').length, 'GENERICO:', data.filter(p=>p.brand==='GENERICO').length, 'otros:', data.filter(p=>p.brand!=='BEEPAW'&&p.brand!=='GENERICO').map(p=>p.brand).slice(0,5));
+    if(!Array.isArray(data)) throw new Error(data.message || 'Error al descargar productos');
+    console.log('Productos descargados:', data.length);
 
     const wb = XLSX.utils.book_new();
     // Hoja BEEPAW
