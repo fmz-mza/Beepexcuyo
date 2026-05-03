@@ -17,9 +17,9 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE") o
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "16CTx8wJkiY45VDO9ft2r1VZZjsPyh5t_YGmhTOgQtrU")
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK_URL")
 
-# Nombres de recursos (Cambiar para salir de piloto)
-PRODUCT_TABLE = "productos_demo"
-FOTOS_BUCKET = "fotos_demo"
+# Nombres de recursos (PRODUCCIÓN)
+PRODUCT_TABLE = "productos"
+FOTOS_BUCKET = "fotos"
 
 # URLs de origen
 BEEPAW_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=1686576198"
@@ -71,7 +71,7 @@ def limpiar_precio(val):
     
     # 2. Manejar decimales .00 o ,00 al final
     if re.search(r'[,.]\d{2}$', s):
-        s = s[:-3]
+        s = s[:-3]a
     
     # 3. Eliminar caracteres no numéricos
     s = re.sub(r'[^\d]', '', s)
@@ -289,7 +289,7 @@ def run_sync():
         except:
             pass
 
-        # Upsert en Supabase (Tabla productos_demo para el piloto)
+        # Upsert en Supabase (Tabla productos operativa)
         product_data = {
             "codigo": sku,
             "producto": nombre,
