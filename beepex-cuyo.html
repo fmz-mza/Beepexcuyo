@@ -737,7 +737,7 @@ let userSalePrices={}; // {sku: price}
     <div class="desc-modal-body">
       <div class="desc-modal-header-row">
         <div class="desc-modal-name" id="descModalName"></div>
-        <button class="desc-modal-close-top" onclick="closeDescBtn()" aria-label="Cerrar">✕</button>
+        <button class="desc-modal-close-top" onclick="closeDescBtn(event)" aria-label="Cerrar">✕</button>
       </div>
       <div class="desc-modal-sku" id="descModalSku"></div>
       <div class="desc-modal-price" id="descModalPrice"></div>
@@ -1398,8 +1398,17 @@ function _checkSentinelScroll(){
     _loadingMore=false;
   }
 }
-window.addEventListener('scroll',_checkSentinelScroll,{passive:true});
-document.addEventListener('touchmove',_checkSentinelScroll,{passive:true});
+// Throttling para scroll
+let _scrollTimeout = null;
+window.addEventListener('scroll', ()=>{
+  if(_scrollTimeout) return;
+  _scrollTimeout = setTimeout(()=>{
+    _scrollTimeout = null;
+    if(!_loadingMore && _pagedIdx < _pagedList.length){
+      _checkSentinelScroll();
+    }
+  }, 100);
+},{passive:true});
 
 // Observer para infinite scroll
 const _sentinelObserver = new IntersectionObserver((entries)=>{
@@ -2418,7 +2427,7 @@ function openDesc(sku){
   const descShareRowEl=document.querySelector('.desc-share-row');
   if(!userApproved){
     // No registrado: ocultar precio real, mostrar invitación
-    priceModalEl.innerHTML='<span class="price-locked" onclick="closeDescBtn();openAuth()" style="font-size:16px">🔒 Registrate para ver el precio</span>';
+    priceModalEl.innerHTML='<span class="price-locked" onclick="closeDescBtn(event);openAuth()" style="font-size:16px">🔒 Registrate para ver el precio</span>';
     pvpTextEl.textContent=''; margenEl.style.display='none';
     if(descActionsEl) descActionsEl.style.display='none';
     if(descShareRowEl) descShareRowEl.style.display='none';
@@ -2499,7 +2508,8 @@ function closeDesc(e){
     closeDescBtn();
   }
 }
-function toggleSharePanel(){
+async function toggleSharePanel(e){
+  if(e) e.stopPropagation();
   const panel=document.getElementById('sharePricePanel');
   const btn=document.getElementById('descShareBtn');
   const isOpen=panel.style.display!=='none';
@@ -2666,8 +2676,12 @@ function roundRect(ctx,x,y,w,h,r){
   ctx.closePath();
 }
 
-function closeDescBtn(){
-  document.getElementById('descOverlay').classList.remove('open');
+function closeDescBtn(e){
+  if(e) e.stopPropagation();
+  const overlay = document.getElementById('descOverlay');
+  if(!overlay || !overlay.classList.contains('open')) return;
+  
+  overlay.classList.remove('open');
   const sp=document.getElementById('sharePricePanel');
   if(sp){ sp.style.display='none'; }
   const sb=document.getElementById('descShareBtn');
@@ -2679,7 +2693,11 @@ function closeDescBtn(){
     document.body.style.position='';
     document.body.style.top='';
     document.body.style.width='';
-    window.scrollTo(0,sy);
+    descActiveSku = null;
+    // Usar setTimeout para alejar del frame actual de animación y evitar crashes en browsers mobile
+    setTimeout(()=>{
+      window.scrollTo({top: sy, behavior: 'instant'});
+    }, 0);
   }
 }
 
