@@ -71,7 +71,7 @@ def limpiar_precio(val):
     
     # 2. Manejar decimales .00 o ,00 al final
     if re.search(r'[,.]\d{2}$', s):
-        s = s[:-3]a
+        s = s[:-3]
     
     # 3. Eliminar caracteres no numéricos
     s = re.sub(r'[^\d]', '', s)
