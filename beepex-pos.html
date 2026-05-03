@@ -284,6 +284,10 @@ input,select,textarea{font-family:inherit;}
     <div class="hdr-logo">🐾 <span>POS</span></div>
     <div class="hdr-badge">PUNTO DE VENTA</div>
     <div class="conn-dot" id="connDot"></div>
+    <div class="iva-toggle" id="ivaToggle" onclick="toggleIVA()" style="margin-left:10px;display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:700;">
+      <div class="dot" id="ivaDot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);"></div>
+      <span id="ivaLabel">Sin IVA</span>
+    </div>
     <div class="hdr-right">
       <div class="hdr-user" id="hUser"></div>
       <button class="logout-btn" onclick="doLogout()">Salir</button>
@@ -472,13 +476,14 @@ const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
 
 let currentUser = null, products = [], clients = [], cart = [];
 let payMethod = 'efectivo', lastTicket = null;
-let isOnline = navigator.onLine;
+let isOnline = navigator.onLine, includeIVA = false;
 let pendingSync = JSON.parse(localStorage.getItem('pos_pending_sync')||'[]');
 let _lastScanCode = '', _lastScanTime = 0;
 let clienteSaldoPendiente = 0;   // saldo deuda del cliente seleccionado
 let cobrarSaldoJunto = false;    // toggle: cobrar deuda junto con la venta
 
-const fmt = n => '$' + Math.round(n||0).toLocaleString('es-AR');
+const fmt = n => '$'+Math.round(n||0).toLocaleString('es-AR').replace(/,/g,'.');
+const mayorista = p => includeIVA ? Math.round(p.precio_pesos*(1+(p.iva||21)/100)) : p.precio_pesos;
 const normalizeWA = tel => {
   if(!tel) return '';
   const d = tel.replace(/\D/g,'');
@@ -497,6 +502,19 @@ function setOnline(v){
 }
 window.addEventListener('online', ()=>setOnline(true));
 window.addEventListener('offline',()=>setOnline(false));
+
+function toggleIVA(){
+  includeIVA = !includeIVA;
+  const dot = document.getElementById('ivaDot');
+  const lbl = document.getElementById('ivaLabel');
+  const btn = document.getElementById('ivaToggle');
+  dot.style.background = includeIVA ? 'var(--accent2)' : 'var(--muted)';
+  lbl.textContent = includeIVA ? 'Con IVA' : 'Sin IVA';
+  btn.style.color = includeIVA ? 'var(--accent2)' : 'var(--text)';
+  btn.style.borderColor = includeIVA ? 'var(--accent2)' : 'var(--border)';
+  renderProds(products);
+  renderCart();
+}
 
 /* AUTH */
 async function doLogin(){
@@ -558,8 +576,28 @@ function tryLoadImg(el, sku, i=0){
 }
 
 async function loadProducts(){
-  const {data}=await _sb.from('productos').select('*').order('producto');
-  products=data||[]; renderProds(products);
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/productos?select=codigo,producto,marca,precio_pesos,precio_pvp,iva,stock_estado,stock_fisico,stock_ingresos,descripcion,rubro,ean&order=marca.asc,producto.asc`,
+      { headers:{
+          'apikey': SUPABASE_ANON,
+          'Authorization': `Bearer ${SUPABASE_ANON}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+      }}
+    );
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows = await res.json();
+    products = rows.map(p => {
+      const code = String(p.codigo);
+      if(code === '11573') p.precio_pesos = 59999;
+      return p;
+    });
+    renderProds(products);
+  } catch(e) {
+    console.error('loadProducts error:', e);
+    products = [];
+  }
 }
 function renderProds(list){
   const g=document.getElementById('prodGrid');
@@ -574,7 +612,7 @@ function renderProds(list){
         <div class="prod-brand">${p.marca||''}</div>
         <div class="prod-name">${p.producto}</div>
         <div style="font-size:9px;color:var(--muted);font-weight:600;margin-top:1px;letter-spacing:.3px;">${p.codigo}</div>
-        <div class="prod-price">${fmt(p.precio_pesos)}</div>
+        <div class="prod-price">${fmt(mayorista(p))}</div>
       </div>
     </div>`;
   }).join('');
@@ -666,7 +704,7 @@ function renderCart(){
     return `<div class="cart-item">
       <div class="ci-top">
         <img class="ci-img" src="" data-sku="${p.codigo}" onerror="this.src=''">
-        <div class="ci-info"><div class="ci-name">${p.producto}</div><div class="ci-sku">SKU ${p.codigo}</div></div>
+        <div class="ci-info"><div class="ci-name">${p.producto}</div><div class="ci-sku">SKU ${p.codigo} · IVA ${p.iva||21}%</div></div>
         <button class="ci-del" onclick="removeFromCart('${p.codigo}')">🗑</button>
       </div>
       <div class="ci-bottom">
