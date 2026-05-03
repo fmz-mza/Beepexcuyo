@@ -316,6 +316,9 @@ def run_sync():
             product_data["img_url"] = existing["img_url"]
 
         try:
+            # Upsert usando 'codigo' como identificador único
+            res = supabase.table(PRODUCT_TABLE).upsert(product_data, on_conflict="codigo").execute()
+            
             if existing:
                 old_price = existing.get("precio_pesos", 0)
                 if old_price != precio_pesos:
@@ -325,11 +328,9 @@ def run_sync():
             else:
                 stats["nuevos"] += 1
                 logs.append(f"🆕 NUEVO: {sku} - {nombre}")
-
-            # Intentar upsert sin columnas conflictivas si el cache está sucio
-            supabase.table(PRODUCT_TABLE).upsert(product_data).execute()
         except Exception as e:
             print(f"❌ Error guardando {sku}: {e}")
+            # Si hay error, no incrementamos stats de éxito
 
     # Alerta Discord
     summary = f"🔄 **Sincronización Completada**\n"
