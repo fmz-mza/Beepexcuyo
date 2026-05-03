@@ -1413,7 +1413,7 @@ window.addEventListener('scroll', ()=>{
 
 // Observer para infinite scroll
 const _sentinelObserver = new IntersectionObserver((entries)=>{
-  if(!entries[0].isIntersecting || _loadingMore) return;
+  if(!entries[0].isIntersecting || _loadingMore || _blockScrollLoad) return;
   if(_pagedIdx >= _pagedList.length) return;
   _loadingMore = true;
   requestAnimationFrame(()=>{
