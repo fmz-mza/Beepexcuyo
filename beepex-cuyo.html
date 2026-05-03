@@ -899,7 +899,7 @@ let userSalePrices={}; // {sku: price}
 const GITHUB_USER='fmz-mza', GITHUB_REPO='Beepexcuyo', GITHUB_BRANCH='main';
 const EXTENSIONS=['webp','jpg','jpeg','png','JPG','PNG']; // webp primero
 const WA_NUMBER='5492616220850';
-const BUCKET_URL='https://mmerrzniuxbrjryhcsda.supabase.co/storage/v1/object/public/fotos_demo';
+const BUCKET_URL='https://mmerrzniuxbrjryhcsda.supabase.co/storage/v1/object/public/fotos';
 
 // ── Cache de imágenes ────────────────────────────────────────────────────────
 const imgCache = {}; // sku → url exitosa | 'error'
@@ -1011,7 +1011,7 @@ let productMap = {};
 async function loadProducts(){
   try{
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/productos_demo?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,stock_fisico,stock_ingresos,description:descripcion,rubro,ean&order=marca.asc,producto.asc`,
+      `${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,stock_fisico,stock_ingresos,description:descripcion,rubro,ean&order=marca.asc,producto.asc`,
       { headers:{
           'apikey': SUPABASE_ANON,
           'Authorization': `Bearer ${SUPABASE_ANON}`,
