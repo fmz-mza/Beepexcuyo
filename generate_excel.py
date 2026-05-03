@@ -29,6 +29,8 @@ def generate_client_excel():
     try:
         response = supabase.table("productos").select("*").execute()
         all_products = response.data
+        # ORDENAR por SKU de menor a mayor
+        all_products.sort(key=lambda x: int(x.get('codigo') or 0))
     except Exception as e:
         print(f"Error al consultar Supabase: {e}")
         return
@@ -37,7 +39,7 @@ def generate_client_excel():
     wb = Workbook()
     ws = wb.active
     ws.title = "LISTA DE PRECIOS"
-    headers = ["FOTO", "MARCA", "CÓDIGO", "PRODUCTO", "RUBRO", "PRECIO PESOS", "PVP", "IVA", "ESTADO"]
+    headers = ["FOTO", "MARCA", "CÓDIGO", "PRODUCTO", "RUBRO", "DESCRIPCIÓN", "PRECIO PESOS", "PVP", "IVA", "ESTADO"]
     ws.append(headers)
 
     # Estilos
@@ -54,11 +56,12 @@ def generate_client_excel():
     ws.column_dimensions['B'].width = 15
     ws.column_dimensions['C'].width = 12
     ws.column_dimensions['D'].width = 45
-    ws.column_dimensions['E'].width = 20
-    ws.column_dimensions['F'].width = 15
+    ws.column_dimensions['E'].width = 25
+    ws.column_dimensions['F'].width = 40
     ws.column_dimensions['G'].width = 15
-    ws.column_dimensions['H'].width = 8
-    ws.column_dimensions['I'].width = 18
+    ws.column_dimensions['H'].width = 15
+    ws.column_dimensions['I'].width = 8
+    ws.column_dimensions['J'].width = 18
 
     # 3. Procesamiento
     added_count = 0
@@ -100,18 +103,23 @@ def generate_client_excel():
         ws.cell(row=current_row, column=3, value=sku).font = Font(bold=True)
         ws.cell(row=current_row, column=4, value=p.get('producto'))
         ws.cell(row=current_row, column=5, value=p.get('rubro'))
+        ws.cell(row=current_row, column=6, value=p.get('descripcion'))
         
-        c_price = ws.cell(row=current_row, column=6, value=float(p.get('precio_pesos') or 0))
+        # Precio con parche para 11573 si fuera necesario (consistencia con web)
+        precio_v = float(p.get('precio_pesos') or 0)
+        if str(sku) == '11573': precio_v = 59999
+
+        c_price = ws.cell(row=current_row, column=7, value=precio_v)
         c_price.number_format = '"$"#,##0'
-        c_pvp = ws.cell(row=current_row, column=7, value=float(p.get('precio_pvp') or 0))
+        c_pvp = ws.cell(row=current_row, column=8, value=float(p.get('precio_pvp') or 0))
         c_pvp.number_format = '"$"#,##0'
         
-        ws.cell(row=current_row, column=8, value=f"{p.get('iva')}%")
-        ws.cell(row=current_row, column=9, value=p.get('stock_estado'))
+        ws.cell(row=current_row, column=9, value=f"{p.get('iva')}%")
+        ws.cell(row=current_row, column=10, value=p.get('stock_estado'))
 
         # Estilo de fila
         ws.row_dimensions[current_row].height = 110
-        for col in range(1, 10):
+        for col in range(1, 11):
             ws.cell(row=current_row, column=col).alignment = center_aligned
 
         # Insertar imagen anclada y un poco desplazada para centrar visualmente
