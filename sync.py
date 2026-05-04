@@ -265,6 +265,11 @@ def run_sync():
                 if precio_lista_base == precio_pvp or calculado > precio_lista_base:
                     precio_pesos = calculado
                     regla_trigger = True
+            else:
+                # NUEVA REGLA: Si no hay PVP y los precios de lista son idénticos, sumamos 21%
+                # Ejemplo SKU 11437: 15631 * 1.21 = 18913
+                precio_pesos = int(precio_lista_base * 1.21)
+                regla_trigger = True
         
         # Fallback histórico para SKUs nuevos sin lista base (>= 11432)
         if precio_pesos <= 0:
@@ -280,7 +285,8 @@ def run_sync():
         if regla_trigger:
             # Solo logueamos si el precio calculado es diferente al de LISTA BASE
             if precio_pesos != precio_lista_base:
-                print(f"ℹ️ REGLA IDENTIDAD: SKU {sku} ({nombre}) -> PVP/2 Aplicado: ${precio_pesos} (Base era ${precio_lista_base})")
+                motivo = "PVP/2" if precio_pvp > 0 else "Base+21%"
+                print(f"ℹ️ REGLA IDENTIDAD ({motivo}): SKU {sku} ({nombre}) -> Aplicado: ${precio_pesos} (Base era ${precio_lista_base})")
 
         # Stock
         stock_raw = str(row.get("STOCK/INGRESO", "0")).upper()
