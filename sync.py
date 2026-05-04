@@ -294,14 +294,19 @@ def run_sync():
         
         stock_ingresos = limpiar_stock(row.get("STOCK INGRESOS", "0"))
 
-        fecha_ingreso = str(row.get("INGRESOS", "")).strip()
-        if fecha_ingreso.lower() == "none" or fecha_ingreso == "0": 
+        fecha_val = row.get("INGRESOS")
+        if pd.isna(fecha_val) or str(fecha_val).lower() in ["none", "0", "nan"]:
             fecha_ingreso = ""
+        else:
+            fecha_ingreso = str(fecha_val).strip()
 
         if stock_fisico > 0 or "STOCK" in stock_raw or "DISPONIBLE" in stock_raw:
             estado_stock = "STOCK"
         elif stock_ingresos > 0 or "PREVENTA" in stock_raw:
-            estado_stock = f"PREVENTA ({fecha_ingreso})" if fecha_ingreso else "PREVENTA"
+            if fecha_ingreso:
+                estado_stock = f"PREVENTA ({fecha_ingreso})"
+            else:
+                estado_stock = "PREVENTA PROX."
         else:
             estado_stock = "NOSTOCK"
 
