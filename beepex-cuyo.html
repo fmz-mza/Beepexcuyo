@@ -228,6 +228,12 @@
   .mc-detail-qty{color:var(--muted);font-size:12px;white-space:nowrap;}
   .mc-detail-subtotal{font-weight:700;white-space:nowrap;}
   .mc-detail-total-row{display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:10px 0 0;border-top:2px solid var(--border);margin-top:4px;}
+  /* ── Modal Reset Password ── */
+  .reset-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px;}
+  .reset-overlay.open{display:flex;}
+  .reset-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 24px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px;animation:slideUp .2s ease;}
+  .reset-modal h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;text-align:center;}
+  .reset-modal p{font-size:13px;color:var(--muted);text-align:center;margin-top:-4px;}
   .cart-overlay.open{display:block;}
   .cart-drawer{position:fixed;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
   .cart-drawer.open{transform:translateX(0);}
@@ -668,6 +674,16 @@ let userSalePrices={}; // {sku: price}
     <div class="pwd-msg" id="pwdMsg"></div>
     <button class="pwd-btn" onclick="submitChangePassword()">Guardar contraseña</button>
     <button class="pwd-btn pwd-btn-cancel" onclick="closeChangePassword()">Cancelar</button>
+  </div>
+</div>
+<div class="reset-overlay" id="resetOverlay">
+  <div class="reset-modal">
+    <h2>🔐 Nueva contraseña</h2>
+    <p>Ingresá tu nueva contraseña para continuar.</p>
+    <input class="auth-input" id="resetPass1" type="password" placeholder="🔑 Nueva contraseña" onkeydown="if(event.key==='Enter')submitResetPassword()">
+    <input class="auth-input" id="resetPass2" type="password" placeholder="🔑 Confirmar contraseña" onkeydown="if(event.key==='Enter')submitResetPassword()">
+    <div class="auth-msg" id="resetMsg"></div>
+    <button class="auth-btn" onclick="submitResetPassword()">Guardar nueva contraseña</button>
   </div>
 </div>
 <div class="micuenta-overlay" id="micuentaOverlay" onclick="closeMiCuenta()"></div>
@@ -2965,10 +2981,20 @@ async function initAuth(){
       }
     } catch(e){ localStorage.removeItem('sb_access_token'); }
   }
-  // Limpiar hash de la URL si viene del link de confirmación
+  // Detectar recovery password o confirmación de email en el hash
   if(window.location.hash&&window.location.hash.includes('access_token')){
-    history.replaceState(null,'',window.location.pathname);
-    showToast('✅ Email confirmado. ¡Ya podés ingresar!');
+    const params=new URLSearchParams(window.location.hash.slice(1));
+    const type=params.get('type');
+    const token=params.get('access_token');
+    if(type==='recovery'&&token){
+      // Guardar token de recovery y mostrar modal de nueva contraseña
+      history.replaceState(null,'',window.location.pathname);
+      showResetPasswordModal(token);
+      return; // no continuar con el flujo normal
+    } else {
+      history.replaceState(null,'',window.location.pathname);
+      showToast('✅ Email confirmado. ¡Ya podés ingresar!');
+    }
   }
   updateAuthUI();
 }
@@ -3918,6 +3944,48 @@ function switchTab(tab){
   if(fl) fl.style.display=tab==='login'?'block':'none';
   toggleForgot(false); // siempre cerrar el panel al cambiar tab
   document.getElementById('authMsg').textContent='';
+}
+
+let _resetToken = null;
+
+function showResetPasswordModal(token){
+  _resetToken = token;
+  document.getElementById('resetOverlay').classList.add('open');
+  document.getElementById('resetPass1').focus();
+}
+
+async function submitResetPassword(){
+  const p1 = document.getElementById('resetPass1').value;
+  const p2 = document.getElementById('resetPass2').value;
+  const msg = document.getElementById('resetMsg');
+  if(!p1||p1.length<6){ msg.style.color='var(--red)'; msg.textContent='Mínimo 6 caracteres'; return; }
+  if(p1!==p2){ msg.style.color='var(--red)'; msg.textContent='Las contraseñas no coinciden'; return; }
+  msg.style.color='var(--muted)'; msg.textContent='Guardando...';
+  try{
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`,{
+      method:'PUT',
+      headers:{
+        'apikey':SUPABASE_ANON,
+        'Authorization':`Bearer ${_resetToken}`,
+        'Content-Type':'application/json'
+      },
+      body: JSON.stringify({password: p1})
+    });
+    if(res.ok){
+      document.getElementById('resetOverlay').classList.remove('open');
+      _resetToken = null;
+      showToast('✅ Contraseña actualizada. ¡Ya podés ingresar!');
+      // Limpiar campos y abrir modal de login
+      setTimeout(()=>{ openAuth(null,'login'); }, 500);
+      updateAuthUI();
+    } else {
+      const d = await res.json();
+      msg.style.color='var(--red)';
+      msg.textContent = d.message||d.error_description||'Error al actualizar';
+    }
+  } catch(e){
+    msg.style.color='var(--red)'; msg.textContent='Error de conexión';
+  }
 }
 
 function toggleForgot(show){
