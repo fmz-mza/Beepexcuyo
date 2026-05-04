@@ -2965,7 +2965,11 @@ async function initAuth(){
         }
         await loadProfile();
         updatePresence();
-        setTimeout(()=>openWelcome(), 600);
+        // No abrir bienvenida si viene de un link de recovery
+        const _hashStr=window.location.hash||'';
+        if(!(_hashStr.includes('type=recovery')||_hashStr.includes('type%3Drecovery'))){
+          setTimeout(()=>openWelcome(), 600);
+        }
       } else {
         // Token expirado — intentar refrescar con refresh_token
         const refreshed=await refreshSession();
@@ -2986,11 +2990,29 @@ async function initAuth(){
     const params=new URLSearchParams(window.location.hash.slice(1));
     const type=params.get('type');
     const token=params.get('access_token');
-    if(type==='recovery'&&token){
-      // Guardar token de recovery y mostrar modal de nueva contraseña
+    if(type==='recovery'){
       history.replaceState(null,'',window.location.pathname);
-      showResetPasswordModal(token);
-      return; // no continuar con el flujo normal
+      // El template nuevo envía token_hash (OTP) — canjearlo por JWT
+      const tokenHash=params.get('token_hash')||params.get('refresh_token')||token;
+      // Intentar verificar OTP para obtener access_token real
+      try{
+        const vRes=await fetch(`${SUPABASE_URL}/auth/v1/verify`,{
+          method:'POST',
+          headers:{'apikey':SUPABASE_ANON,'Content-Type':'application/json'},
+          body:JSON.stringify({token_hash:tokenHash, type:'recovery'})
+        });
+        if(vRes.ok){
+          const vData=await vRes.json();
+          const jwt=vData.access_token||token;
+          showResetPasswordModal(jwt);
+        } else {
+          // Fallback: usar el token directo si viene como JWT válido
+          showResetPasswordModal(token||tokenHash);
+        }
+      } catch(e){
+        showResetPasswordModal(token||tokenHash);
+      }
+      return;
     } else {
       history.replaceState(null,'',window.location.pathname);
       showToast('✅ Email confirmado. ¡Ya podés ingresar!');
