@@ -792,6 +792,13 @@ let userSalePrices={}; // {sku: price}
       <input class="auth-input" id="authNombre" type="text" placeholder="👤 Tu nombre o negocio" style="display:none">
       <div class="auth-msg" id="authMsg"></div>
       <button class="auth-btn" id="authSubmit" onclick="submitAuth()">Ingresar</button>
+      <div id="forgotPanel" style="display:none;margin-top:4px;">
+        <input class="auth-input" id="forgotEmail" type="email" placeholder="📧 Tu email registrado">
+        <div class="auth-msg" id="forgotMsg"></div>
+        <button class="auth-btn" onclick="submitForgot()" style="margin-top:4px;">Enviar link de reset</button>
+        <button class="auth-skip" onclick="toggleForgot(false)">← Volver</button>
+      </div>
+      <button class="auth-skip" id="forgotLink" onclick="toggleForgot(true)" style="color:var(--accent);font-size:12px;margin-top:2px;display:none;">¿Olvidaste tu contraseña?</button>
       <button class="auth-skip" onclick="closeAuth()">Seguir explorando sin registrarme</button>
     </div>
   </div>
@@ -3883,6 +3890,7 @@ async function submitChangePassword(){
 function openAuth(pending, tab){
   if(pending) authPending=pending;
   if(tab) switchTab(tab);
+  toggleForgot(false);
   document.getElementById('authOverlay').classList.add('open');
   document.body.style.overflow='hidden';
   setTimeout(()=>document.getElementById('authEmail').focus(),200);
@@ -3905,7 +3913,49 @@ function switchTab(tab){
   document.getElementById('authSubmit').textContent=tab==='login'?'Ingresar':'Crear cuenta';
   document.getElementById('authTitle').textContent=tab==='login'?'¡Bienvenido de nuevo!':'Crear cuenta';
   document.getElementById('authSub').textContent=tab==='login'?'Ingresá para ver precios y hacer pedidos':'Registrate para acceder al catálogo mayorista';
+  // Mostrar "Olvidé mi contraseña" solo en tab login
+  const fl=document.getElementById('forgotLink');
+  if(fl) fl.style.display=tab==='login'?'block':'none';
+  toggleForgot(false); // siempre cerrar el panel al cambiar tab
   document.getElementById('authMsg').textContent='';
+}
+
+function toggleForgot(show){
+  document.getElementById('forgotPanel').style.display=show?'block':'none';
+  document.getElementById('forgotLink').style.display=show?'none':'block';
+  document.getElementById('authSubmit').style.display=show?'none':'block';
+  document.getElementById('forgotMsg').textContent='';
+  if(show){
+    // Pre-rellenar con el email ya ingresado
+    const em=document.getElementById('authEmail').value.trim();
+    if(em) document.getElementById('forgotEmail').value=em;
+    document.getElementById('forgotEmail').focus();
+  }
+}
+
+async function submitForgot(){
+  const email=document.getElementById('forgotEmail').value.trim();
+  const msg=document.getElementById('forgotMsg');
+  if(!email){ msg.textContent='Ingresá tu email'; msg.style.color='var(--red)'; return; }
+  msg.textContent='Enviando...'; msg.style.color='var(--muted)';
+  try{
+    const res=await fetch(`${SUPABASE_URL}/auth/v1/recover`,{
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON,'Content-Type':'application/json'},
+      body:JSON.stringify({email})
+    });
+    if(res.ok||res.status===200){
+      msg.style.color='var(--green)';
+      msg.textContent='✅ Revisá tu email para el link de reset';
+    } else {
+      const d=await res.json();
+      msg.style.color='var(--red)';
+      msg.textContent=d.message||'Error al enviar el email';
+    }
+  }catch(e){
+    msg.style.color='var(--red)';
+    msg.textContent='Error de conexión';
+  }
 }
 
 async function submitAuth(){
