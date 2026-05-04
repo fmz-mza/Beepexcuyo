@@ -56,24 +56,35 @@ def normalizar_iva(val):
 
 def limpiar_precio(val):
     """
-    Limpia y convierte a entero strings de precios con formatos variados:
-    $11,899.00 -> 11899
-    $11.899,00 -> 11899
-    1.899 -> 1899
-    21499 -> 21499
+    Limpia y convierte a entero strings de precios.
+    Detecta si los últimos dígitos son centavos (ej: .00 o ,50) para truncarlos,
+    pero protege los miles (ej: 59.999).
     """
     if pd.isna(val) or val is None: return 0
     s = str(val).replace('$', '').strip()
     if s.upper() == "SIN PVP": return 0
     
-    # 1. Quitar espacios
+    # Quitar todos los espacios
     s = s.replace(' ', '').replace('\xa0', '')
     
-    # 2. Manejar decimales .00 o ,00 al final
-    if re.search(r'[,.]\d{2}$', s):
-        s = s[:-3]
+    # Encontrar el último separador
+    last_sep_idx = -1
+    for i, char in enumerate(s):
+        if char in ',.':
+            last_sep_idx = i
+            
+    if last_sep_idx != -1:
+        # Analizar qué hay después del último separador
+        decimals_part = s[last_sep_idx+1:]
+        # Si hay exactamente 2 dígitos después del punto/coma, son centavos.
+        # Si hay 3 o más, es herencia de separador de miles o error de formato.
+        if len(decimals_part) == 2:
+            s = s[:last_sep_idx]
+        elif len(decimals_part) == 1:
+            # Caso raro de un solo decimal, también truncamos
+            s = s[:last_sep_idx]
     
-    # 3. Eliminar caracteres no numéricos
+    # Eliminar cualquier carácter no numérico restante
     s = re.sub(r'[^\d]', '', s)
     
     try:
@@ -240,23 +251,36 @@ def run_sync():
         precio_20_30 = limpiar_precio(row.get("LISTA 20/30"))
         
         # REGLA DEFINITIVA: 
-        # Si LISTA BASE == LISTA 14/20 == LISTA 20/30, significa que es un precio no calculado.
-        # En ese caso, si hay PVP, calculamos PVP / 2.
+        # Si LISTA BASE == LISTA 14/20 == LISTA 20/30, consideramos que es un precio "crudo"
+        # y usamos PVP / 2 como precio mayorista base.
         
         precio_pesos = precio_lista_base
+        regla_trigger = False
         
         if precio_lista_base > 0 and precio_lista_base == precio_14_20 == precio_20_30:
             if precio_pvp > 0:
-                precio_pesos = int(precio_pvp / 2)
+                # Solo aplicamos PVP/2 si el precio de lista es igual al PVP (crudo total)
+                # o si el cálculo resultante NO es menor al precio de lista base.
+                calculado = int(precio_pvp / 2)
+                if precio_lista_base == precio_pvp or calculado > precio_lista_base:
+                    precio_pesos = calculado
+                    regla_trigger = True
         
-        # Fallback histórico para SKUs nuevos sin lista base
+        # Fallback histórico para SKUs nuevos sin lista base (>= 11432)
         if precio_pesos <= 0:
             try:
                 val_sku = int(sku)
                 if val_sku >= 11432 and precio_pvp > 0:
                     precio_pesos = int(precio_pvp / 2)
+                    regla_trigger = True
             except:
                 pass
+
+        # Mostrar en log si se aplicó la regla especial de identidad
+        if regla_trigger:
+            # Solo logueamos si el precio calculado es diferente al de LISTA BASE
+            if precio_pesos != precio_lista_base:
+                print(f"ℹ️ REGLA IDENTIDAD: SKU {sku} ({nombre}) -> PVP/2 Aplicado: ${precio_pesos} (Base era ${precio_lista_base})")
 
         # Stock
         stock_raw = str(row.get("STOCK/INGRESO", "0")).upper()
