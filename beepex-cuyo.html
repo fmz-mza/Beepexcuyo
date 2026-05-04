@@ -2950,6 +2950,25 @@ setInterval(updatePresence, 2*60*1000);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) updatePresence(); });
 
 async function initAuth(){
+  // ── Detectar recovery PRIMERO, antes de cualquier otra cosa ──
+  if(window.location.hash&&window.location.hash.includes('type=recovery')){
+    const params=new URLSearchParams(window.location.hash.slice(1));
+    const token=params.get('access_token');
+    const tokenHash=params.get('token_hash')||params.get('refresh_token')||token;
+    history.replaceState(null,'',window.location.pathname);
+    try{
+      const vRes=await fetch(`${SUPABASE_URL}/auth/v1/verify`,{
+        method:'POST',
+        headers:{'apikey':SUPABASE_ANON,'Content-Type':'application/json'},
+        body:JSON.stringify({token_hash:tokenHash,type:'recovery'})
+      });
+      const jwt=(vRes.ok?(await vRes.json()).access_token:null)||token||tokenHash;
+      showResetPasswordModal(jwt);
+    } catch(e){ showResetPasswordModal(token||tokenHash); }
+    updateAuthUI(); // actualizar UI sin abrir bienvenida
+    return;
+  }
+
   // onAuthStateChange eliminado — usamos fetch directo + localStorage
   // Restaurar sesión desde localStorage si existe
   const savedToken=localStorage.getItem('sb_access_token');
@@ -2965,11 +2984,7 @@ async function initAuth(){
         }
         await loadProfile();
         updatePresence();
-        // No abrir bienvenida si viene de un link de recovery
-        const _hashStr=window.location.hash||'';
-        if(!(_hashStr.includes('type=recovery')||_hashStr.includes('type%3Drecovery'))){
-          setTimeout(()=>openWelcome(), 600);
-        }
+        setTimeout(()=>openWelcome(), 600);
       } else {
         // Token expirado — intentar refrescar con refresh_token
         const refreshed=await refreshSession();
@@ -2985,38 +3000,10 @@ async function initAuth(){
       }
     } catch(e){ localStorage.removeItem('sb_access_token'); }
   }
-  // Detectar recovery password o confirmación de email en el hash
+  // Confirmación de email (no recovery)
   if(window.location.hash&&window.location.hash.includes('access_token')){
-    const params=new URLSearchParams(window.location.hash.slice(1));
-    const type=params.get('type');
-    const token=params.get('access_token');
-    if(type==='recovery'){
-      history.replaceState(null,'',window.location.pathname);
-      // El template nuevo envía token_hash (OTP) — canjearlo por JWT
-      const tokenHash=params.get('token_hash')||params.get('refresh_token')||token;
-      // Intentar verificar OTP para obtener access_token real
-      try{
-        const vRes=await fetch(`${SUPABASE_URL}/auth/v1/verify`,{
-          method:'POST',
-          headers:{'apikey':SUPABASE_ANON,'Content-Type':'application/json'},
-          body:JSON.stringify({token_hash:tokenHash, type:'recovery'})
-        });
-        if(vRes.ok){
-          const vData=await vRes.json();
-          const jwt=vData.access_token||token;
-          showResetPasswordModal(jwt);
-        } else {
-          // Fallback: usar el token directo si viene como JWT válido
-          showResetPasswordModal(token||tokenHash);
-        }
-      } catch(e){
-        showResetPasswordModal(token||tokenHash);
-      }
-      return;
-    } else {
-      history.replaceState(null,'',window.location.pathname);
-      showToast('✅ Email confirmado. ¡Ya podés ingresar!');
-    }
+    history.replaceState(null,'',window.location.pathname);
+    showToast('✅ Email confirmado. ¡Ya podés ingresar!');
   }
   updateAuthUI();
 }
