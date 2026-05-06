@@ -51,7 +51,12 @@
   .search-input::placeholder{color:var(--muted);}
   .search-input:focus{border-color:var(--accent);}
   .filters{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding-bottom:4px;}
-  .rubro-chips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0 2px;max-height:calc(3 * 30px + 2 * 6px);overflow:hidden;justify-content:center;}
+  .rubro-chips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0 2px;max-height:none;overflow:visible;justify-content:center;}
+  /* Ocultar iconos nativos de type="search" para mantener consistencia visual */
+  input[type="search"]::-webkit-search-decoration,
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-results-button,
+  input[type="search"]::-webkit-search-results-decoration { display: none; }
   .rubro-chip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .18s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;white-space:nowrap;letter-spacing:.3px;}
   .rubro-chip:active{transform:scale(.93);}
   .rubro-chip.active{background:var(--accent);border-color:var(--accent);color:#fff;}
@@ -1208,7 +1213,7 @@ function renderRubros(){
     if(showNoStock) return true;
     return p.stock&&p.stock.toUpperCase()!=='NOSTOCK';
   });
-  const rubros=[...new Set(base.map(p=>p.rubro).filter(Boolean))].sort();
+  const rubros=[...new Set(base.map(p=>p.rubro).filter(r => r && r.toLowerCase() !== 'nan'))].sort();
   if(!rubros.length){el.innerHTML='';return;}
   let html=`<button class="rubro-chip ${activeRubro==='ALL'?'active':''}" onclick="setRubro('ALL')">Todos los rubros</button>`;
   html+=rubros.map(r=>`<button class="rubro-chip ${activeRubro===r?'active':''}" onclick="setRubro('${r}')">${r}</button>`).join('');
