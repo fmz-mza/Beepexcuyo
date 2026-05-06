@@ -647,10 +647,13 @@ let userSalePrices={}; // {sku: price}
     <input type="text" style="display:none" aria-hidden="true">
     <input type="email" style="display:none" aria-hidden="true">
     
-    <input type="search" class="search-input" id="searchInput" name="q_search_catalogo" 
+    <input type="search" class="search-input" id="searchInput" name="campo_busqueda_productos" 
            placeholder="🔍  Buscar producto, SKU, marca..." 
            oninput="scheduleRender()" 
-           autocomplete="off" 
+           autocomplete="one-time-code" 
+           readonly 
+           onfocus="this.removeAttribute('readonly');"
+           onmouseover="this.removeAttribute('readonly');"
            spellcheck="false">
     <button class="search-clear" id="searchClear" onclick="clearSearch()" aria-label="Limpiar búsqueda">✕</button>
   </div>
@@ -4619,6 +4622,18 @@ function addVoiceToCart(){
 
   renderBrands();
   renderGrid();
+
+  // Limpiar forzadamente el buscador para evitar autofill persistente de algunos navegadores
+  const forceClearSearch = () => {
+    const sInput = document.getElementById('searchInput');
+    if(sInput) {
+      sInput.value = '';
+      sInput.blur();
+    }
+  };
+  forceClearSearch();
+  setTimeout(forceClearSearch, 100);
+  setTimeout(forceClearSearch, 500);
 
   // Auth en paralelo (no bloquea el catálogo)
   initAuth();
