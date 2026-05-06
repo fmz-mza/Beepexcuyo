@@ -51,7 +51,7 @@
   .search-input::placeholder{color:var(--muted);}
   .search-input:focus{border-color:var(--accent);}
   .filters{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding-bottom:4px;}
-  .rubro-chips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0 2px;justify-content:center;}
+  .rubro-chips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0 2px;max-height:calc(3 * 30px + 2 * 6px);overflow:hidden;justify-content:center;}
   .rubro-chip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .18s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;white-space:nowrap;letter-spacing:.3px;}
   .rubro-chip:active{transform:scale(.93);}
   .rubro-chip.active{background:var(--accent);border-color:var(--accent);color:#fff;}
@@ -65,14 +65,14 @@
   .filter-btn.f-nostock.active,.filter-btn.f-nostock:hover{background:var(--red);border-color:var(--red);color:#fff;}
   .filter-sep{width:1px;background:var(--border);margin:0 2px;align-self:stretch;}
   .count-sort-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-  .product-count{font-size:12px;color:var(--muted);margin-bottom:0;padding-bottom:0;line-height:1;}
+  .product-count{font-size:12px;color:var(--muted);}
   .sort-select{background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;font-weight:600;padding:5px 8px;font-family:inherit;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;}
   .sort-select:focus{border-color:var(--accent);color:var(--text);}
   .grid{max-width:960px;margin:0 auto;padding:14px 16px 140px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .grid>.card,.grid>.section-title{order:9999;}
   @media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr);}}
   @media(min-width:900px){.grid{grid-template-columns:repeat(4,1fr);}}
-  .section-title{grid-column:1/-1;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:2px 0 0;}
+  .section-title{grid-column:1/-1;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:8px 0 0;}
   .section-title.hidden{display:none;}
   .no-results{grid-column:1/-1;text-align:center;color:var(--muted);padding:60px 0;}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s;}
@@ -228,12 +228,6 @@
   .mc-detail-qty{color:var(--muted);font-size:12px;white-space:nowrap;}
   .mc-detail-subtotal{font-weight:700;white-space:nowrap;}
   .mc-detail-total-row{display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:10px 0 0;border-top:2px solid var(--border);margin-top:4px;}
-  /* ── Modal Reset Password ── */
-  .reset-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px;}
-  .reset-overlay.open{display:flex;}
-  .reset-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 24px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px;animation:slideUp .2s ease;}
-  .reset-modal h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;text-align:center;}
-  .reset-modal p{font-size:13px;color:var(--muted);text-align:center;margin-top:-4px;}
   .cart-overlay.open{display:block;}
   .cart-drawer{position:fixed;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
   .cart-drawer.open{transform:translateX(0);}
@@ -649,7 +643,15 @@ let userSalePrices={}; // {sku: price}
 </header>
 <div class="toolbar">
   <div class="search-wrap">
-    <input class="search-input" id="searchInput" placeholder="🔍  Buscar producto, SKU, marca..." oninput="scheduleRender()">
+    <!-- Honeypot para evitar que el navegador autocompletes el buscador con el email del usuario -->
+    <input type="text" style="display:none" aria-hidden="true">
+    <input type="email" style="display:none" aria-hidden="true">
+    
+    <input type="search" class="search-input" id="searchInput" name="q_search_catalogo" 
+           placeholder="🔍  Buscar producto, SKU, marca..." 
+           oninput="scheduleRender()" 
+           autocomplete="off" 
+           spellcheck="false">
     <button class="search-clear" id="searchClear" onclick="clearSearch()" aria-label="Limpiar búsqueda">✕</button>
   </div>
   <div class="filters" id="brandFilters"></div>
@@ -674,16 +676,6 @@ let userSalePrices={}; // {sku: price}
     <div class="pwd-msg" id="pwdMsg"></div>
     <button class="pwd-btn" onclick="submitChangePassword()">Guardar contraseña</button>
     <button class="pwd-btn pwd-btn-cancel" onclick="closeChangePassword()">Cancelar</button>
-  </div>
-</div>
-<div class="reset-overlay" id="resetOverlay">
-  <div class="reset-modal">
-    <h2>🔐 Nueva contraseña</h2>
-    <p>Ingresá tu nueva contraseña para continuar.</p>
-    <input class="auth-input" id="resetPass1" type="password" placeholder="🔑 Nueva contraseña" onkeydown="if(event.key==='Enter')submitResetPassword()">
-    <input class="auth-input" id="resetPass2" type="password" placeholder="🔑 Confirmar contraseña" onkeydown="if(event.key==='Enter')submitResetPassword()">
-    <div class="auth-msg" id="resetMsg"></div>
-    <button class="auth-btn" onclick="submitResetPassword()">Guardar nueva contraseña</button>
   </div>
 </div>
 <div class="micuenta-overlay" id="micuentaOverlay" onclick="closeMiCuenta()"></div>
@@ -808,13 +800,6 @@ let userSalePrices={}; // {sku: price}
       <input class="auth-input" id="authNombre" type="text" placeholder="👤 Tu nombre o negocio" style="display:none">
       <div class="auth-msg" id="authMsg"></div>
       <button class="auth-btn" id="authSubmit" onclick="submitAuth()">Ingresar</button>
-      <div id="forgotPanel" style="display:none;margin-top:4px;">
-        <input class="auth-input" id="forgotEmail" type="email" placeholder="📧 Tu email registrado">
-        <div class="auth-msg" id="forgotMsg"></div>
-        <button class="auth-btn" onclick="submitForgot()" style="margin-top:4px;">Enviar link de reset</button>
-        <button class="auth-skip" onclick="toggleForgot(false)">← Volver</button>
-      </div>
-      <button class="auth-skip" id="forgotLink" onclick="toggleForgot(true)" style="color:var(--accent);font-size:12px;margin-top:2px;display:none;">¿Olvidaste tu contraseña?</button>
       <button class="auth-skip" onclick="closeAuth()">Seguir explorando sin registrarme</button>
     </div>
   </div>
@@ -1050,19 +1035,24 @@ async function loadProducts(){
     }
     const rows = await res.json();
     console.log('loadProducts rows:', rows.length);
-    products = rows.map(r=>({
-      sku:   String(r.sku),
-      name:  r.name,
-      brand: r.brand === 'BEEPAW' ? 'BEEPAW' : 'GENÉRICOS',
-      price: r.price,
-      pvp:   r.pvp||0,
-      iva:   parseFloat(r.iva)||21,
-      stock: r.stock||'STOCK',
-      stock_fisico: parseFloat(r.stock_fisico)||0,
-      stock_ingresos: parseFloat(r.stock_ingresos)||0,
-      rubro: r.rubro||null,
-      ean:   r.ean||''
-    }));
+    products = rows.map(r=>{
+      const sku = String(r.sku);
+      let price = r.price;
+      if(sku === '11573') price = 59999;
+      return {
+        sku:   sku,
+        name:  r.name,
+        brand: r.brand === 'BEEPAW' ? 'BEEPAW' : 'GENÉRICOS',
+        price: price,
+        pvp:   r.pvp||0,
+        iva:   parseFloat(r.iva)||21,
+        stock: r.stock||'STOCK',
+        stock_fisico: parseFloat(r.stock_fisico)||0,
+        stock_ingresos: parseFloat(r.stock_ingresos)||0,
+        rubro: r.rubro||null,
+        ean:   r.ean||''
+      };
+    });
     productMeta = {};
     rows.forEach(r=>{
       const tags = (r.description||'').toLowerCase();
@@ -2950,25 +2940,6 @@ setInterval(updatePresence, 2*60*1000);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) updatePresence(); });
 
 async function initAuth(){
-  // ── Detectar recovery PRIMERO, antes de cualquier otra cosa ──
-  if(window.location.hash&&window.location.hash.includes('type=recovery')){
-    const params=new URLSearchParams(window.location.hash.slice(1));
-    const token=params.get('access_token');
-    const tokenHash=params.get('token_hash')||params.get('refresh_token')||token;
-    history.replaceState(null,'',window.location.pathname);
-    try{
-      const vRes=await fetch(`${SUPABASE_URL}/auth/v1/verify`,{
-        method:'POST',
-        headers:{'apikey':SUPABASE_ANON,'Content-Type':'application/json'},
-        body:JSON.stringify({token_hash:tokenHash,type:'recovery'})
-      });
-      const jwt=(vRes.ok?(await vRes.json()).access_token:null)||token||tokenHash;
-      showResetPasswordModal(jwt);
-    } catch(e){ showResetPasswordModal(token||tokenHash); }
-    updateAuthUI(); // actualizar UI sin abrir bienvenida
-    return;
-  }
-
   // onAuthStateChange eliminado — usamos fetch directo + localStorage
   // Restaurar sesión desde localStorage si existe
   const savedToken=localStorage.getItem('sb_access_token');
@@ -3000,7 +2971,7 @@ async function initAuth(){
       }
     } catch(e){ localStorage.removeItem('sb_access_token'); }
   }
-  // Confirmación de email (no recovery)
+  // Limpiar hash de la URL si viene del link de confirmación
   if(window.location.hash&&window.location.hash.includes('access_token')){
     history.replaceState(null,'',window.location.pathname);
     showToast('✅ Email confirmado. ¡Ya podés ingresar!');
@@ -3925,7 +3896,6 @@ async function submitChangePassword(){
 function openAuth(pending, tab){
   if(pending) authPending=pending;
   if(tab) switchTab(tab);
-  toggleForgot(false);
   document.getElementById('authOverlay').classList.add('open');
   document.body.style.overflow='hidden';
   setTimeout(()=>document.getElementById('authEmail').focus(),200);
@@ -3948,91 +3918,7 @@ function switchTab(tab){
   document.getElementById('authSubmit').textContent=tab==='login'?'Ingresar':'Crear cuenta';
   document.getElementById('authTitle').textContent=tab==='login'?'¡Bienvenido de nuevo!':'Crear cuenta';
   document.getElementById('authSub').textContent=tab==='login'?'Ingresá para ver precios y hacer pedidos':'Registrate para acceder al catálogo mayorista';
-  // Mostrar "Olvidé mi contraseña" solo en tab login
-  const fl=document.getElementById('forgotLink');
-  if(fl) fl.style.display=tab==='login'?'block':'none';
-  toggleForgot(false); // siempre cerrar el panel al cambiar tab
   document.getElementById('authMsg').textContent='';
-}
-
-let _resetToken = null;
-
-function showResetPasswordModal(token){
-  _resetToken = token;
-  document.getElementById('resetOverlay').classList.add('open');
-  document.getElementById('resetPass1').focus();
-}
-
-async function submitResetPassword(){
-  const p1 = document.getElementById('resetPass1').value;
-  const p2 = document.getElementById('resetPass2').value;
-  const msg = document.getElementById('resetMsg');
-  if(!p1||p1.length<6){ msg.style.color='var(--red)'; msg.textContent='Mínimo 6 caracteres'; return; }
-  if(p1!==p2){ msg.style.color='var(--red)'; msg.textContent='Las contraseñas no coinciden'; return; }
-  msg.style.color='var(--muted)'; msg.textContent='Guardando...';
-  try{
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`,{
-      method:'PUT',
-      headers:{
-        'apikey':SUPABASE_ANON,
-        'Authorization':`Bearer ${_resetToken}`,
-        'Content-Type':'application/json'
-      },
-      body: JSON.stringify({password: p1})
-    });
-    if(res.ok){
-      document.getElementById('resetOverlay').classList.remove('open');
-      _resetToken = null;
-      showToast('✅ Contraseña actualizada. ¡Ya podés ingresar!');
-      // Limpiar campos y abrir modal de login
-      setTimeout(()=>{ openAuth(null,'login'); }, 500);
-      updateAuthUI();
-    } else {
-      const d = await res.json();
-      msg.style.color='var(--red)';
-      msg.textContent = d.message||d.error_description||'Error al actualizar';
-    }
-  } catch(e){
-    msg.style.color='var(--red)'; msg.textContent='Error de conexión';
-  }
-}
-
-function toggleForgot(show){
-  document.getElementById('forgotPanel').style.display=show?'block':'none';
-  document.getElementById('forgotLink').style.display=show?'none':'block';
-  document.getElementById('authSubmit').style.display=show?'none':'block';
-  document.getElementById('forgotMsg').textContent='';
-  if(show){
-    // Pre-rellenar con el email ya ingresado
-    const em=document.getElementById('authEmail').value.trim();
-    if(em) document.getElementById('forgotEmail').value=em;
-    document.getElementById('forgotEmail').focus();
-  }
-}
-
-async function submitForgot(){
-  const email=document.getElementById('forgotEmail').value.trim();
-  const msg=document.getElementById('forgotMsg');
-  if(!email){ msg.textContent='Ingresá tu email'; msg.style.color='var(--red)'; return; }
-  msg.textContent='Enviando...'; msg.style.color='var(--muted)';
-  try{
-    const res=await fetch(`${SUPABASE_URL}/auth/v1/recover`,{
-      method:'POST',
-      headers:{'apikey':SUPABASE_ANON,'Content-Type':'application/json'},
-      body:JSON.stringify({email})
-    });
-    if(res.ok||res.status===200){
-      msg.style.color='var(--green)';
-      msg.textContent='✅ Revisá tu email para el link de reset';
-    } else {
-      const d=await res.json();
-      msg.style.color='var(--red)';
-      msg.textContent=d.message||'Error al enviar el email';
-    }
-  }catch(e){
-    msg.style.color='var(--red)';
-    msg.textContent='Error de conexión';
-  }
 }
 
 async function submitAuth(){
