@@ -243,6 +243,8 @@ def run_sync():
         
         descripcion = str(row.get("DESCRIPCION", "")).strip()
         iva = normalizar_iva(row.get("IVA"))
+        marca = str(row.get("MARCA", "")).strip()
+        rubro = str(row.get("RUBRO", "")).strip()
         
         # PRECIOS: Lógica de Identidad entre listas
         precio_pvp = limpiar_precio(row.get("PVP"))
@@ -256,6 +258,7 @@ def run_sync():
         
         precio_pesos = precio_lista_base
         regla_trigger = False
+        motivo_regla = "Identidad"
         
         if precio_lista_base > 0 and precio_lista_base == precio_14_20 == precio_20_30:
             if precio_pvp > 0:
@@ -265,11 +268,25 @@ def run_sync():
                 if precio_lista_base == precio_pvp or calculado > precio_lista_base:
                     precio_pesos = calculado
                     regla_trigger = True
+                    motivo_regla = "PVP/2"
             else:
-                # NUEVA REGLA: Si no hay PVP y los precios de lista son idénticos, sumamos 21%
-                # Ejemplo SKU 11437: 15631 * 1.21 = 18913
+                # NUEVA REGLA (04/05): Si no hay PVP y los precios de lista son idénticos, sumamos 21%
                 precio_pesos = int(precio_lista_base * 1.21)
                 regla_trigger = True
+                motivo_regla = "Base+21% (Iden)"
+
+        # REGLA PROTECCIÓN GENÉRICOS (08/05):
+        # Independientemente de si las listas son iguales, si es Genérico >= 11432 y no hay PVP
+        # forzamos Base + 21% para proteger el margen ante cambios asimétricos.
+        if not regla_trigger:
+            try:
+                val_sku = int(sku)
+                if val_sku >= 11432 and "GENERICOS" in marca.upper() and precio_pvp <= 0:
+                    precio_pesos = int(precio_lista_base * 1.21)
+                    regla_trigger = True
+                    motivo_regla = "Gen_Base+21%"
+            except:
+                pass
         
         # Fallback histórico para SKUs nuevos sin lista base (>= 11432)
         if precio_pesos <= 0:
@@ -278,15 +295,15 @@ def run_sync():
                 if val_sku >= 11432 and precio_pvp > 0:
                     precio_pesos = int(precio_pvp / 2)
                     regla_trigger = True
+                    motivo_regla = "PVP/2 (Fallback)"
             except:
                 pass
-
-        # Mostrar en log si se aplicó la regla especial de identidad
+ 
+        # Mostrar en log si se aplicó alguna regla especial
         if regla_trigger:
             # Solo logueamos si el precio calculado es diferente al de LISTA BASE
             if precio_pesos != precio_lista_base:
-                motivo = "PVP/2" if precio_pvp > 0 else "Base+21%"
-                print(f"ℹ️ REGLA IDENTIDAD ({motivo}): SKU {sku} ({nombre}) -> Aplicado: ${precio_pesos} (Base era ${precio_lista_base})")
+                print(f"ℹ️ REGLA {motivo_regla}: SKU {sku} ({nombre}) -> Aplicado: ${precio_pesos} (Base era ${precio_lista_base})")
 
         # Stock
         stock_raw = str(row.get("STOCK/INGRESO", "0")).upper()
