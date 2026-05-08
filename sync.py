@@ -251,10 +251,7 @@ def run_sync():
         precio_lista_base = limpiar_precio(row.get("LISTA BASE"))
         precio_14_20 = limpiar_precio(row.get("LISTA 14/20"))
         precio_20_30 = limpiar_precio(row.get("LISTA 20/30"))
-        
-        # REGLA DEFINITIVA: 
-        # Si LISTA BASE == LISTA 14/20 == LISTA 20/30, consideramos que es un precio "crudo"
-        # y usamos PVP / 2 como precio mayorista base.
+        precio_liqui = limpiar_precio(row.get("LISTA LIQUIDACION"))
         
         precio_pesos = precio_lista_base
         regla_trigger = False
@@ -262,8 +259,6 @@ def run_sync():
         
         if precio_lista_base > 0 and precio_lista_base == precio_14_20 == precio_20_30:
             if precio_pvp > 0:
-                # Solo aplicamos PVP/2 si el precio de lista es igual al PVP (crudo total)
-                # o si el cálculo resultante NO es menor al precio de lista base.
                 calculado = int(precio_pvp / 2)
                 if precio_lista_base == precio_pvp or calculado > precio_lista_base:
                     precio_pesos = calculado
@@ -275,18 +270,23 @@ def run_sync():
                 regla_trigger = True
                 motivo_regla = "Base+21% (Iden)"
 
-        # REGLA PROTECCIÓN GENÉRICOS (08/05):
-        # Independientemente de si las listas son iguales, si es Genérico >= 11432 y no hay PVP
-        # forzamos Base + 21% para proteger el margen ante cambios asimétricos.
-        if not regla_trigger:
-            try:
-                val_sku = int(sku)
-                if val_sku >= 11432 and "GENERICOS" in marca.upper() and precio_pvp <= 0:
+        # REGLA PROTECCIÓN GENÉRICOS (REFINADA 08/05):
+        # Si es Genérico >= 11432 y no hay PVP:
+        # 1. Si hay Liquidación: Anclamos a 20/30 + 21% (BASE está inflada temporalmente).
+        # 2. Si no hay Liquidación: Usamos BASE + 21% (Protección estándar).
+        try:
+            val_sku = int(sku)
+            if val_sku >= 11432 and "GENERICOS" in marca.upper() and precio_pvp <= 0:
+                if precio_liqui > 0 and precio_20_30 > 0:
+                    precio_pesos = int(precio_20_30 * 1.21)
+                    regla_trigger = True
+                    motivo_regla = "Gen_20/30+21%(Liq)"
+                elif not regla_trigger:
                     precio_pesos = int(precio_lista_base * 1.21)
                     regla_trigger = True
                     motivo_regla = "Gen_Base+21%"
-            except:
-                pass
+        except:
+            pass
         
         # Fallback histórico para SKUs nuevos sin lista base (>= 11432)
         if precio_pesos <= 0:
