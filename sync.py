@@ -93,8 +93,22 @@ def limpiar_precio(val):
         return 0
 
 def get_drive_ids_from_netlify():
-    """Extrae el mapeo de IDs de Drive desde el HTML de Netlify"""
+    """Extrae el mapeo de IDs de Drive desde la API de Landings o HTML de Netlify"""
     try:
+        # Intento 1: API de Landings (Nueva fuente dinámica)
+        api_url = "https://beepex.dev/api/landings/products"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        res = requests.get(api_url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            if 'driveMap' in data:
+                print(f"Obtenido driveMap desde API exitosamente ({len(data['driveMap'])} imágenes).")
+                return data['driveMap']
+    except Exception as e:
+        print(f"Error obteniendo driveMap desde API: {e}")
+
+    try:
+        # Intento 2: Scraping HTML (Fallback legacy)
         headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(NETLIFY_SRC_URL, headers=headers, timeout=10)
         html = res.text
