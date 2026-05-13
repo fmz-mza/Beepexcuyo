@@ -234,7 +234,15 @@ def run_sync():
     logs = []
 
     for _, row in df.iterrows():
-        sku = str(row.get("CODIGO", "")).strip()
+        sku_raw = row.get("CODIGO", "")
+        if pd.isna(sku_raw) or sku_raw == "":
+            continue
+            
+        # Limpieza de SKU para evitar decimales .0 (problema de float en Pandas)
+        sku = str(sku_raw).strip()
+        if sku.endswith(".0"):
+            sku = sku[:-2]
+        
         nombre = str(row.get("NOMBRE", "")).replace('_', ' ').strip()
         
         # Saltar si no hay SKU o es de prueba
