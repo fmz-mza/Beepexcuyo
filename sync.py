@@ -351,7 +351,7 @@ def run_sync():
 
         # Foto
         foto_id = str(row.get("FOTO", "")).strip()
-        if not foto_id or foto_id.lower() == "prueba":
+        if not foto_id or foto_id.lower() == "prueba" or foto_id.lower() == "nan":
             foto_id = netlify_mapping.get(sku, "")
         
         # 2. Verificar existencia y datos previos para evitar re-procesamiento innecesario
