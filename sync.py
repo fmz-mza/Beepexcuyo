@@ -233,7 +233,27 @@ def process_image(drive_id, sku):
         print(f"⚠️ Error procesando {sku}: {e}")
         return None
 
+def cleanup_corrupt_records():
+    """Busca y elimina registros con códigos terminados en .0 que rompen el frontend."""
+    print("🧹 Revisando si existen registros corruptos (SKUs con .0)...")
+    try:
+        res = supabase.table(PRODUCT_TABLE).select("codigo").like("codigo", "%.0").execute()
+        corruptos = res.data
+        if corruptos:
+            print(f"⚠️ Se encontraron {len(corruptos)} registros corruptos. Eliminando...")
+            for item in corruptos:
+                sku = item["codigo"]
+                supabase.table(PRODUCT_TABLE).delete().eq("codigo", sku).execute()
+            print("✅ Limpieza completada.")
+        else:
+            print("✅ No se detectaron registros corruptos.")
+    except Exception as e:
+        print(f"⚠️ Error durante la limpieza automática: {e}")
+
 def run_sync():
+    # 0. Limpieza automática
+    cleanup_corrupt_records()
+    
     print(f"Iniciando sincronización: {datetime.now()}")
     
     # 1. Obtener datos

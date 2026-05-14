@@ -1503,7 +1503,7 @@ function createCard(p){
       </div>
     </div>`;
   // Cargar imagen: directo si hay cache, lazy si no
-  const imgEl=div.querySelector(`#img-${p.sku}`);
+  const imgEl=div.querySelector(`[id="img-${p.sku}"]`);
   if(imgEl){
     // Siempre intentar cargar — el observer se encarga de no recargar si ya cargó
     tryLoadImg(imgEl, p.sku);
