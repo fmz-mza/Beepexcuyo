@@ -2008,6 +2008,29 @@ function addFreq(sku, prevQty){
 }
 
 
+// ── Helper: agrupar y ordenar items del carrito ─────────────────────────────
+// Retorna array de [brand, items[]] ordenado: BEEPAW primero, luego el resto.
+// Dentro de cada marca, SKUs ordenados de menor a mayor.
+function getOrderedCartGroups(){
+  const items=Object.values(cart).filter(c=>c.qty>0);
+  const groups={};
+  items.forEach(c=>{ const b=c.product.brand||'Sin marca'; (groups[b]=groups[b]||[]).push(c); });
+  // Ordenar SKUs dentro de cada marca (numérico ascendente)
+  Object.values(groups).forEach(list=>{
+    list.sort((a,b)=>{
+      const na=parseInt(a.product.sku)||0, nb=parseInt(b.product.sku)||0;
+      return na-nb;
+    });
+  });
+  // Ordenar marcas: BEEPAW primero, luego el resto alfabético
+  const sorted=Object.entries(groups).sort(([a],[b])=>{
+    if(a==='BEEPAW') return -1;
+    if(b==='BEEPAW') return 1;
+    return a.localeCompare(b);
+  });
+  return sorted;
+}
+
 // ── WhatsApp ──────────────────────────────────────────────────────────────────
 function sendWhatsApp(){
   if(!userApproved) return;
@@ -2016,8 +2039,8 @@ function sendWhatsApp(){
     const inp=document.getElementById('clientName');
     inp.style.borderColor='var(--red)';
     inp.focus();
-    inp.placeholder='⚠️ Ingresá tu nombre para continuar';
-    setTimeout(()=>{ inp.style.borderColor=''; inp.placeholder='👤 Tu nombre'; },3000);
+    inp.placeholder='\u26A0 Ingresá tu nombre para continuar';
+    setTimeout(()=>{ inp.style.borderColor=''; inp.placeholder='\uD83D\uDC64 Tu nombre'; },3000);
     return;
   }
   const name=nameRaw;
@@ -2032,23 +2055,24 @@ function sendWhatsApp(){
   const total=includeIVA?sub+ivaTot:sub;
   const totalU=items.reduce((a,c)=>a+c.qty,0);
   const hasPrev=items.some(c=>stockType(c.product.stock)==='PREVENTA');
-  let msg=`🐾 *PEDIDO BEEPEX CUYO*\n━━━━━━━━━━━━━━━━━━\n`;
-  msg+=`👤 *Cliente:* ${name}\n📅 *Fecha:* ${today}\n💰 *Precios:* ${includeIVA?'Con IVA':'Sin IVA'}\n━━━━━━━━━━━━━━━━━━\n\n`;
+
+  let msg = "\uD83D\uDC3E *PEDIDO BEEPEX CUYO*\n━━━━━━━━━━━━━━━━━━\n";
+  msg += "\uD83D\uDC64 *Cliente:* " + name + "\n\uD83D\uDCC5 *Fecha:* " + today + "\n\uD83D\uDCB0 *Precios:* " + (includeIVA ? "Con IVA" : "Sin IVA") + "\n━━━━━━━━━━━━━━━━━━\n\n";
   Object.entries(groups).forEach(([brand,list])=>{
-    msg+=`📦 *${brand}*\n`;
+    msg += "\uD83D\uDCE6 *" + brand + "*\n";
     list.forEach(c=>{
       const precio=mayorista(c.product);
       const isPrev=stockType(c.product.stock)==='PREVENTA';
-      msg+=`• ${c.product.name} (SKU ${c.product.sku})${isPrev?' 🕐 '+c.product.stock:''}\n`;
-      msg+=`  Cant: ${c.qty} × ${fmt(precio)} = *${fmt(precio*c.qty)}*\n`;
+      msg += "\u2022 " + c.product.name + " (SKU " + c.product.sku + ")" + (isPrev ? " \uD83D\uDD50 " + c.product.stock : "") + "\n";
+      msg += "  Cant: " + c.qty + " × " + fmt(precio) + " = *" + fmt(precio*c.qty) + "*\n";
     });
-    msg+='\n';
+    msg += "\n";
   });
-  msg+=`━━━━━━━━━━━━━━━━━━\n📊 *Subtotal s/IVA:* ${fmt(sub)}\n`;
-  if(includeIVA) msg+=`💳 *IVA:* + ${fmt(ivaTot)}\n`;
-  msg+=`✅ *TOTAL (${totalU} productos):* *${fmt(total)}*`;
-  if(hasPrev) msg+=`\n🕐 *Incluye productos en preventa*`;
-  if(obs) msg+=`\n\n💬 *Obs:* ${obs}`;
+  msg += "━━━━━━━━━━━━━━━━━━\n\uD83D\uDCCA *Subtotal s/IVA:* " + fmt(sub) + "\n";
+  if(includeIVA) msg += "\uD83D\uDCB3 *IVA:* + " + fmt(ivaTot) + "\n";
+  msg += "\u2705 *TOTAL (" + totalU + " productos):* *" + fmt(total) + "*";
+  if(hasPrev) msg += "\n\uD83D\uDD50 *Incluye productos en preventa*";
+  if(obs) msg += "\n\n\uD83D\uDCAC *Obs:* " + obs;
   // GA4: pedido enviado
   if(typeof gtag!=='undefined') gtag('event','purchase',{
     currency:'ARS',
@@ -2059,8 +2083,9 @@ function sendWhatsApp(){
   // Guardar en historial de pedidos
   saveOrderHistory(name, total, totalU);
   saveOrderSupabase('whatsapp');
-  window.location.href=`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`;
+  window.location.href = 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg);
 }
+
 
 // ── Historial de pedidos ─────────────────────────────────────────────────────
 function saveOrderHistory(name, total, qty){
@@ -2155,24 +2180,27 @@ async function saveOrderSupabase(via){
   } catch(e){ console.warn('Error guardando pedido:', e.message); }
 }
 
-// ── Exportar PDF del pedido ──────────────────────────────────────────────────
-// Convierte una URL de imagen a base64 para jsPDF
-async function imgToBase64(url){
-  try {
-    const resp = await fetch(url);
-    const blob = await resp.blob();
-    return await new Promise(res=>{
-      const r = new FileReader();
-      r.onload = ()=>res(r.result);
-      r.readAsDataURL(blob);
-    });
-  } catch(e){ return null; }
-}
-
+// ── Exportar PDF del pedido (Ticket térmico 80mm) ───────────────────────────
 async function exportPDF(){
   if(!userApproved) return;
+  const nameRaw=document.getElementById('clientName').value.trim();
+  if(!nameRaw){
+    const inp=document.getElementById('clientName');
+    inp.style.borderColor='var(--red)';
+    inp.focus();
+    inp.placeholder='⚠️ Ingresá tu nombre para continuar';
+    setTimeout(()=>{ inp.style.borderColor=''; inp.placeholder='👤 Tu nombre'; },3000);
+    return;
+  }
+  const name=nameRaw;
+  const obs=document.getElementById('clientObs').value.trim();
+  const today=new Date().toLocaleDateString('es-AR');
+  const items=Object.values(cart).filter(c=>c.qty>0);
+  if(!items.length) return;
+
   // Lazy load jsPDF solo cuando se necesita
   if(!window.jspdf){
+    showToast('⏳ Cargando PDF...');
     await new Promise((res,rej)=>{
       const s=document.createElement('script');
       s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -2180,256 +2208,167 @@ async function exportPDF(){
       document.head.appendChild(s);
     });
   }
+
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:'mm', format:'a4' });
-  const items = Object.values(cart).filter(c=>c.qty>0);
-  if(!items.length) return;
+  const ANCHO = 72; // ancho útil en mm (80 - 4 margen de cada lado)
 
-  // Precargar imágenes de productos en cache base64
-  const imgB64 = {};
-  await Promise.all(items.map(async c=>{
-    const sku = c.product.sku;
-    const cached = imgCache[sku];
-    if(cached && cached!=='error'){
-      const b64 = await imgToBase64(cached);
-      if(b64) imgB64[sku] = b64;
-    }
-  }));
-
-  const name = document.getElementById('clientName').value.trim()||'Sin nombre';
-  const obs  = document.getElementById('clientObs').value.trim();
-  const today = new Date().toLocaleDateString('es-AR');
-  const W = 210, margin = 16, col = W - margin*2;
-
-  // Paleta
-  const BG      = [14,15,20];
-  const SURFACE = [22,24,31];
-  const CARD    = [28,31,42];
-  const BORDER  = [42,45,58];
-  const ACCENT  = [74,124,255];
-  const GOLD    = [245,166,35];
-  const GREEN   = [34,197,94];
-  const MUTED   = [139,144,168];
-  const WHITE   = [240,242,255];
-
-  // Fondo completo
-  doc.setFillColor(...BG);
-  doc.rect(0, 0, W, 297, 'F');
-
-  let y = 0;
-
-  // ── Header ──
-  doc.setFillColor(...SURFACE);
-  doc.rect(0, 0, W, 28, 'F');
-  doc.setFillColor(...BORDER);
-  doc.rect(0, 28, W, 0.4, 'F');
-
-  // Logo pill
-  doc.setFillColor(...ACCENT);
-  doc.roundedRect(margin, 7, 32, 14, 3, 3, 'F');
-  doc.setTextColor(...WHITE);
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(9);
-  doc.text('BEEPEX', margin+16, 15.5, {align:'center'});
-
-  // Título
-  doc.setTextColor(...WHITE);
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(14);
-  doc.text('PEDIDO MAYORISTA', margin+38, 13);
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...MUTED);
-  doc.text(`Beepex Cuyo · Catálogo ${document.getElementById('catalogMonth').textContent}`, margin+38, 19);
-
-  // Fecha arriba derecha
-  doc.setTextColor(...MUTED);
-  doc.setFontSize(8);
-  doc.text(today, W-margin, 13, {align:'right'});
-
-  y = 36;
-
-  // ── Info cliente ──
-  doc.setFillColor(...CARD);
-  doc.roundedRect(margin, y, col, 18, 3, 3, 'F');
-  doc.setFillColor(...ACCENT);
-  doc.roundedRect(margin, y, 3, 18, 1.5, 1.5, 'F');
-  doc.setTextColor(...MUTED);
-  doc.setFontSize(7);
-  doc.setFont('helvetica','normal');
-  doc.text('CLIENTE', margin+7, y+6);
-  doc.setTextColor(...WHITE);
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(11);
-  doc.text(name, margin+7, y+13);
-  if(obs){
-    doc.setTextColor(...MUTED);
-    doc.setFont('helvetica','normal');
-    doc.setFontSize(7);
-    doc.text(`Obs: ${obs}`, margin+7, y+18.5);
-  }
-  // IVA badge
-  const ivaTxt = includeIVA ? 'PRECIOS CON IVA' : 'PRECIOS SIN IVA';
-  const ivaBg = includeIVA ? GREEN : MUTED;
-  doc.setFillColor(...ivaBg);
-  doc.roundedRect(W-margin-36, y+5, 36, 8, 2, 2, 'F');
-  doc.setTextColor(...BG);
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(7);
-  doc.text(ivaTxt, W-margin-18, y+10.2, {align:'center'});
-
-  y += 24;
-
-  // ── Productos por marca ──
-  const groups = {};
-  items.forEach(c=>{ const b=c.product.brand||'Sin marca'; (groups[b]=groups[b]||[]).push(c); });
-
-  for(const [brand, list] of Object.entries(groups)){
-    // Verificar espacio
-    if(y > 265){ doc.addPage(); doc.setFillColor(...BG); doc.rect(0,0,W,297,'F'); y=16; }
-
-    // Cabecera de marca
-    doc.setFillColor(...SURFACE);
-    doc.roundedRect(margin, y, col, 8, 2, 2, 'F');
-    doc.setTextColor(...ACCENT);
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(8);
-    doc.text(brand.toUpperCase(), margin+4, y+5.5);
-    y += 11;
-
-    // Cabecera de tabla
-    doc.setFillColor(...BORDER);
-    doc.rect(margin, y, col, 6, 'F');
-    doc.setTextColor(...MUTED);
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(7);
-    doc.text('PRODUCTO', margin+3, y+4.2);
-    doc.text('SKU', margin+95, y+4.2);
-    doc.text('PRECIO U.', margin+115, y+4.2);
-    doc.text('CANT.', margin+140, y+4.2);
-    doc.text('SUBTOTAL', margin+158, y+4.2);
-    y += 6;
-
-    // Filas
-    list.forEach((c, idx)=>{
-      if(y > 270){ doc.addPage(); doc.setFillColor(...BG); doc.rect(0,0,W,297,'F'); y=16; }
-      const rowH = 12;
-      const rowBg = idx%2===0 ? CARD : SURFACE;
-      doc.setFillColor(...rowBg);
-      doc.rect(margin, y, col, rowH, 'F');
-
-      const precio = mayorista(c.product);
-      const subtotal = precio * c.qty;
-      const isPrev = stockType(c.product.stock)==='PREVENTA';
-
-      // Imagen del producto
-      const b64 = imgB64[c.product.sku];
-      if(b64){
-        try{
-          doc.addImage(b64, 'JPEG', margin+2, y+1, 10, 10, undefined, 'FAST');
-        }catch(e){}
-      } else {
-        doc.setFillColor(...BORDER);
-        doc.roundedRect(margin+2, y+1, 10, 10, 1, 1, 'F');
-        doc.setTextColor(...MUTED);
-        doc.setFontSize(7);
-        doc.text('📷', margin+7, y+7.5, {align:'center'});
-      }
-
-      // Nombre (truncado) — offset por imagen
-      const maxNom = 48;
-      const nom = c.product.name.length > maxNom ? c.product.name.slice(0,maxNom)+'…' : c.product.name;
-      doc.setTextColor(...WHITE);
-      doc.setFont('helvetica', isPrev?'bolditalic':'normal');
-      doc.setFontSize(7.5);
-      doc.text(nom, margin+15, y+6);
-
-      doc.setFont('helvetica','normal');
-      doc.setTextColor(...MUTED);
-      doc.text(String(c.product.sku), margin+95, y+6);
-
-      doc.setTextColor(...WHITE);
-      doc.text(fmt(precio), margin+115, y+6);
-      doc.text(String(c.qty), margin+143, y+6, {align:'center'});
-
-      doc.setTextColor(...GOLD);
-      doc.setFont('helvetica','bold');
-      doc.text(fmt(subtotal), margin+178, y+6, {align:'right'});
-
-      if(isPrev){
-        doc.setTextColor(...[167,139,250]);
-        doc.setFontSize(6);
-        doc.text('PREVENTA', margin+15, y+10);
-      }
-      y += rowH;
-    });
-    y += 5;
-  }
-
-  // ── Totales ──
-  if(y > 255){ doc.addPage(); doc.setFillColor(...BG); doc.rect(0,0,W,297,'F'); y=16; }
-
+  // Calcular precios y datos
   let sub=0, ivaTot=0;
   items.forEach(c=>{ sub+=c.product.price*c.qty; ivaTot+=Math.round(c.product.price*c.qty*c.product.iva/100); });
-  const total = includeIVA ? sub+ivaTot : sub;
-  const totalU = items.reduce((a,c)=>a+c.qty,0);
+  const total=includeIVA?sub+ivaTot:sub;
+  const totalU=items.reduce((a,c)=>a+c.qty,0);
+  const hasPrev=items.some(c=>stockType(c.product.stock)==='PREVENTA');
 
-  doc.setFillColor(...SURFACE);
-  doc.roundedRect(margin, y, col, includeIVA?28:20, 3, 3, 'F');
-  doc.setFillColor(...BORDER);
-  doc.rect(margin, y, col, 0.4, 'F');
+  const orderedGroups = getOrderedCartGroups();
 
-  let ty = y+7;
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...MUTED);
-  doc.text('Subtotal s/IVA:', margin+6, ty);
-  doc.setTextColor(...WHITE);
-  doc.text(fmt(sub), W-margin-4, ty, {align:'right'});
-  ty += 7;
+  // ── Paso 1: calcular altura real antes de crear el doc ──
+  let yCalc = 8;
+  yCalc += 5 + 4 + 4; // Header title + subtitle + separator
+  yCalc += 4 + 4 + 4 + 4; // Cliente + Fecha + Precios + separator
 
-  if(includeIVA){
-    doc.setTextColor(...MUTED);
-    doc.text('IVA:', margin+6, ty);
-    doc.setTextColor(...WHITE);
-    doc.text(`+ ${fmt(ivaTot)}`, W-margin-4, ty, {align:'right'});
-    ty += 7;
+  const tmpDoc = new jsPDF({unit:'mm', format:[80, 500]});
+  const groupLines = [];
+  orderedGroups.forEach(([brand, list]) => {
+    yCalc += 6; // Espacio cabecera marca
+    const listLines = list.map(c => {
+      tmpDoc.setFontSize(8);
+      return tmpDoc.splitTextToSize(c.product.name, ANCHO);
+    });
+    groupLines.push(listLines);
+
+    list.forEach((c, idx) => {
+      const lines = listLines[idx];
+      yCalc += lines.length * 3.8; // líneas del nombre
+      yCalc += 3.5; // SKU
+      yCalc += 4.5; // qty x precio = subtotal
+      if(stockType(c.product.stock)==='PREVENTA'){
+        yCalc += 3.5; // Preventa label
+      }
+    });
+    yCalc += 2; // gap al final de cada marca
+  });
+
+  yCalc += 4; // separador
+  yCalc += 4; // cant productos
+  yCalc += 4; // subtotal
+  if(includeIVA) yCalc += 4; // IVA
+  yCalc += 5; // total
+
+  if(hasPrev) yCalc += 4; // Aviso preventa global
+
+  let obsLines = [];
+  if(obs){
+    yCalc += 2; // gap
+    tmpDoc.setFontSize(8);
+    obsLines = tmpDoc.splitTextToSize(`Obs: ${obs}`, ANCHO);
+    yCalc += obsLines.length * 3.8;
   }
 
-  // Línea separadora
-  doc.setFillColor(...BORDER);
-  doc.rect(margin+4, ty-3, col-8, 0.4, 'F');
+  yCalc += 4; // separador
+  yCalc += 5; // pie
 
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(11);
-  doc.setTextColor(...GOLD);
-  doc.text(`TOTAL (${totalU} productos)`, margin+6, ty+4);
-  doc.setFontSize(13);
-  doc.text(fmt(total), W-margin-4, ty+4, {align:'right'});
+  const pageH = Math.ceil(yCalc) + 8;
 
-  // ── Footer ──
-  y = 285;
-  doc.setFillColor(...BORDER);
-  doc.rect(0, y-2, W, 0.4, 'F');
+  // ── Paso 2: crear doc con tamaño exacto ──
+  const doc = new jsPDF({unit:'mm', format:[80, pageH]});
+  let y = 8;
+
+  // Header
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('BEEPEX CUYO', 40, y, {align:'center'}); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text('PEDIDO MAYORISTA', 40, y, {align:'center'}); y+=4;
+  doc.setLineWidth(.3); doc.line(4,y,76,y); y+=4;
+
+  // Encabezado info pedido
+  doc.setFont('helvetica','bold'); doc.setFontSize(8);
+  doc.text('Cliente: '+name, 4, y); y+=4;
   doc.setFont('helvetica','normal');
-  doc.setFontSize(7);
-  doc.setTextColor(...MUTED);
-  doc.text('Beepex Cuyo · Catálogo Mayorista · beepex-cuyo.github.io', W/2, y+3, {align:'center'});
+  doc.text('Fecha: '+today, 4, y); y+=4;
+  doc.text('Precios: '+(includeIVA?'Con IVA':'Sin IVA'), 4, y); y+=4;
+  doc.line(4,y,76,y); y+=4;
 
-  // ── Guardar pedido en Supabase (antes de compartir, para no perderse el return) ──
+  // Render items por marca ordenados
+  orderedGroups.forEach(([brand, list], gIdx) => {
+    doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    doc.text(brand.toUpperCase(), 4, y); y+=5;
+
+    const listLines = groupLines[gIdx];
+    list.forEach((c, idx) => {
+      const precio = mayorista(c.product);
+      const isPrev = stockType(c.product.stock)==='PREVENTA';
+      const lines = listLines[idx];
+
+      // Nombre completo
+      doc.setFont('helvetica','normal'); doc.setFontSize(8);
+      lines.forEach(line => { doc.text(line, 4, y); y+=3.8; });
+
+      // SKU
+      doc.setFontSize(7); doc.setTextColor(120,120,140);
+      doc.text('SKU: '+c.product.sku, 4, y);
+      doc.setTextColor(0,0,0); doc.setFontSize(8); y+=3.5;
+
+      // Línea cantidades y precio
+      doc.text(`  ${c.qty} x ${fmt(precio)} = ${fmt(precio*c.qty)}`, 4, y); y+=4.5;
+
+      // Línea preventa individual si corresponde
+      if(isPrev){
+        doc.setFontSize(7); doc.setTextColor(124, 58, 237);
+        doc.text(`  PREVENTA: ${c.product.stock}`, 4, y);
+        doc.setTextColor(0,0,0); doc.setFontSize(8); y+=3.5;
+      }
+    });
+    y+=2;
+  });
+
+  doc.line(4,y,76,y); y+=4;
+
+  // Resumen totales
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+  doc.text(`Productos: ${items.length} · Unidades: ${totalU}`, 4, y); y+=4;
+  doc.text(`Subtotal s/IVA: ${fmt(sub)}`, 4, y); y+=4;
+  if(includeIVA){
+    doc.text(`IVA: + ${fmt(ivaTot)}`, 4, y); y+=4;
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text(`TOTAL: ${fmt(total)}`, 4, y); y+=5;
+
+  // Aviso preventa global
+  if(hasPrev){
+    doc.setFont('helvetica','bolditalic'); doc.setFontSize(7.5); doc.setTextColor(124, 58, 237);
+    doc.text('Incluye productos en preventa', 4, y);
+    doc.setTextColor(0,0,0); y+=4;
+  }
+
+  // Observaciones
+  if(obs){
+    doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(80,80,90);
+    y+=2;
+    obsLines.forEach(line => { doc.text(line, 4, y); y+=3.8; });
+    doc.setTextColor(0,0,0);
+  }
+
+  doc.line(4,y,76,y); y+=4;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+  doc.text('Beepex Cuyo', 40, y, {align:'center'});
+
+  // Guardar pedido en Supabase
   saveOrderSupabase('pdf');
 
-  // ── Compartir o descargar ──
+  // Compartir o descargar
   const pdfBlob = doc.output('blob');
   const fileName = `Pedido_Beepex_${name.replace(/\s+/g,'_')}_${today.replace(/\//g,'-')}.pdf`;
 
   if(navigator.share && navigator.canShare){
     const file = new File([pdfBlob], fileName, {type:'application/pdf'});
     if(navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:'Pedido Beepex Cuyo', text:`Pedido de ${name}`});
+      try{
+        await navigator.share({files:[file], title:'Pedido Beepex Cuyo', text:`Pedido de ${name}`});
+      }catch(e){ console.warn('Share cancelled or failed', e); }
       return;
     }
   }
+
   // Fallback: descarga directa
   const url = URL.createObjectURL(pdfBlob);
   const a = document.createElement('a');
@@ -2439,6 +2378,7 @@ async function exportPDF(){
   // GA4
   if(typeof gtag!=='undefined') gtag('event','share',{method:'pdf', content_type:'order', item_id:name});
 }
+
 
 // ── Modal descripción ────────────────────────────────────────────────────────
 function openLightbox(sku){

@@ -1329,15 +1329,15 @@ function shareWA(){
   const {t, client, ml} = buildTicketLines();
   const {order, items, totalVenta, total, pagado, saldoAnterior, saldoRestante} = t;
 
-  let msg = '🐾 *BEEPEX CUYO*\n';
+  let msg = '\uD83D\uDC3E *BEEPEX CUYO*\n';
   msg += 'Ticket #'+order.ticket_display+'\n';
-  msg += '📅 '+new Date(order.fecha).toLocaleDateString('es-AR')+'\n';
-  if(client) msg += '👤 '+client.nombre+'\n';
+  msg += '\uD83D\uDCC5 '+new Date(order.fecha).toLocaleDateString('es-AR')+'\n';
+  if(client) msg += '\uD83D\uDC64 '+client.nombre+'\n';
   msg += '━━━━━━━━━━━━━━\n';
 
   items.forEach(i=>{
     const p = i.precio_modificado ?? i.precio_unitario;
-    msg += '• '+i.nombre+'\n  '+i.cantidad+' × '+fmt(p)+' = '+fmt(p*i.cantidad)+'\n';
+    msg += '\u2022 '+i.nombre+'\n  '+i.cantidad+' × '+fmt(p)+' = '+fmt(p*i.cantidad)+'\n';
   });
 
   msg += '━━━━━━━━━━━━━━\n';
@@ -1358,9 +1358,9 @@ function shareWA(){
     msg += 'Recibido: '+fmt(pagado)+'\n';
     if(saldoAnterior > 0){
       if(saldoRestante > 0)
-        msg += '⚠️ Saldo restante cta cte: '+fmt(saldoRestante)+'\n';
+        msg += '\u26A0 Saldo restante cta cte: '+fmt(saldoRestante)+'\n';
       else
-        msg += '✅ Cuenta cancelada\n';
+        msg += '\u2705 Cuenta cancelada\n';
     } else {
       const diff = total - pagado;
       if(diff > 0) msg += 'Queda a cta cte: '+fmt(diff)+'\n';
@@ -1380,10 +1380,10 @@ function shareWASoloPago(){
   const client = clients.find(x=>x.id===t.clientId);
   const ml = {efectivo:'Efectivo', transferencia:'Transferencia', cta_cte:'Cuenta Corriente'};
 
-  let msg = '🐾 *BEEPEX CUYO*\n';
+  let msg = '\uD83D\uDC3E *BEEPEX CUYO*\n';
   msg += 'Comprobante de Pago\n';
-  msg += '📅 '+new Date(t.fecha).toLocaleDateString('es-AR')+'\n';
-  if(client) msg += '👤 '+client.nombre+'\n';
+  msg += '\uD83D\uDCC5 '+new Date(t.fecha).toLocaleDateString('es-AR')+'\n';
+  if(client) msg += '\uD83D\uDC64 '+client.nombre+'\n';
   msg += '━━━━━━━━━━━━━━\n';
   msg += 'Saldo anterior: '+fmt(t.saldoAnterior)+'\n';
   msg += 'Abono recibido: '+fmt(t.saldoCobrado)+'\n';
@@ -1391,9 +1391,9 @@ function shareWASoloPago(){
   if(t.pagado > t.saldoCobrado) msg += 'Vuelto: '+fmt(t.pagado - t.saldoCobrado)+'\n';
   msg += '━━━━━━━━━━━━━━\n';
   if(t.saldoRestante > 0)
-    msg += '⚠️ Saldo restante: '+fmt(t.saldoRestante)+'\n';
+    msg += '\u26A0 Saldo restante: '+fmt(t.saldoRestante)+'\n';
   else
-    msg += '✅ *Cuenta cancelada*\n';
+    msg += '\u2705 *Cuenta cancelada*\n';
 
   const wa = client?.telefono_wa || client?.telefono || WA_NUMBER;
   window.location.href = 'https://wa.me/'+wa+'?text='+encodeURIComponent(msg);

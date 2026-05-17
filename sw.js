@@ -1,6 +1,6 @@
-const CACHE = 'beepex-v1';
+const CACHE = 'beepex-v3';
 const ASSETS = [
-  '/Beepexcuyo/beepex-cuyo.html',
+  'beepex-cuyo.html',
 ];
 
 self.addEventListener('install', e => {
