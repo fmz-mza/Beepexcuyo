@@ -1372,7 +1372,7 @@ function shareWA(){
 
   const wa = client?.telefono_wa || WA_NUMBER;
   // location.href — no abre ventana nueva, WhatsApp app en mobile
-  window.location.href = 'https://wa.me/'+wa+'?text='+encodeURIComponent(msg);
+  window.location.href = 'https://api.whatsapp.com/send/?phone='+wa+'&text='+encodeURIComponent(msg);
 }
 
 function shareWASoloPago(){
@@ -1396,7 +1396,7 @@ function shareWASoloPago(){
     msg += '\u2705 *Cuenta cancelada*\n';
 
   const wa = client?.telefono_wa || client?.telefono || WA_NUMBER;
-  window.location.href = 'https://wa.me/'+wa+'?text='+encodeURIComponent(msg);
+  window.location.href = 'https://api.whatsapp.com/send/?phone='+wa+'&text='+encodeURIComponent(msg);
 }
 
 /* SCANNER */

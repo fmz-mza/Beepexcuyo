@@ -2083,7 +2083,7 @@ function sendWhatsApp(){
   // Guardar en historial de pedidos
   saveOrderHistory(name, total, totalU);
   saveOrderSupabase('whatsapp');
-  window.location.href = 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg);
+  window.location.href = 'https://api.whatsapp.com/send/?phone=' + WA_NUMBER + '&text=' + encodeURIComponent(msg);
 }
 
 
