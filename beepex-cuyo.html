@@ -233,6 +233,17 @@
   .mc-detail-qty{color:var(--muted);font-size:12px;white-space:nowrap;}
   .mc-detail-subtotal{font-weight:700;white-space:nowrap;}
   .mc-detail-total-row{display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:10px 0 0;border-top:2px solid var(--border);margin-top:4px;}
+  /* ── Modal Reset Password ── */
+  .reset-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px;}
+  .reset-overlay.open{display:flex;}
+  .reset-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 24px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px;animation:slideUp .2s ease;}
+  .reset-modal h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;text-align:center;}
+  .reset-modal p{font-size:13px;color:var(--muted);text-align:center;margin-top:-4px;}
+  /* ── Forgot Password Panel ── */
+  .forgot-link{color:var(--accent);font-size:12px;margin-top:2px;background:none;border:none;cursor:pointer;text-decoration:underline;opacity:.85;transition:opacity .2s;}
+  .forgot-link:hover{opacity:1;}
+  .forgot-spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px;}
+  @keyframes spin{to{transform:rotate(360deg)}}
   .cart-overlay.open{display:block;}
   .cart-drawer{position:fixed;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--border);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
   .cart-drawer.open{transform:translateX(0);}
@@ -686,6 +697,16 @@ let userSalePrices={}; // {sku: price}
     <button class="pwd-btn pwd-btn-cancel" onclick="closeChangePassword()">Cancelar</button>
   </div>
 </div>
+<div class="reset-overlay" id="resetOverlay">
+  <div class="reset-modal">
+    <h2>🔐 Nueva contraseña</h2>
+    <p>Ingresá tu nueva contraseña para continuar.</p>
+    <input class="auth-input" id="resetPass1" type="password" placeholder="🔑 Nueva contraseña" onkeydown="if(event.key==='Enter')submitResetPassword()">
+    <input class="auth-input" id="resetPass2" type="password" placeholder="🔑 Confirmar contraseña" onkeydown="if(event.key==='Enter')submitResetPassword()">
+    <div class="auth-msg" id="resetMsg"></div>
+    <button class="auth-btn" onclick="submitResetPassword()">Guardar nueva contraseña</button>
+  </div>
+</div>
 <div class="micuenta-overlay" id="micuentaOverlay" onclick="closeMiCuenta()"></div>
 <div class="micuenta-drawer" id="micuentaDrawer">
   <div class="micuenta-header">
@@ -803,11 +824,21 @@ let userSalePrices={}; // {sku: price}
         <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Ingresar</button>
         <button class="auth-tab" id="tabRegister" onclick="switchTab('register')">Registrarse</button>
       </div>
-      <input class="auth-input" id="authEmail" type="email" placeholder="📧 Tu email" onkeydown="if(event.key==='Enter') submitAuth()">
-      <input class="auth-input" id="authPass" type="password" placeholder="🔑 Contraseña" onkeydown="if(event.key==='Enter') submitAuth()">
-      <input class="auth-input" id="authNombre" type="text" placeholder="👤 Tu nombre o negocio" style="display:none">
-      <div class="auth-msg" id="authMsg"></div>
-      <button class="auth-btn" id="authSubmit" onclick="submitAuth()">Ingresar</button>
+      <div id="authLoginFields">
+        <input class="auth-input" id="authEmail" type="email" placeholder="📧 Tu email" onkeydown="if(event.key==='Enter') submitAuth()">
+        <input class="auth-input" id="authPass" type="password" placeholder="🔑 Contraseña" onkeydown="if(event.key==='Enter') submitAuth()">
+        <input class="auth-input" id="authNombre" type="text" placeholder="👤 Tu nombre o negocio" style="display:none">
+        <div class="auth-msg" id="authMsg"></div>
+        <button class="auth-btn" id="authSubmit" onclick="submitAuth()">Ingresar</button>
+        <button class="forgot-link" id="forgotLink" onclick="toggleForgot(true)">¿Olvidaste tu contraseña?</button>
+      </div>
+      <div id="forgotPanel" style="display:none;">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px;text-align:center;">Ingresá tu email y te enviaremos un link para restablecer tu contraseña.</div>
+        <input class="auth-input" id="forgotEmail" type="email" placeholder="📧 Tu email registrado" onkeydown="if(event.key==='Enter') submitForgot()">
+        <div class="auth-msg" id="forgotMsg"></div>
+        <button class="auth-btn" onclick="submitForgot()">Enviar link de recuperación</button>
+        <button class="auth-skip" onclick="toggleForgot(false)" style="margin-top:4px;">← Volver al login</button>
+      </div>
       <button class="auth-skip" onclick="closeAuth()">Seguir explorando sin registrarme</button>
     </div>
   </div>
@@ -2948,6 +2979,31 @@ setInterval(updatePresence, 2*60*1000);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) updatePresence(); });
 
 async function initAuth(){
+  // ── Detectar recovery PRIMERO, antes de cualquier otra cosa ──
+  if(window.location.hash&&window.location.hash.includes('type=recovery')){
+    const params=new URLSearchParams(window.location.hash.slice(1));
+    const token=params.get('access_token');
+    const tokenHash=params.get('token_hash')||params.get('refresh_token')||token;
+    history.replaceState(null,'',window.location.pathname);
+    try{
+      // Validar token con Supabase antes de mostrar el modal
+      const vRes=await fetch(`${SUPABASE_URL}/auth/v1/user`,{
+        headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+      });
+      if(vRes.ok){
+        showResetPasswordModal(token);
+      } else {
+        showToast('⚠️ El link expiró. Solicitá uno nuevo desde "Olvidaste tu contraseña".');
+        setTimeout(()=>openAuth(null,'login'), 800);
+      }
+    } catch(e){
+      // Si no podemos validar, mostramos el modal igualmente (fallback)
+      showResetPasswordModal(token||tokenHash);
+    }
+    updateAuthUI();
+    return;
+  }
+
   // onAuthStateChange eliminado — usamos fetch directo + localStorage
   // Restaurar sesión desde localStorage si existe
   const savedToken=localStorage.getItem('sb_access_token');
@@ -2979,7 +3035,7 @@ async function initAuth(){
       }
     } catch(e){ localStorage.removeItem('sb_access_token'); }
   }
-  // Limpiar hash de la URL si viene del link de confirmación
+  // Confirmación de email (no recovery)
   if(window.location.hash&&window.location.hash.includes('access_token')){
     history.replaceState(null,'',window.location.pathname);
     showToast('✅ Email confirmado. ¡Ya podés ingresar!');
@@ -3904,6 +3960,7 @@ async function submitChangePassword(){
 function openAuth(pending, tab){
   if(pending) authPending=pending;
   if(tab) switchTab(tab);
+  toggleForgot(false);
   document.getElementById('authOverlay').classList.add('open');
   document.body.style.overflow='hidden';
   setTimeout(()=>document.getElementById('authEmail').focus(),200);
@@ -3914,6 +3971,7 @@ function closeAuth(){
   document.body.style.overflow='';
   authPending=null;
   document.getElementById('authMsg').textContent='';
+  toggleForgot(false);
 }
 
 function switchTab(tab){
@@ -3926,7 +3984,111 @@ function switchTab(tab){
   document.getElementById('authSubmit').textContent=tab==='login'?'Ingresar':'Crear cuenta';
   document.getElementById('authTitle').textContent=tab==='login'?'¡Bienvenido de nuevo!':'Crear cuenta';
   document.getElementById('authSub').textContent=tab==='login'?'Ingresá para ver precios y hacer pedidos':'Registrate para acceder al catálogo mayorista';
+  // Mostrar "Olvidé mi contraseña" solo en tab login
+  const fl=document.getElementById('forgotLink');
+  if(fl) fl.style.display=tab==='login'?'inline-block':'none';
+  toggleForgot(false);
   document.getElementById('authMsg').textContent='';
+}
+
+// ── Olvidaste tu contraseña ──────────────────────────────────────────────────
+let _forgotBusy=false;
+function toggleForgot(show){
+  if(_forgotBusy) return;
+  _forgotBusy=true;
+  const loginFields=document.getElementById('authLoginFields');
+  const forgotPanel=document.getElementById('forgotPanel');
+  const tabs=document.getElementById('authTabs');
+  if(!loginFields||!forgotPanel){ _forgotBusy=false; return; }
+  if(show){
+    // Ocultar campos de login, mostrar panel de recovery
+    loginFields.style.display='none';
+    forgotPanel.style.display='block';
+    tabs.style.display='none';
+    document.getElementById('authTitle').textContent='Recuperar contraseña';
+    document.getElementById('authSub').textContent='Te enviaremos un link a tu email';
+    // Pre-rellenar con el email ya ingresado
+    const em=document.getElementById('authEmail').value.trim();
+    if(em) document.getElementById('forgotEmail').value=em;
+    document.getElementById('forgotMsg').textContent='';
+    setTimeout(()=>document.getElementById('forgotEmail').focus(),100);
+  } else {
+    // Restaurar vista de login
+    loginFields.style.display='block';
+    forgotPanel.style.display='none';
+    if(tabs) tabs.style.display='';
+  }
+  _forgotBusy=false;
+}
+
+async function submitForgot(){
+  const email=document.getElementById('forgotEmail').value.trim();
+  const msg=document.getElementById('forgotMsg');
+  if(!email){ msg.textContent='Ingresá tu email'; msg.style.color='var(--red)'; return; }
+  msg.innerHTML='<span class="forgot-spinner"></span> Enviando...'; msg.style.color='var(--muted)';
+  try{
+    const res=await fetch(`${SUPABASE_URL}/auth/v1/recover`,{
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON,'Content-Type':'application/json'},
+      body:JSON.stringify({email})
+    });
+    if(res.ok||res.status===200){
+      msg.style.color='var(--green)';
+      msg.textContent='✅ Revisá tu email para el link de recuperación';
+    } else {
+      const d=await res.json();
+      msg.style.color='var(--red)';
+      msg.textContent=d.message||'Error al enviar el email';
+    }
+  }catch(e){
+    msg.style.color='var(--red)';
+    msg.textContent='Error de conexión';
+  }
+}
+
+// ── Reset Password Modal (llega desde el link del email) ─────────────────────
+let _resetToken = null;
+
+function showResetPasswordModal(token){
+  _resetToken = token;
+  document.getElementById('resetOverlay').classList.add('open');
+  document.getElementById('resetPass1').value='';
+  document.getElementById('resetPass2').value='';
+  document.getElementById('resetMsg').textContent='';
+  setTimeout(()=>document.getElementById('resetPass1').focus(),100);
+}
+
+async function submitResetPassword(){
+  const p1 = document.getElementById('resetPass1').value;
+  const p2 = document.getElementById('resetPass2').value;
+  const msg = document.getElementById('resetMsg');
+  if(!p1||p1.length<6){ msg.style.color='var(--red)'; msg.textContent='Mínimo 6 caracteres'; return; }
+  if(p1!==p2){ msg.style.color='var(--red)'; msg.textContent='Las contraseñas no coinciden'; return; }
+  msg.innerHTML='<span class="forgot-spinner"></span> Guardando...'; msg.style.color='var(--muted)';
+  try{
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`,{
+      method:'PUT',
+      headers:{
+        'apikey':SUPABASE_ANON,
+        'Authorization':`Bearer ${_resetToken}`,
+        'Content-Type':'application/json'
+      },
+      body: JSON.stringify({password: p1})
+    });
+    if(res.ok){
+      document.getElementById('resetOverlay').classList.remove('open');
+      _resetToken = null;
+      showToast('✅ Contraseña actualizada. ¡Ya podés ingresar!');
+      setTimeout(()=>{ openAuth(null,'login'); }, 500);
+      updateAuthUI();
+    } else {
+      const d = await res.json();
+      msg.style.color='var(--red)';
+      msg.textContent = d.message||d.error_description||'Error al actualizar';
+    }
+  } catch(e){
+    msg.style.color='var(--red)'; msg.textContent='Error de conexión';
+  }
 }
 
 async function submitAuth(){
