@@ -4786,9 +4786,9 @@ function addVoiceToCart(){
   setTimeout(forceClearSearch, 100);
   setTimeout(forceClearSearch, 500);
 
-  // Auth en paralelo (no bloquea el catálogo)
-  initAuth();
-  setTimeout(() => { if(!_isRecovering) openWelcome(); }, 600);
+  // Auth primero, luego openWelcome solo si no es recovery
+  await initAuth();
+  if(!_isRecovering) setTimeout(() => openWelcome(), 600);
 })();
 </script>
 </body>
