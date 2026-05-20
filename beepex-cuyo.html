@@ -2919,26 +2919,56 @@ setInterval(updatePresence, 2*60*1000);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) updatePresence(); });
 
 async function initAuth(){
-  // ── Detectar recovery PRIMERO, antes de cualquier otra cosa ──
-  if(window.location.hash&&window.location.hash.includes('type=recovery')){
-    const params=new URLSearchParams(window.location.hash.slice(1));
-    const token=params.get('access_token');
-    const tokenHash=params.get('token_hash')||params.get('refresh_token')||token;
-    history.replaceState(null,'',window.location.pathname);
+  // Parsear parámetros tanto de hash como de query string
+  const hashParams = new URLSearchParams(window.location.hash.slice(1));
+  const queryParams = new URLSearchParams(window.location.search);
+  
+  const error = hashParams.get('error') || queryParams.get('error');
+  const errorDesc = hashParams.get('error_description') || queryParams.get('error_description');
+  
+  // 1. Manejar errores de redirección (ej. link expirado)
+  if(error){
+    const isRecovery = window.location.hash.includes('recovery') || window.location.search.includes('recovery') || 
+                       window.location.hash.includes('reset') || window.location.search.includes('reset') || 
+                       error.includes('expired') || error.includes('token');
+    if(isRecovery){
+      history.replaceState(null, '', window.location.pathname);
+      showToast(`⚠️ Error: ${errorDesc || error || 'El link no es válido'}`);
+      setTimeout(() => openAuth(null, 'login'), 800);
+      updateAuthUI();
+      return;
+    }
+  }
+
+  // 2. Detectar recovery
+  const type = hashParams.get('type') || queryParams.get('type');
+  if(type === 'recovery' || window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery')){
+    const token = hashParams.get('access_token') || queryParams.get('access_token');
+    const tokenHash = hashParams.get('token_hash') || queryParams.get('token_hash') || hashParams.get('refresh_token') || queryParams.get('refresh_token') || token;
+    
+    history.replaceState(null, '', window.location.pathname);
+    
+    if(!token){
+      showToast('⚠️ No se encontró un token de acceso válido.');
+      setTimeout(() => openAuth(null, 'login'), 800);
+      updateAuthUI();
+      return;
+    }
+    
     try{
       // Validar token con Supabase antes de mostrar el modal
-      const vRes=await fetch(`${SUPABASE_URL}/auth/v1/user`,{
-        headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+      const vRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${token}` }
       });
       if(vRes.ok){
         showResetPasswordModal(token);
       } else {
-        showToast('⚠️ El link expiró. Solicitá uno nuevo desde "Olvidaste tu contraseña".');
-        setTimeout(()=>openAuth(null,'login'), 800);
+        showToast('⚠️ El link expiró o no es válido. Solicitá uno nuevo.');
+        setTimeout(() => openAuth(null, 'login'), 800);
       }
     } catch(e){
-      // Si no podemos validar, mostramos el modal igualmente (fallback)
-      showResetPasswordModal(token||tokenHash);
+      // Fallback si falla la llamada
+      showResetPasswordModal(token || tokenHash);
     }
     updateAuthUI();
     return;
@@ -3970,7 +4000,10 @@ async function submitForgot(){
     const res=await fetch(`${SUPABASE_URL}/auth/v1/recover`,{
       method:'POST',
       headers:{'apikey':SUPABASE_ANON,'Content-Type':'application/json'},
-      body:JSON.stringify({email})
+      body:JSON.stringify({
+        email,
+        redirect_to: window.location.origin + window.location.pathname
+      })
     });
     if(res.ok||res.status===200){
       msg.style.color='var(--green)';
