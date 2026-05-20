@@ -2964,22 +2964,9 @@ async function initAuth(){
       return;
     }
     
-    try{
-      // Validar token con Supabase antes de mostrar el modal
-      const vRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${token}` }
-      });
-      if(vRes.ok){
-        showResetPasswordModal(token);
-      } else {
-        showToast('⚠️ El link expiró o no es válido. Solicitá uno nuevo.');
-        _isRecovering = false;
-        setTimeout(() => openAuth(null, 'login'), 800);
-      }
-    } catch(e){
-      // Fallback si falla la llamada
-      showResetPasswordModal(token || tokenHash);
-    }
+    // Mostrar modal directamente — el token de recovery de Supabase
+    // no es un access token estándar; si está vencido el error se verá al guardar.
+    showResetPasswordModal(token);
     updateAuthUI();
     return;
   }
@@ -4034,7 +4021,6 @@ let _resetToken = null;
 
 function showResetPasswordModal(token){
   _resetToken = token;
-  // Cerrar cualquier modal que pudiera estar abierto encima
   const welcome = document.getElementById('welcomeOverlay');
   if(welcome) welcome.classList.remove('open');
   const auth = document.getElementById('authOverlay');
