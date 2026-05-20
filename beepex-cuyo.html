@@ -2966,7 +2966,8 @@ async function initAuth(){
     
     // Mostrar modal directamente — el token de recovery de Supabase
     // no es un access token estándar; si está vencido el error se verá al guardar.
-    showResetPasswordModal(token);
+    const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token') || '';
+    showResetPasswordModal(token, refreshToken);
     updateAuthUI();
     return;
   }
@@ -4018,9 +4019,11 @@ async function submitForgot(){
 
 // ── Reset Password Modal (llega desde el link del email) ─────────────────────
 let _resetToken = null;
+let _resetRefreshToken = '';
 
-function showResetPasswordModal(token){
+function showResetPasswordModal(token, refreshToken){
   _resetToken = token;
+  _resetRefreshToken = refreshToken || '';
   const welcome = document.getElementById('welcomeOverlay');
   if(welcome) welcome.classList.remove('open');
   const auth = document.getElementById('authOverlay');
@@ -4041,27 +4044,29 @@ async function submitResetPassword(){
   if(p1!==p2){ msg.style.color='var(--red)'; msg.textContent='Las contraseñas no coinciden'; return; }
   msg.innerHTML='<span class="forgot-spinner"></span> Guardando...'; msg.style.color='var(--muted)';
   try{
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`,{
-      method:'PUT',
-      headers:{
-        'apikey':SUPABASE_ANON,
-        'Authorization':`Bearer ${_resetToken}`,
-        'Content-Type':'application/json'
-      },
-      body: JSON.stringify({password: p1})
+    // Establecer sesión con el token de recovery para obtener acceso válido
+    const { error: sessionError } = await _supabase.auth.setSession({
+      access_token: _resetToken,
+      refresh_token: _resetRefreshToken
     });
-    if(res.ok){
-      document.getElementById('resetOverlay').classList.remove('open');
-      _resetToken = null;
-      _isRecovering = false;
-      showToast('✅ Contraseña actualizada. ¡Ya podés ingresar!');
-      setTimeout(()=>{ openAuth(null,'login'); }, 500);
-      updateAuthUI();
-    } else {
-      const d = await res.json();
+    if(sessionError){ msg.style.color='var(--red)'; msg.textContent='El link expiró. Solicitá uno nuevo.'; return; }
+
+    // Ahora actualizar la contraseña con la sesión activa
+    const { error: updateError } = await _supabase.auth.updateUser({ password: p1 });
+    if(updateError){
       msg.style.color='var(--red)';
-      msg.textContent = d.message||d.error_description||'Error al actualizar';
+      msg.textContent = updateError.message || 'Error al actualizar';
+      return;
     }
+
+    document.getElementById('resetOverlay').classList.remove('open');
+    _resetToken = null;
+    _resetRefreshToken = '';
+    _isRecovering = false;
+    await _supabase.auth.signOut();
+    showToast('✅ Contraseña actualizada. ¡Ya podés ingresar!');
+    setTimeout(()=>{ openAuth(null,'login'); }, 500);
+    updateAuthUI();
   } catch(e){
     msg.style.color='var(--red)'; msg.textContent='Error de conexión';
   }
