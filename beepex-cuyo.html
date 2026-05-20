@@ -4068,7 +4068,9 @@ async function submitResetPassword(){
     setTimeout(()=>{ openAuth(null,'login'); }, 500);
     updateAuthUI();
   } catch(e){
-    msg.style.color='var(--red)'; msg.textContent='Error de conexión';
+    console.error('Submit reset password error:', e);
+    msg.style.color='var(--red)';
+    msg.textContent = e?.message || 'Error de conexión';
   }
 }
 
