@@ -234,7 +234,7 @@
   .mc-detail-subtotal{font-weight:700;white-space:nowrap;}
   .mc-detail-total-row{display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:10px 0 0;border-top:2px solid var(--border);margin-top:4px;}
   /* ── Modal Reset Password ── */
-  .reset-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px;}
+  .reset-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:800;align-items:center;justify-content:center;padding:20px;}
   .reset-overlay.open{display:flex;}
   .reset-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 24px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px;animation:slideUp .2s ease;}
   .reset-modal h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;text-align:center;}
@@ -4034,6 +4034,12 @@ let _resetToken = null;
 
 function showResetPasswordModal(token){
   _resetToken = token;
+  // Cerrar cualquier modal que pudiera estar abierto encima
+  const welcome = document.getElementById('welcomeOverlay');
+  if(welcome) welcome.classList.remove('open');
+  const auth = document.getElementById('authOverlay');
+  if(auth) auth.classList.remove('open');
+  document.body.style.overflow = 'hidden';
   document.getElementById('resetOverlay').classList.add('open');
   document.getElementById('resetPass1').value='';
   document.getElementById('resetPass2').value='';
