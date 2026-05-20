@@ -4788,7 +4788,7 @@ function addVoiceToCart(){
 
   // Auth en paralelo (no bloquea el catálogo)
   initAuth();
-  setTimeout(()=>{ openWelcome(); }, 600);
+  setTimeout(() => { if(!_isRecovering) openWelcome(); }, 600);
 })();
 </script>
 </body>
