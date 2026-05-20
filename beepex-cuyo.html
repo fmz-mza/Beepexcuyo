@@ -1714,6 +1714,7 @@ function _showView(id){
 }
 
 function openWelcome(forceLogin=false){
+  if(_isRecovering) return;
   if(!currentUser){
     // No logueado — siempre mostrar
     _lockScroll();
@@ -2918,6 +2919,8 @@ setInterval(updatePresence, 2*60*1000);
 // También al cargar y al volver a la pestaña
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) updatePresence(); });
 
+let _isRecovering = false;
+
 async function initAuth(){
   // Parsear parámetros tanto de hash como de query string
   const hashParams = new URLSearchParams(window.location.hash.slice(1));
@@ -2932,9 +2935,13 @@ async function initAuth(){
                        window.location.hash.includes('reset') || window.location.search.includes('reset') || 
                        error.includes('expired') || error.includes('token');
     if(isRecovery){
+      _isRecovering = true;
       history.replaceState(null, '', window.location.pathname);
       showToast(`⚠️ Error: ${errorDesc || error || 'El link no es válido'}`);
-      setTimeout(() => openAuth(null, 'login'), 800);
+      setTimeout(() => {
+        _isRecovering = false;
+        openAuth(null, 'login');
+      }, 800);
       updateAuthUI();
       return;
     }
@@ -2943,6 +2950,7 @@ async function initAuth(){
   // 2. Detectar recovery
   const type = hashParams.get('type') || queryParams.get('type');
   if(type === 'recovery' || window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery')){
+    _isRecovering = true;
     const token = hashParams.get('access_token') || queryParams.get('access_token');
     const tokenHash = hashParams.get('token_hash') || queryParams.get('token_hash') || hashParams.get('refresh_token') || queryParams.get('refresh_token') || token;
     
@@ -2950,6 +2958,7 @@ async function initAuth(){
     
     if(!token){
       showToast('⚠️ No se encontró un token de acceso válido.');
+      _isRecovering = false;
       setTimeout(() => openAuth(null, 'login'), 800);
       updateAuthUI();
       return;
@@ -2964,6 +2973,7 @@ async function initAuth(){
         showResetPasswordModal(token);
       } else {
         showToast('⚠️ El link expiró o no es válido. Solicitá uno nuevo.');
+        _isRecovering = false;
         setTimeout(() => openAuth(null, 'login'), 800);
       }
     } catch(e){
@@ -4051,6 +4061,7 @@ async function submitResetPassword(){
     if(res.ok){
       document.getElementById('resetOverlay').classList.remove('open');
       _resetToken = null;
+      _isRecovering = false;
       showToast('✅ Contraseña actualizada. ¡Ya podés ingresar!');
       setTimeout(()=>{ openAuth(null,'login'); }, 500);
       updateAuthUI();
