@@ -2948,54 +2948,27 @@ async function initAuth(){
   }
 
   // 2. Detectar recovery
+  // Con flowType:'implicit', el SDK procesa el hash automáticamente al crear el cliente.
+  // Para cuando initAuth corre, la sesión ya está establecida internamente.
+  // Solo hay que detectar el type=recovery en la URL original y pedir la sesión al SDK.
+  const rawHash = window.location.hash;
   const type = hashParams.get('type') || queryParams.get('type');
-  if(type === 'recovery' || window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery')){
+  if(type === 'recovery' || rawHash.includes('type=recovery') || window.location.search.includes('type=recovery')){
     _isRecovering = true;
-
-    const accessToken  = hashParams.get('access_token')  || queryParams.get('access_token')  || '';
-    const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token') || '';
-
-    // Limpiar URL antes de establecer sesión
     history.replaceState(null, '', window.location.pathname);
 
-    if(!accessToken){
-      showToast('⚠️ No se encontró token. Solicitá un nuevo link.');
+    // El SDK ya procesó el hash — obtener la sesión que estableció
+    const { data: { session: recSession } } = await _supabase.auth.getSession();
+
+    if(!recSession){
+      showToast('⚠️ El link expiró. Solicitá uno nuevo.');
       _isRecovering = false;
       updateAuthUI();
       return;
     }
 
-    // El link de recovery de Supabase trae access_token (corto) y refresh_token.
-    // Hay que canjear el refresh_token via grant_type=refresh_token para obtener
-    // un JWT real, ya que el access_token del link no es un JWT válido.
-    let realAccessToken = '', realRefreshToken = '';
-    try {
-      const tokenRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken })
-      });
-      const tokenData = await tokenRes.json();
-      if(!tokenRes.ok || !tokenData.access_token){
-        showToast('⚠️ El link expiró. Solicitá uno nuevo.');
-        _isRecovering = false;
-        updateAuthUI();
-        return;
-      }
-      realAccessToken  = tokenData.access_token;
-      realRefreshToken = tokenData.refresh_token || refreshToken;
-    } catch(e){
-      showToast('⚠️ Error de conexión al verificar el link.');
-      _isRecovering = false;
-      updateAuthUI();
-      return;
-    }
-
-    // Establecer sesión en el SDK con los tokens reales
-    await _supabase.auth.setSession({ access_token: realAccessToken, refresh_token: realRefreshToken });
-    _resetToken = realAccessToken;
-    _resetRefreshToken = realRefreshToken;
-
+    _resetToken = recSession.access_token;
+    _resetRefreshToken = recSession.refresh_token || '';
     showResetPasswordModal(_resetToken, _resetRefreshToken);
     updateAuthUI();
     return;
@@ -4768,6 +4741,9 @@ function addVoiceToCart(){
   if(fab) fab.style.opacity = '1';
 })();
 (async function initApp(){
+  // Detectar recovery ANTES de cualquier otra operación
+  await initAuth();
+
   // Mostrar spinner mientras carga el catálogo
   const grid = document.getElementById('grid');
   if(grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted);font-size:14px;">⏳ Cargando catálogo...</div>';
@@ -4775,7 +4751,7 @@ function addVoiceToCart(){
   loadSettings();
   loadCart();
 
-  // Cargar productos desde Supabase PRIMERO
+  // Cargar productos desde Supabase
   await loadProducts();
 
   // Restaurar modo venta
@@ -4808,8 +4784,7 @@ function addVoiceToCart(){
   setTimeout(forceClearSearch, 100);
   setTimeout(forceClearSearch, 500);
 
-  // Auth primero, luego openWelcome solo si no es recovery
-  await initAuth();
+  // openWelcome solo si no es recovery
   if(!_isRecovering) setTimeout(() => openWelcome(), 600);
 })();
 </script>
