@@ -2957,20 +2957,44 @@ async function initAuth(){
     _isRecovering = true;
     history.replaceState(null, '', window.location.pathname);
 
-    // El SDK ya procesó el hash — obtener la sesión que estableció
-    const { data: { session: recSession }, error: sessErr } = await _supabase.auth.getSession();
-    console.log('[recovery] getSession result:', JSON.stringify(recSession), 'error:', sessErr);
-    console.log('[recovery] hash at this point:', rawHash.substring(0, 80));
+    // El access_token del link es un OTP corto, no un JWT.
+    // Canjearlo con /auth/v1/token?grant_type=recovery usando el token_hash
+    const accessToken  = hashParams.get('access_token') || '';
+    const refreshToken = hashParams.get('refresh_token') || '';
+    history.replaceState(null, '', window.location.pathname);
 
-    if(!recSession){
+    let realToken = '';
+    // Intentar primero verifyOtp del SDK (token_hash)
+    const { data: otpData, error: otpErr } = await _supabase.auth.verifyOtp({
+      token_hash: accessToken,
+      type: 'recovery'
+    });
+    console.log('[recovery] verifyOtp:', JSON.stringify(otpData), otpErr);
+
+    if(otpData?.session){
+      realToken = otpData.session.access_token;
+      _resetRefreshToken = otpData.session.refresh_token || '';
+    } else {
+      // Fallback: canjear refresh_token directamente
+      const { data: sessData, error: sessErr2 } = await _supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
+      console.log('[recovery] setSession:', JSON.stringify(sessData), sessErr2);
+      if(sessData?.session){
+        realToken = sessData.session.access_token;
+        _resetRefreshToken = sessData.session.refresh_token || '';
+      }
+    }
+
+    if(!realToken){
       showToast('⚠️ El link expiró. Solicitá uno nuevo.');
       _isRecovering = false;
       updateAuthUI();
       return;
     }
 
-    _resetToken = recSession.access_token;
-    _resetRefreshToken = recSession.refresh_token || '';
+    _resetToken = realToken;
     showResetPasswordModal(_resetToken, _resetRefreshToken);
     updateAuthUI();
     return;
