@@ -2951,24 +2951,26 @@ async function initAuth(){
   const type = hashParams.get('type') || queryParams.get('type');
   if(type === 'recovery' || window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery')){
     _isRecovering = true;
-    const token = hashParams.get('access_token') || queryParams.get('access_token');
-    const tokenHash = hashParams.get('token_hash') || queryParams.get('token_hash') || hashParams.get('refresh_token') || queryParams.get('refresh_token') || token;
-    
+
+    // Dejar que el SDK procese el hash (detectSessionInUrl:true llama getSession internamente)
+    const { data: { session: recSession } } = await _supabase.auth.getSession();
+
+    // Recién ahora limpiar el hash de la URL
     history.replaceState(null, '', window.location.pathname);
-    
-    if(!token){
-      showToast('⚠️ No se encontró un token de acceso válido.');
+
+    if(recSession){
+      // SDK tiene sesión activa — guardar el access_token como respaldo
+      _resetToken = recSession.access_token;
+      _resetRefreshToken = recSession.refresh_token || '';
+    } else {
+      // SDK no pudo establecer sesión — token expirado o inválido
+      showToast('⚠️ El link expiró. Solicitá uno nuevo.');
       _isRecovering = false;
-      setTimeout(() => openAuth(null, 'login'), 800);
       updateAuthUI();
       return;
     }
-    
-    // Mostrar modal directamente — el token de recovery de Supabase
-    // no es un access token estándar; si está vencido el error se verá al guardar.
-    // El SDK (detectSessionInUrl:true) ya procesó el hash y tiene sesión activa.
-    // Solo abrimos el modal — updateUser usará la sesión del SDK directamente.
-    showResetPasswordModal(token);
+
+    showResetPasswordModal(_resetToken, _resetRefreshToken);
     updateAuthUI();
     return;
   }
@@ -4072,7 +4074,9 @@ async function submitResetPassword(){
 
     if(updateError){
       msg.style.color='var(--red)';
-      msg.textContent = updateError.message || 'Error al actualizar';
+      const errDetail = JSON.stringify(updateError);
+      console.error('[resetPassword] updateError:', errDetail);
+      msg.textContent = updateError.message || errDetail || 'Error al actualizar';
       return;
     }
 
