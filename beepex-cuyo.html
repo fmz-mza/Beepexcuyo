@@ -2966,8 +2966,9 @@ async function initAuth(){
     
     // Mostrar modal directamente — el token de recovery de Supabase
     // no es un access token estándar; si está vencido el error se verá al guardar.
-    const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token') || '';
-    showResetPasswordModal(token, refreshToken);
+    // El SDK (detectSessionInUrl:true) ya procesó el hash y tiene sesión activa.
+    // Solo abrimos el modal — updateUser usará la sesión del SDK directamente.
+    showResetPasswordModal(token);
     updateAuthUI();
     return;
   }
@@ -4044,31 +4045,31 @@ async function submitResetPassword(){
   if(p1!==p2){ msg.style.color='var(--red)'; msg.textContent='Las contraseñas no coinciden'; return; }
   msg.innerHTML='<span class="forgot-spinner"></span> Guardando...'; msg.style.color='var(--muted)';
   try{
-    // Determine which token forms a valid JWT. Use it; otherwise fall back to refresh token.
-    const tokenIsJwt = _resetToken && _resetToken.split('.').length === 3;
-    let sessionPayload;
-    if (tokenIsJwt) {
-      sessionPayload = { access_token: _resetToken };
-    } else if (_resetRefreshToken) {
-      // Use refresh token to obtain a new JWT session
-      sessionPayload = { refresh_token: _resetRefreshToken };
-    } else {
-      console.error('No valid token for session restoration');
-      msg.style.color = 'var(--red)';
-      msg.textContent = 'Token inválido. Solicite un nuevo link.';
-      return;
-    }
-    console.log('Setting Supabase session with', tokenIsJwt ? 'access token' : 'refresh token');
-    const { error: sessionError } = await _supabase.auth.setSession(sessionPayload);
-    if (sessionError) {
-      console.error('Session error:', sessionError);
-      msg.style.color = 'var(--red)';
-      msg.textContent = 'El link expiró o es inválido. Solicite uno nuevo.';
-      return;
+    // El SDK ya estableció la sesión automáticamente desde el hash (detectSessionInUrl:true).
+    // Intentar updateUser directo primero.
+    let updateError = null;
+    const sdkResult = await _supabase.auth.updateUser({ password: p1 });
+    updateError = sdkResult.error;
+
+    // Fallback: si el SDK no tiene sesión, usar fetch directo con el token del link
+    if(updateError && _resetToken){
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: 'PUT',
+        headers: {
+          'apikey': SUPABASE_ANON,
+          'Authorization': `Bearer ${_resetToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password: p1 })
+      });
+      if(res.ok){
+        updateError = null;
+      } else {
+        const d = await res.json().catch(()=>({}));
+        updateError = { message: d.message || d.error_description || 'Error al actualizar' };
+      }
     }
 
-    // Ahora actualizar la contraseña con la sesión activa
-    const { error: updateError } = await _supabase.auth.updateUser({ password: p1 });
     if(updateError){
       msg.style.color='var(--red)';
       msg.textContent = updateError.message || 'Error al actualizar';
@@ -4079,14 +4080,13 @@ async function submitResetPassword(){
     _resetToken = null;
     _resetRefreshToken = '';
     _isRecovering = false;
-    await _supabase.auth.signOut();
+    try{ await _supabase.auth.signOut(); } catch(_){}
     showToast('✅ Contraseña actualizada. ¡Ya podés ingresar!');
     setTimeout(()=>{ openAuth(null,'login'); }, 500);
     updateAuthUI();
   } catch(e){
-    console.error('Submit reset password error:', e);
     msg.style.color='var(--red)';
-    msg.textContent = e?.message || 'Error de conexión';
+    msg.textContent = 'Error: ' + (e.message || e);
   }
 }
 
