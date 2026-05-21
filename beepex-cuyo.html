@@ -2958,7 +2958,9 @@ async function initAuth(){
     history.replaceState(null, '', window.location.pathname);
 
     // El SDK ya procesó el hash — obtener la sesión que estableció
-    const { data: { session: recSession } } = await _supabase.auth.getSession();
+    const { data: { session: recSession }, error: sessErr } = await _supabase.auth.getSession();
+    console.log('[recovery] getSession result:', JSON.stringify(recSession), 'error:', sessErr);
+    console.log('[recovery] hash at this point:', rawHash.substring(0, 80));
 
     if(!recSession){
       showToast('⚠️ El link expiró. Solicitá uno nuevo.');
