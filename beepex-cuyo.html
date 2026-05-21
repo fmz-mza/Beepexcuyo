@@ -2965,24 +2965,25 @@ async function initAuth(){
       return;
     }
 
-    // El access_token del link de recovery de Supabase no es un JWT —
-    // hay que canjearlo via /auth/v1/verify para obtener una sesión real.
+    // El link de recovery de Supabase trae access_token (corto) y refresh_token.
+    // Hay que canjear el refresh_token via grant_type=refresh_token para obtener
+    // un JWT real, ya que el access_token del link no es un JWT válido.
     let realAccessToken = '', realRefreshToken = '';
     try {
-      const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+      const tokenRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
         method: 'POST',
         headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: accessToken, type: 'recovery' })
+        body: JSON.stringify({ refresh_token: refreshToken })
       });
-      const verifyData = await verifyRes.json();
-      if(!verifyRes.ok || !verifyData.access_token){
+      const tokenData = await tokenRes.json();
+      if(!tokenRes.ok || !tokenData.access_token){
         showToast('⚠️ El link expiró. Solicitá uno nuevo.');
         _isRecovering = false;
         updateAuthUI();
         return;
       }
-      realAccessToken  = verifyData.access_token;
-      realRefreshToken = verifyData.refresh_token || '';
+      realAccessToken  = tokenData.access_token;
+      realRefreshToken = tokenData.refresh_token || refreshToken;
     } catch(e){
       showToast('⚠️ Error de conexión al verificar el link.');
       _isRecovering = false;
