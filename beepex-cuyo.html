@@ -2965,22 +2965,35 @@ async function initAuth(){
       return;
     }
 
-    // Establecer sesión explícitamente con los tokens del link
-    const { data: sessData, error: sessErr } = await _supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken
-    });
-
-    if(sessErr || !sessData?.session){
-      showToast('⚠️ El link expiró. Solicitá uno nuevo.');
+    // El access_token del link de recovery de Supabase no es un JWT —
+    // hay que canjearlo via /auth/v1/verify para obtener una sesión real.
+    let realAccessToken = '', realRefreshToken = '';
+    try {
+      const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: accessToken, type: 'recovery' })
+      });
+      const verifyData = await verifyRes.json();
+      if(!verifyRes.ok || !verifyData.access_token){
+        showToast('⚠️ El link expiró. Solicitá uno nuevo.');
+        _isRecovering = false;
+        updateAuthUI();
+        return;
+      }
+      realAccessToken  = verifyData.access_token;
+      realRefreshToken = verifyData.refresh_token || '';
+    } catch(e){
+      showToast('⚠️ Error de conexión al verificar el link.');
       _isRecovering = false;
       updateAuthUI();
       return;
     }
 
-    // Sesión establecida — guardar tokens de la sesión activa
-    _resetToken = sessData.session.access_token;
-    _resetRefreshToken = sessData.session.refresh_token || '';
+    // Establecer sesión en el SDK con los tokens reales
+    await _supabase.auth.setSession({ access_token: realAccessToken, refresh_token: realRefreshToken });
+    _resetToken = realAccessToken;
+    _resetRefreshToken = realRefreshToken;
 
     showResetPasswordModal(_resetToken, _resetRefreshToken);
     updateAuthUI();
