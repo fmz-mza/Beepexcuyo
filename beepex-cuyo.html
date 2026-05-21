@@ -2952,23 +2952,35 @@ async function initAuth(){
   if(type === 'recovery' || window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery')){
     _isRecovering = true;
 
-    // Dejar que el SDK procese el hash (detectSessionInUrl:true llama getSession internamente)
-    const { data: { session: recSession } } = await _supabase.auth.getSession();
+    const accessToken  = hashParams.get('access_token')  || queryParams.get('access_token')  || '';
+    const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token') || '';
 
-    // Recién ahora limpiar el hash de la URL
+    // Limpiar URL antes de establecer sesión
     history.replaceState(null, '', window.location.pathname);
 
-    if(recSession){
-      // SDK tiene sesión activa — guardar el access_token como respaldo
-      _resetToken = recSession.access_token;
-      _resetRefreshToken = recSession.refresh_token || '';
-    } else {
-      // SDK no pudo establecer sesión — token expirado o inválido
+    if(!accessToken){
+      showToast('⚠️ No se encontró token. Solicitá un nuevo link.');
+      _isRecovering = false;
+      updateAuthUI();
+      return;
+    }
+
+    // Establecer sesión explícitamente con los tokens del link
+    const { data: sessData, error: sessErr } = await _supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken
+    });
+
+    if(sessErr || !sessData?.session){
       showToast('⚠️ El link expiró. Solicitá uno nuevo.');
       _isRecovering = false;
       updateAuthUI();
       return;
     }
+
+    // Sesión establecida — guardar tokens de la sesión activa
+    _resetToken = sessData.session.access_token;
+    _resetRefreshToken = sessData.session.refresh_token || '';
 
     showResetPasswordModal(_resetToken, _resetRefreshToken);
     updateAuthUI();
@@ -4047,36 +4059,13 @@ async function submitResetPassword(){
   if(p1!==p2){ msg.style.color='var(--red)'; msg.textContent='Las contraseñas no coinciden'; return; }
   msg.innerHTML='<span class="forgot-spinner"></span> Guardando...'; msg.style.color='var(--muted)';
   try{
-    // El SDK ya estableció la sesión automáticamente desde el hash (detectSessionInUrl:true).
-    // Intentar updateUser directo primero.
-    let updateError = null;
-    const sdkResult = await _supabase.auth.updateUser({ password: p1 });
-    updateError = sdkResult.error;
-
-    // Fallback: si el SDK no tiene sesión, usar fetch directo con el token del link
-    if(updateError && _resetToken){
-      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        method: 'PUT',
-        headers: {
-          'apikey': SUPABASE_ANON,
-          'Authorization': `Bearer ${_resetToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ password: p1 })
-      });
-      if(res.ok){
-        updateError = null;
-      } else {
-        const d = await res.json().catch(()=>({}));
-        updateError = { message: d.message || d.error_description || 'Error al actualizar' };
-      }
-    }
+    // Sesión ya establecida en initAuth via setSession — updateUser directo
+    const { error: updateError } = await _supabase.auth.updateUser({ password: p1 });
 
     if(updateError){
       msg.style.color='var(--red)';
-      const errDetail = JSON.stringify(updateError);
-      console.error('[resetPassword] updateError:', errDetail);
-      msg.textContent = updateError.message || errDetail || 'Error al actualizar';
+      console.error('[resetPassword]', updateError);
+      msg.textContent = updateError.message || 'Error al actualizar';
       return;
     }
 
