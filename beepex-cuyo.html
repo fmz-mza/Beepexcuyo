@@ -2957,34 +2957,20 @@ async function initAuth(){
     _isRecovering = true;
     history.replaceState(null, '', window.location.pathname);
 
-    // El access_token del link es un OTP corto, no un JWT.
-    // Canjearlo con /auth/v1/token?grant_type=recovery usando el token_hash
-    const accessToken  = hashParams.get('access_token') || '';
-    const refreshToken = hashParams.get('refresh_token') || '';
+    // Template del email: access_token={{ .Token }} (OTP corto), refresh_token={{ .TokenHash }}
+    // El TokenHash es el que sirve para verifyOtp — viene en refresh_token del hash
+    const tokenHash    = hashParams.get('refresh_token') || hashParams.get('token_hash') || '';
     history.replaceState(null, '', window.location.pathname);
 
     let realToken = '';
-    // Intentar primero verifyOtp del SDK (token_hash)
     const { data: otpData, error: otpErr } = await _supabase.auth.verifyOtp({
-      token_hash: accessToken,
+      token_hash: tokenHash,
       type: 'recovery'
     });
-    console.log('[recovery] verifyOtp:', JSON.stringify(otpData), otpErr);
 
     if(otpData?.session){
       realToken = otpData.session.access_token;
       _resetRefreshToken = otpData.session.refresh_token || '';
-    } else {
-      // Fallback: canjear refresh_token directamente
-      const { data: sessData, error: sessErr2 } = await _supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-      });
-      console.log('[recovery] setSession:', JSON.stringify(sessData), sessErr2);
-      if(sessData?.session){
-        realToken = sessData.session.access_token;
-        _resetRefreshToken = sessData.session.refresh_token || '';
-      }
     }
 
     if(!realToken){
