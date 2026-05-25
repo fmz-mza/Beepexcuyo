@@ -1169,6 +1169,28 @@ function showSuccess(ticket, total, pagado){
 }
 function newSale(){document.getElementById('successBg').classList.remove('open');lastTicket=null;}
 
+
+// Helper: enriquece y ordena items del ticket (marca desde products, orden BEEPAW primero, SKU asc)
+function enrichItems(items){
+  const prodMap = {};
+  products.forEach(p => { prodMap[String(p.codigo)] = p; });
+  return items
+    .map(i => {
+      const p = prodMap[String(i.sku)] || {};
+      return { ...i, marca: p.marca || 'GENÉRICOS', codigo: i.sku };
+    })
+    .sort((a,b)=>{
+      const ma = a.marca.toUpperCase() === 'BEEPAW' ? 0 : 1;
+      const mb = b.marca.toUpperCase() === 'BEEPAW' ? 0 : 1;
+      if(ma !== mb) return ma - mb;
+      return String(a.sku).localeCompare(String(b.sku), undefined, {numeric:true});
+    });
+}
+function groupByMarca(items){
+  const groups = {};
+  items.forEach(i => { (groups[i.marca] = groups[i.marca] || []).push(i); });
+  return groups;
+}
 function buildTicketLines(){
   // Helper compartido por PDF y WA
   const t = lastTicket;
@@ -1198,13 +1220,22 @@ async function compartirPDF(){
   if(client){ doc.text('Cliente: '+client.nombre, 4, y); y+=4; }
   doc.line(4,y,76,y); y+=4;
 
-  // Items
-  items.forEach(i=>{
-    const p = i.precio_modificado ?? i.precio_unitario;
-    doc.setFontSize(8);
-    const nm = i.nombre.length>30 ? i.nombre.slice(0,30)+'…' : i.nombre;
-    doc.text(nm, 4, y); y+=3.5;
-    doc.text('  '+i.cantidad+' x '+fmt(p)+' = '+fmt(p*i.cantidad), 4, y); y+=4;
+  // Items agrupados por marca: BEEPAW primero, luego resto, por SKU asc
+  const enrichedPdf = enrichItems(items);
+  const groupsPdf = groupByMarca(enrichedPdf);
+  Object.entries(groupsPdf).forEach(([brand, list])=>{
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
+    doc.text('[ '+brand+' ]', 4, y); y+=3.5;
+    doc.setFont('helvetica','normal');
+    list.forEach(i=>{
+      const p = i.precio_modificado ?? i.precio_unitario;
+      doc.setFontSize(7.5);
+      // Nombre completo con wrap automático
+      const lines = doc.splitTextToSize(i.nombre+' (SKU '+i.sku+')', 72);
+      lines.forEach(l=>{ doc.text(l, 4, y); y+=3.5; });
+      doc.text('  '+i.cantidad+' x '+fmt(p)+' = '+fmt(p*i.cantidad), 4, y); y+=4;
+    });
+    y+=1;
   });
   doc.line(4,y,76,y); y+=4;
 
@@ -1331,12 +1362,9 @@ function shareWA(){
   const today = new Date(order.fecha).toLocaleDateString('es-AR');
   const totalU = items.reduce((a,i)=>a+i.cantidad, 0);
 
-  // Agrupar items por marca
-  const groups = {};
-  items.forEach(i=>{
-    const b = i.marca || 'Sin marca';
-    (groups[b] = groups[b] || []).push(i);
-  });
+  // Agrupar items: BEEPAW primero, luego resto, ordenados por SKU asc
+  const enriched = enrichItems(items);
+  const groups = groupByMarca(enriched);
 
   let msg = '\uD83D\uDC3E *TICKET BEEPEX CUYO*\n';
   msg += '━━━━━━━━━━━━━━━━━━\n';
@@ -1350,7 +1378,7 @@ function shareWA(){
     msg += '\uD83D\uDCE6 *'+brand+'*\n';
     list.forEach(i=>{
       const p = i.precio_modificado ?? i.precio_unitario;
-      msg += '\u2022 '+i.nombre+' (SKU '+i.codigo+')\n';
+      msg += '\u2022 '+i.nombre+' (SKU '+i.sku+')\n';
       msg += '  Cant: '+i.cantidad+' × '+fmt(p)+' = *'+fmt(p*i.cantidad)+'*\n';
     });
     msg += '\n';
