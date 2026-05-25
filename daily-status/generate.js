@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SUPABASE_URL    = process.env.SUPABASE_URL;
-const SUPABASE_ANON   = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_ANON   = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
 const RESEND_API_KEY  = process.env.RESEND_API_KEY;
 const BUCKET_URL      = `${SUPABASE_URL}/storage/v1/object/public/fotos`;
 const USED_FILE       = path.join(__dirname, 'used-products.json');
