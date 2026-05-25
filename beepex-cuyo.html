@@ -1237,46 +1237,35 @@ function renderRubros(){
 }
 
 function setRubro(r){
-  activeRubro=r; renderRubros(); _cardEnterIdx=0; _applyFilterAnim(); setTimeout(()=>renderGrid(),0);
+  activeRubro=r; renderRubros(); _cardEnterIdx=0; window.scrollTo({top:0}); _applyFilterAnim(); setTimeout(()=>renderGrid(),0);
 }
 function setSaleBrand(b){
   activeBrand=b; renderBrands(); renderGrid();
 }
-// ── Efecto 2: flip-Y al cambiar filtros ──────────────────────────────────────
+// ── Efecto 2: fade simple al cambiar filtros (sin 3D — evita GPU flush en mobile)
 let _filterAnimPending = false;
 function _applyFilterAnim(){
   if(_filterAnimPending) return;
   _filterAnimPending = true;
-  const visibles = [...document.querySelectorAll('#grid .card:not(.hidden)')];
-  visibles.forEach(el=>{
-    el.style.transition='opacity 250ms ease, transform 250ms cubic-bezier(.4,.2,.2,1)';
-    el.style.opacity='0';
-    el.style.transform='rotateY(90deg)';
-  });
+  const grid = document.getElementById('grid');
+  grid.style.transition = 'opacity 150ms ease';
+  grid.style.opacity = '0';
   setTimeout(()=>{
     _filterAnimPending = false;
-    const newVisible = [...document.querySelectorAll('#grid .card:not(.hidden)')];
-    newVisible.forEach((el, i)=>{
-      el.style.transition='none';
-      el.style.opacity='0';
-      el.style.transform='rotateY(-90deg)';
-      requestAnimationFrame(()=>{
-        el.style.transition=`opacity 300ms ease ${i*18}ms, transform 300ms cubic-bezier(.34,1.56,.64,1) ${i*18}ms`;
-        el.style.opacity='1';
-        el.style.transform='rotateY(0deg)';
-      });
-    });
-  }, 260);
+    grid.style.opacity = '1';
+    setTimeout(()=>{ grid.style.transition=''; grid.style.opacity=''; }, 160);
+  }, 155);
 }
 
 function setBrand(b){
   activeBrand=b; renderBrands();
   _cardEnterIdx=0;
+  window.scrollTo({top:0});
   _applyFilterAnim();
   setTimeout(()=>renderGrid(), 0);
   if(typeof gtag!=='undefined'&&b!=='ALL') gtag('event','select_item',{item_list_name:'filtro_marca',item_list_id:b});
 }
-function setStock(s){ activeStock=activeStock===s?'ALL':s; renderBrands(); _cardEnterIdx=0; _applyFilterAnim(); setTimeout(()=>renderGrid(),0); }
+function setStock(s){ activeStock=activeStock===s?'ALL':s; renderBrands(); _cardEnterIdx=0; window.scrollTo({top:0}); _applyFilterAnim(); setTimeout(()=>renderGrid(),0); }
 function setSort(v){ activeSort=v; renderGrid(); }
 
 // ── Debounce para el buscador ─────────────────────────────────────────────────
