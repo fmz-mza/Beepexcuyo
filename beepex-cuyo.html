@@ -80,7 +80,7 @@
   .section-title{grid-column:1/-1;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:8px 0 0;}
   .section-title.hidden{display:none;}
   .no-results{grid-column:1/-1;text-align:center;color:var(--muted);padding:60px 0;}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s;contain:layout style;}
   .card.hidden{display:none;}
   .card:hover{transform:translateY(-2px);border-color:#3a3f55;}
   .card.pop{animation:cardPop .3s ease;}
@@ -234,7 +234,7 @@
   .mc-detail-subtotal{font-weight:700;white-space:nowrap;}
   .mc-detail-total-row{display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:10px 0 0;border-top:2px solid var(--border);margin-top:4px;}
   /* ── Modal Reset Password ── */
-  .reset-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:800;align-items:center;justify-content:center;padding:20px;}
+  .reset-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px;}
   .reset-overlay.open{display:flex;}
   .reset-modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 24px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px;animation:slideUp .2s ease;}
   .reset-modal h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;text-align:center;}
@@ -992,7 +992,7 @@ const imgObserver = new IntersectionObserver((entries)=>{
   });
 }, { rootMargin:'400px', threshold:0 });
 
-// ── Efecto 1: scroll-triggered — slide desde lados según columna ─────────────
+// ── Efecto scroll: fade-up simple, sin getBoundingClientRect ────────────────
 let _cardEnterIdx = 0;
 const cardObserver = new IntersectionObserver((entries)=>{
   entries.forEach(e=>{
@@ -1001,38 +1001,23 @@ const cardObserver = new IntersectionObserver((entries)=>{
     cardObserver.unobserve(el);
     if(el.dataset.entered) return;
     el.dataset.entered = '1';
-
-    // Detectar columna: comparar posición X del card con el centro del grid
-    const grid = document.getElementById('grid');
-    const gridRect = grid.getBoundingClientRect();
-    const cardRect = el.getBoundingClientRect();
-    const cardCenterX = cardRect.left + cardRect.width / 2;
-    const gridCenterX = gridRect.left + gridRect.width / 2;
-
-    // Dirección: izquierda si está a la izquierda del centro, derecha si está a la derecha
-    const fromLeft = cardCenterX < gridCenterX;
-    const tx = fromLeft ? '-52px' : '52px';
-
-    // Delay corto para las primeras 8 (stagger suave en pantalla inicial)
-    const delay = Math.min(_cardEnterIdx, 7) * 45;
+    const delay = Math.min(_cardEnterIdx, 5) * 35;
     _cardEnterIdx++;
-
     el.style.transition = 'none';
     el.style.opacity = '0';
-    el.style.transform = `translateX(${tx})`;
-
+    el.style.transform = 'translateY(16px)';
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      el.style.transition = `opacity .4s ease ${delay}ms, transform .45s cubic-bezier(.25,.46,.45,.94) ${delay}ms`;
+      el.style.transition = `opacity .35s ease ${delay}ms, transform .35s ease ${delay}ms`;
       el.style.opacity = '1';
-      el.style.transform = 'translateX(0)';
+      el.style.transform = 'translateY(0)';
       setTimeout(()=>{
         el.style.transition = '';
         el.style.opacity = '';
         el.style.transform = '';
-      }, delay + 500);
+      }, delay + 400);
     }));
   });
-}, { rootMargin:'40px', threshold:0.08 });
+}, { rootMargin:'0px', threshold:0 });
 
 // ── Helpers de stock ─────────────────────────────────────────────────────────
 function stockType(s){
@@ -1436,25 +1421,24 @@ function _renderPage(grid, sortedList, listNoStock, from, to){
   });
 }
 
-// Scroll fallback por si IntersectionObserver tarda
+// Scroll fallback — solo como respaldo del IntersectionObserver
 function _checkSentinelScroll(){
   const s=document.getElementById('grid-sentinel');
   if(!s||_loadingMore||_pagedIdx>=_pagedList.length) return;
   const r=s.getBoundingClientRect();
-  if(r.top < window.innerHeight + 800) _sentinelObserver.takeRecords(); // fuerza check
-  // Si el sentinel está cerca, cargar directamente
-  if(r.top < window.innerHeight + 400){
-    const grid=document.getElementById('grid');
-    const listNoStock=_pagedList.filter(p=>stockType(p.stock)==='NOSTOCK');
+  if(r.top < window.innerHeight + 300){
     _loadingMore=true;
-    const next=Math.min(_pagedIdx+PAGE_SIZE,_pagedList.length);
-    _renderPage(grid,_pagedList,listNoStock,_pagedIdx,next);
-    _pagedIdx=next;
-    if(_pagedIdx>=_pagedList.length){ if(s) s.remove(); }
-    _loadingMore=false;
+    requestAnimationFrame(()=>{
+      const grid=document.getElementById('grid');
+      const listNoStock=_pagedList.filter(p=>stockType(p.stock)==='NOSTOCK');
+      const next=Math.min(_pagedIdx+PAGE_SIZE,_pagedList.length);
+      _renderPage(grid,_pagedList,listNoStock,_pagedIdx,next);
+      _pagedIdx=next;
+      if(_pagedIdx>=_pagedList.length){ if(s) s.remove(); }
+      _loadingMore=false;
+    });
   }
 }
-// Throttling y bloqueo para scroll
 let _scrollTimeout = null;
 let _blockScrollLoad = false;
 window.addEventListener('scroll', ()=>{
@@ -1464,7 +1448,7 @@ window.addEventListener('scroll', ()=>{
     if(!_loadingMore && _pagedIdx < _pagedList.length && !_blockScrollLoad){
       _checkSentinelScroll();
     }
-  }, 150);
+  }, 250);
 },{passive:true});
 
 // Observer para infinite scroll
@@ -2948,40 +2932,38 @@ async function initAuth(){
   }
 
   // 2. Detectar recovery
-  // Con flowType:'implicit', el SDK procesa el hash automáticamente al crear el cliente.
-  // Para cuando initAuth corre, la sesión ya está establecida internamente.
-  // Solo hay que detectar el type=recovery en la URL original y pedir la sesión al SDK.
-  const rawHash = window.location.hash;
   const type = hashParams.get('type') || queryParams.get('type');
-  if(type === 'recovery' || rawHash.includes('type=recovery') || window.location.search.includes('type=recovery')){
+  if(type === 'recovery' || window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery')){
     _isRecovering = true;
+    const token = hashParams.get('access_token') || queryParams.get('access_token');
+    const tokenHash = hashParams.get('token_hash') || queryParams.get('token_hash') || hashParams.get('refresh_token') || queryParams.get('refresh_token') || token;
+    
     history.replaceState(null, '', window.location.pathname);
-
-    // Template del email: access_token={{ .Token }} (OTP corto), refresh_token={{ .TokenHash }}
-    // El TokenHash es el que sirve para verifyOtp — viene en refresh_token del hash
-    const tokenHash    = hashParams.get('refresh_token') || hashParams.get('token_hash') || '';
-    history.replaceState(null, '', window.location.pathname);
-
-    let realToken = '';
-    const { data: otpData, error: otpErr } = await _supabase.auth.verifyOtp({
-      token_hash: tokenHash,
-      type: 'recovery'
-    });
-
-    if(otpData?.session){
-      realToken = otpData.session.access_token;
-      _resetRefreshToken = otpData.session.refresh_token || '';
-    }
-
-    if(!realToken){
-      showToast('⚠️ El link expiró. Solicitá uno nuevo.');
+    
+    if(!token){
+      showToast('⚠️ No se encontró un token de acceso válido.');
       _isRecovering = false;
+      setTimeout(() => openAuth(null, 'login'), 800);
       updateAuthUI();
       return;
     }
-
-    _resetToken = realToken;
-    showResetPasswordModal(_resetToken, _resetRefreshToken);
+    
+    try{
+      // Validar token con Supabase antes de mostrar el modal
+      const vRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${token}` }
+      });
+      if(vRes.ok){
+        showResetPasswordModal(token);
+      } else {
+        showToast('⚠️ El link expiró o no es válido. Solicitá uno nuevo.');
+        _isRecovering = false;
+        setTimeout(() => openAuth(null, 'login'), 800);
+      }
+    } catch(e){
+      // Fallback si falla la llamada
+      showResetPasswordModal(token || tokenHash);
+    }
     updateAuthUI();
     return;
   }
@@ -4033,16 +4015,9 @@ async function submitForgot(){
 
 // ── Reset Password Modal (llega desde el link del email) ─────────────────────
 let _resetToken = null;
-let _resetRefreshToken = '';
 
-function showResetPasswordModal(token, refreshToken){
+function showResetPasswordModal(token){
   _resetToken = token;
-  _resetRefreshToken = refreshToken || '';
-  const welcome = document.getElementById('welcomeOverlay');
-  if(welcome) welcome.classList.remove('open');
-  const auth = document.getElementById('authOverlay');
-  if(auth) auth.classList.remove('open');
-  document.body.style.overflow = 'hidden';
   document.getElementById('resetOverlay').classList.add('open');
   document.getElementById('resetPass1').value='';
   document.getElementById('resetPass2').value='';
@@ -4058,27 +4033,29 @@ async function submitResetPassword(){
   if(p1!==p2){ msg.style.color='var(--red)'; msg.textContent='Las contraseñas no coinciden'; return; }
   msg.innerHTML='<span class="forgot-spinner"></span> Guardando...'; msg.style.color='var(--muted)';
   try{
-    // Sesión ya establecida en initAuth via setSession — updateUser directo
-    const { error: updateError } = await _supabase.auth.updateUser({ password: p1 });
-
-    if(updateError){
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`,{
+      method:'PUT',
+      headers:{
+        'apikey':SUPABASE_ANON,
+        'Authorization':`Bearer ${_resetToken}`,
+        'Content-Type':'application/json'
+      },
+      body: JSON.stringify({password: p1})
+    });
+    if(res.ok){
+      document.getElementById('resetOverlay').classList.remove('open');
+      _resetToken = null;
+      _isRecovering = false;
+      showToast('✅ Contraseña actualizada. ¡Ya podés ingresar!');
+      setTimeout(()=>{ openAuth(null,'login'); }, 500);
+      updateAuthUI();
+    } else {
+      const d = await res.json();
       msg.style.color='var(--red)';
-      console.error('[resetPassword]', updateError);
-      msg.textContent = updateError.message || 'Error al actualizar';
-      return;
+      msg.textContent = d.message||d.error_description||'Error al actualizar';
     }
-
-    document.getElementById('resetOverlay').classList.remove('open');
-    _resetToken = null;
-    _resetRefreshToken = '';
-    _isRecovering = false;
-    try{ await _supabase.auth.signOut(); } catch(_){}
-    showToast('✅ Contraseña actualizada. ¡Ya podés ingresar!');
-    setTimeout(()=>{ openAuth(null,'login'); }, 500);
-    updateAuthUI();
   } catch(e){
-    msg.style.color='var(--red)';
-    msg.textContent = 'Error: ' + (e.message || e);
+    msg.style.color='var(--red)'; msg.textContent='Error de conexión';
   }
 }
 
@@ -4753,9 +4730,6 @@ function addVoiceToCart(){
   if(fab) fab.style.opacity = '1';
 })();
 (async function initApp(){
-  // Detectar recovery ANTES de cualquier otra operación
-  await initAuth();
-
   // Mostrar spinner mientras carga el catálogo
   const grid = document.getElementById('grid');
   if(grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted);font-size:14px;">⏳ Cargando catálogo...</div>';
@@ -4763,7 +4737,7 @@ function addVoiceToCart(){
   loadSettings();
   loadCart();
 
-  // Cargar productos desde Supabase
+  // Cargar productos desde Supabase PRIMERO
   await loadProducts();
 
   // Restaurar modo venta
@@ -4796,8 +4770,9 @@ function addVoiceToCart(){
   setTimeout(forceClearSearch, 100);
   setTimeout(forceClearSearch, 500);
 
-  // openWelcome solo si no es recovery
-  if(!_isRecovering) setTimeout(() => openWelcome(), 600);
+  // Auth en paralelo (no bloquea el catálogo)
+  initAuth();
+  setTimeout(() => { if(!_isRecovering) openWelcome(); }, 600);
 })();
 </script>
 </body>
