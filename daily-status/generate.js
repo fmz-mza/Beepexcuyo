@@ -78,6 +78,18 @@ function buildHTML(products) {
     weekday: 'long', day: 'numeric', month: 'long'
   });
 
+  // Cargar logo local como base64
+  let logoSrc = '';
+  try {
+    const iconPath = path.join(__dirname, '..', 'images', 'icon-192.png');
+    if (fs.existsSync(iconPath)) {
+      const iconBase64 = fs.readFileSync(iconPath, 'base64');
+      logoSrc = `data:image/png;base64,${iconBase64}`;
+    }
+  } catch (err) {
+    console.warn('No se pudo cargar el logo local:', err.message);
+  }
+
   const cards = products.map(p => {
     const imgUrl = `${BUCKET_URL}/${p.codigo}.webp`;
     const isPreventa = (p.stock_estado || '').toUpperCase().includes('PREVENTA');
@@ -144,6 +156,13 @@ function buildHTML(products) {
     display: flex;
     align-items: center;
     gap: 18px;
+  }
+
+  .logo-img {
+    width: 68px; height: 68px;
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(58, 108, 240, 0.25);
+    object-fit: cover;
   }
 
   .logo-icon {
@@ -218,18 +237,18 @@ function buildHTML(products) {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 18px;
+    padding: 12px;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
     backdrop-filter: blur(12px);
   }
 
   .img-wrap {
     width: 100%;
-    height: 400px;
+    height: 480px;
     background: #ffffff;
     border-radius: 22px;
     display: flex; align-items: center; justify-content: center;
-    padding: 24px;
+    padding: 8px;
     overflow: hidden;
     box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
   }
@@ -327,7 +346,7 @@ function buildHTML(products) {
 <body>
   <div class="header">
     <div class="logo">
-      <div class="logo-icon">🐾</div>
+      ${logoSrc ? `<img class="logo-img" src="${logoSrc}" alt="Logo" />` : `<div class="logo-icon">🐾</div>`}
       <div class="logo-text">
         <h1>BEEPEX CUYO</h1>
         <p>Distribuidora de mascotas</p>
@@ -338,13 +357,13 @@ function buildHTML(products) {
 
   <div class="title-sec">
     <h2>Recomendados de hoy</h2>
-    <p>Los mejores productos seleccionados para tu mascota</p>
+    <p>Stock y precios mayoristas para tu veterinaria o pet shop</p>
   </div>
 
   <div class="grid">${cards}</div>
 
   <div class="footer">
-    <span class="footer-text">Consultá disponibilidad y precios en la web</span>
+    <span class="footer-text">Accedé a nuestro catálogo y hacé tu pedido mayorista en</span>
     <span class="footer-cta">fmz-mza.github.io/Beepexcuyo</span>
   </div>
 </body>
