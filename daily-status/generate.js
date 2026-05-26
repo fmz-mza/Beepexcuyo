@@ -52,7 +52,8 @@ function pickProducts(all, usedThisMonth) {
   const fresh = available.filter(p => !usedThisMonth.includes(String(p.codigo)));
 
   // Si se agotaron los fresh, resetear (nuevo ciclo)
-  const pool = fresh.length >= PRODUCTS_PER_IMAGE ? fresh : available;
+  const mustReset = fresh.length < PRODUCTS_PER_IMAGE;
+  const pool = mustReset ? available : fresh;
 
   // Shuffle Fisher-Yates
   const shuffled = [...pool];
@@ -60,7 +61,10 @@ function pickProducts(all, usedThisMonth) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  return shuffled.slice(0, PRODUCTS_PER_IMAGE);
+  return {
+    chosen: shuffled.slice(0, PRODUCTS_PER_IMAGE),
+    resetHistory: mustReset
+  };
 }
 
 // ── 4. Formatear precio ───────────────────────────────────────────────────────
@@ -76,18 +80,23 @@ function buildHTML(products) {
 
   const cards = products.map(p => {
     const imgUrl = `${BUCKET_URL}/${p.codigo}.webp`;
-    const stock  = (p.stock_estado || '').toUpperCase().includes('PREVENTA') ? '🕐 Preventa' : '✅ En stock';
-    const nombre = p.producto.length > 42 ? p.producto.slice(0, 42) + '…' : p.producto;
+    const isPreventa = (p.stock_estado || '').toUpperCase().includes('PREVENTA');
+    const stockClass = isPreventa ? 'preventa' : 'in-stock';
+    const stockText = isPreventa ? '🕐 Preventa' : '✅ En Stock';
+    const nombre = p.producto.length > 55 ? p.producto.slice(0, 52) + '…' : p.producto;
+    const marca = (p.marca || 'Genéricos').toUpperCase();
     return `
       <div class="card">
         <div class="img-wrap">
-          <img src="${imgUrl}" alt="${nombre}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><rect width=%22200%22 height=%22200%22 fill=%22%23222%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23555%22 font-size=%2240%22>🐾</text></svg>'"/>
+          <img src="${imgUrl}" alt="${nombre}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><rect width=%22200%22 height=%22200%22 fill=%22%23f5f5f7%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2240%22>🐾</text></svg>'"/>
         </div>
         <div class="info">
-          <div class="brand">${p.marca}</div>
+          <div class="brand">${marca}</div>
           <div class="name">${nombre}</div>
-          <div class="price">${fmt(p.precio_pesos)}</div>
-          <div class="stock">${stock}</div>
+          <div class="price-stock-row">
+            <div class="price">${fmt(p.precio_pesos)}</div>
+            <div class="stock-badge ${stockClass}">${stockText}</div>
+          </div>
         </div>
       </div>`;
   }).join('');
@@ -97,33 +106,34 @@ function buildHTML(products) {
 <head>
 <meta charset="utf-8">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
     width: 1080px;
-    height: 1080px;
-    background: #0e0f14;
-    font-family: 'Inter', sans-serif;
+    height: 1920px;
+    background: #0B0D17;
+    font-family: 'Plus Jakarta Sans', sans-serif;
     overflow: hidden;
     display: flex;
     flex-direction: column;
   }
 
-  /* Fondo degradado sutil */
+  /* Fondo degradado moderno */
   body::before {
     content: '';
     position: fixed;
     inset: 0;
     background:
-      radial-gradient(ellipse 60% 40% at 20% 10%, rgba(58,108,240,.18) 0%, transparent 70%),
-      radial-gradient(ellipse 50% 35% at 80% 90%, rgba(240,165,0,.12) 0%, transparent 70%);
+      radial-gradient(circle at 10% 15%, rgba(90, 120, 250, 0.16) 0%, transparent 60%),
+      radial-gradient(circle at 90% 85%, rgba(180, 80, 250, 0.14) 0%, transparent 60%),
+      radial-gradient(circle at 50% 50%, rgba(58, 108, 240, 0.04) 0%, transparent 70%);
     pointer-events: none;
   }
 
   .header {
-    padding: 36px 48px 20px;
+    padding: 70px 64px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -133,37 +143,62 @@ function buildHTML(products) {
   .logo {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 18px;
   }
 
   .logo-icon {
-    width: 52px; height: 52px;
-    background: #3a6cf0;
-    border-radius: 14px;
+    width: 68px; height: 68px;
+    background: linear-gradient(135deg, #3a6cf0 0%, #5f86f7 100%);
+    border-radius: 20px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 28px;
+    font-size: 36px;
+    box-shadow: 0 8px 24px rgba(58, 108, 240, 0.3);
   }
 
   .logo-text h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: 22px; font-weight: 800;
-    color: #fff; line-height: 1.1;
+    font-family: 'Outfit', sans-serif;
+    font-size: 32px; font-weight: 800;
+    color: #ffffff; line-height: 1.1;
+    letter-spacing: 0.5px;
   }
 
   .logo-text p {
-    font-size: 12px; color: #888; margin-top: 2px;
+    font-size: 15px; color: #8a92b2; margin-top: 3px;
+    font-weight: 500;
   }
 
   .date {
-    font-size: 13px; color: #666;
+    font-size: 16px; color: #7c8ba1;
     text-transform: capitalize;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 18px;
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  .divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, #2a2d3e, transparent);
-    margin: 0 48px;
+  .title-sec {
+    padding: 20px 64px 10px;
+    text-align: center;
     flex-shrink: 0;
+  }
+
+  .title-sec h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    color: #ffffff;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .title-sec p {
+    font-size: 16px;
+    color: #7c8ba1;
+    margin-top: 6px;
   }
 
   .grid {
@@ -171,67 +206,101 @@ function buildHTML(products) {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
-    gap: 20px;
-    padding: 20px 48px;
+    gap: 32px;
+    padding: 30px 64px;
   }
 
   .card {
-    background: #16181f;
-    border: 1px solid #2a2d3e;
-    border-radius: 18px;
+    background: rgba(22, 26, 41, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 32px;
     overflow: hidden;
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 18px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(12px);
   }
 
   .img-wrap {
-    width: 180px;
-    height: 100%;
-    flex-shrink: 0;
-    background: #1e2028;
+    width: 100%;
+    height: 400px;
+    background: #ffffff;
+    border-radius: 22px;
     display: flex; align-items: center; justify-content: center;
+    padding: 24px;
     overflow: hidden;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
   }
 
   .img-wrap img {
-    width: 100%; height: 100%;
-    object-fit: cover;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
   }
 
   .info {
-    flex: 1;
-    padding: 18px 20px;
+    padding: 16px 6px 4px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
   }
 
   .brand {
-    font-size: 10px; font-weight: 700;
-    color: #3a6cf0; text-transform: uppercase;
-    letter-spacing: 1px;
+    font-size: 11px; font-weight: 700;
+    color: #7096ff; text-transform: uppercase;
+    letter-spacing: 1.5px;
   }
 
   .name {
-    font-size: 13px; font-weight: 600;
-    color: #e8eaf0; line-height: 1.35;
+    font-size: 15px; font-weight: 600;
+    color: #e2e8f0; line-height: 1.4;
+    height: 42px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .price-stock-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
   }
 
   .price {
-    font-family: 'Syne', sans-serif;
-    font-size: 20px; font-weight: 800;
-    color: #f0a500; margin-top: 4px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 26px; font-weight: 800;
+    color: #ff9f0a;
   }
 
-  .stock {
-    font-size: 10px; color: #666; margin-top: 2px;
+  .stock-badge {
+    font-size: 11px; font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .stock-badge.in-stock {
+    background: rgba(48, 209, 88, 0.15);
+    color: #30d158;
+    border: 1px solid rgba(48, 209, 88, 0.25);
+  }
+
+  .stock-badge.preventa {
+    background: rgba(255, 159, 10, 0.15);
+    color: #ff9f0a;
+    border: 1px solid rgba(255, 159, 10, 0.25);
   }
 
   .footer {
-    padding: 16px 48px 28px;
+    padding: 20px 64px 70px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
@@ -239,12 +308,19 @@ function buildHTML(products) {
   }
 
   .footer-text {
-    font-size: 13px; color: #555;
+    font-size: 15px; color: #7c8ba1;
+    font-weight: 500;
   }
 
   .footer-cta {
-    font-size: 13px; font-weight: 700;
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px; font-weight: 700;
     color: #3a6cf0;
+    background: rgba(58, 108, 240, 0.1);
+    padding: 8px 24px;
+    border-radius: 20px;
+    border: 1px solid rgba(58, 108, 240, 0.2);
+    letter-spacing: 0.5px;
   }
 </style>
 </head>
@@ -260,12 +336,15 @@ function buildHTML(products) {
     <div class="date">${today}</div>
   </div>
 
-  <div class="divider"></div>
+  <div class="title-sec">
+    <h2>Recomendados de hoy</h2>
+    <p>Los mejores productos seleccionados para tu mascota</p>
+  </div>
 
   <div class="grid">${cards}</div>
 
   <div class="footer">
-    <span class="footer-text">Consultá disponibilidad y precios →</span>
+    <span class="footer-text">Consultá disponibilidad y precios en la web</span>
     <span class="footer-cta">fmz-mza.github.io/Beepexcuyo</span>
   </div>
 </body>
@@ -278,7 +357,7 @@ async function screenshot(html) {
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
   });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1080, height: 1080, deviceScaleFactor: 1 });
+  await page.setViewport({ width: 1080, height: 1920, deviceScaleFactor: 2 });
   await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
   // Esperar que las imágenes carguen
   await page.evaluate(() => {
@@ -338,7 +417,10 @@ async function sendMail(imageBuffer, products) {
   console.log(`Productos en catálogo: ${allProducts.length}`);
 
   // Elegir 4
-  const chosen = pickProducts(allProducts, usedThisMonth);
+  const { chosen, resetHistory } = pickProducts(allProducts, usedThisMonth);
+  if (resetHistory) {
+    console.log('🔄 Se agotaron los productos sin usar. Reseteando ciclo del mes.');
+  }
   console.log('Productos elegidos:', chosen.map(p => `${p.codigo} - ${p.producto}`).join(' | '));
 
   // Generar imagen
@@ -353,7 +435,8 @@ async function sendMail(imageBuffer, products) {
   console.log('✅ Mail enviado');
 
   // Actualizar historial
-  const newUsed = [...usedThisMonth, ...chosen.map(p => String(p.codigo))];
+  const baseUsed = resetHistory ? [] : usedThisMonth;
+  const newUsed = [...baseUsed, ...chosen.map(p => String(p.codigo))];
   used[monthKey] = [...new Set(newUsed)]; // deduplicar por si acaso
 
   // Limpiar meses viejos (guardar solo los últimos 2)
