@@ -2484,8 +2484,9 @@ async function descargarTicketPOSExcel(orderId, ticket){
   const token = localStorage.getItem('admin_token');
   try {
     showToast('⏳ Preparando Excel...');
+    // Traer order_items con JOIN a productos
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=sku,nombre,descripcion,cantidad,precio_unitario,precio_modificado,iva`,
+      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=sku,nombre,cantidad,precio_unitario,precio_modificado,productos!inner(descripcion,iva,marca)`,
       {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
     );
     const items = await res.json();
@@ -2500,26 +2501,31 @@ async function descargarTicketPOSExcel(orderId, ticket){
       });
     }
     
-    const mapped = items.map(i => ({
-      'SKU': i.sku || '',
-      'NOMBRE': i.nombre || '',
-      'DESCRIPCIÓN': i.descripcion || '',
-      'CANTIDAD': i.cantidad || 0,
-      'PRECIO PESOS': i.precio_unitario || 0,
-      'PRECIO MODIFICADO': i.precio_modificado || '',
-      'IVA (%)': i.iva || 0
-    }));
+    const mapped = items.map(i => {
+      const prod = i.productos || {};
+      return {
+        'SKU': i.sku || '',
+        'NOMBRE': i.nombre || '',
+        'DESCRIPCIÓN': prod.descripcion || '',
+        'MARCA': prod.marca || '',
+        'CANTIDAD': i.cantidad || 0,
+        'PRECIO PESOS': i.precio_unitario || 0,
+        'PRECIO MODIFICADO': i.precio_modificado || '',
+        'IVA (%)': prod.iva || 0
+      };
+    });
     
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(mapped);
     ws['!cols'] = [
-      { wch: 12 },
-      { wch: 25 },
-      { wch: 20 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 18 },
-      { wch: 10 }
+      { wch: 12 },  // SKU
+      { wch: 25 },  // NOMBRE
+      { wch: 20 },  // DESCRIPCIÓN
+      { wch: 15 },  // MARCA
+      { wch: 10 },  // CANTIDAD
+      { wch: 15 },  // PRECIO PESOS
+      { wch: 18 },  // PRECIO MODIFICADO
+      { wch: 10 }   // IVA
     ];
     
     XLSX.utils.book_append_sheet(wb, ws, 'VENTA');
@@ -2527,6 +2533,7 @@ async function descargarTicketPOSExcel(orderId, ticket){
     showToast('✅ Excel descargado');
   } catch(e) {
     showToast('❌ Error: ' + e.message);
+    console.error('descargarTicketPOSExcel error:', e);
   }
 }
 
