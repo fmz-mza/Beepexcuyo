@@ -1,0 +1,6 @@
+pandas
+openpyxl
+requests
+supabase
+Pillow
+python-dotenv

@@ -1,0 +1,2425 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="robots" content="noindex,nofollow">
+<title>Beepex Admin</title>
+<link rel="icon" type="image/png" href="https://favicon.im/beepex.com.ar?larger=true">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#0e0f14;
+  --surface:#16171f;
+  --card:#1c1f2a;
+  --border:#2a2d3a;
+  --accent:#4a7cff;
+  --accent2:#f5a623;
+  --red:#ef4444;
+  --green:#22c55e;
+  --muted:#8b90a8;
+  --text:#f0f2ff;
+  --tag-bg:#1e2130;
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;-webkit-tap-highlight-color:transparent;}
+
+/* ── Auth gate ── */
+#authGate{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.auth-box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:32px 28px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px;}
+.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+.auth-logo img{width:32px;height:32px;border-radius:8px;}
+.auth-logo span{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;}
+.auth-title{font-size:15px;font-weight:700;color:var(--muted);}
+.auth-input{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:15px;font-family:inherit;outline:none;transition:border-color .2s;}
+.auth-input:focus{border-color:var(--accent);}
+.auth-btn{width:100%;padding:13px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;}
+.auth-msg{font-size:12px;text-align:center;color:var(--red);min-height:16px;}
+
+/* ── App shell ── */
+#app{display:none;min-height:100vh;flex-direction:column;}
+#app.visible{display:flex;}
+
+/* ── Header ── */
+.admin-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:52px;flex-shrink:0;position:sticky;top:0;z-index:100;}
+.admin-header-left{display:flex;align-items:center;gap:10px;}
+.admin-header-left img{width:28px;height:28px;border-radius:6px;}
+.admin-header-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;}
+.admin-header-badge{font-size:10px;font-weight:700;background:var(--accent);color:#fff;padding:2px 8px;border-radius:20px;}
+@media(max-width:480px){.admin-header-badge{display:none;}.admin-back-btn{display:none;}}
+.admin-header-right{display:flex;align-items:center;gap:10px;}
+.admin-back-btn{font-size:12px;font-weight:700;color:var(--muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:8px;transition:all .15s;}
+.admin-back-btn:hover{color:var(--text);border-color:var(--accent);}
+.admin-signout{font-size:12px;font-weight:700;color:var(--red);background:none;border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;}
+
+/* ── Tabs ── */
+.admin-tabs{display:flex;gap:0;padding:0 4px;border-bottom:1px solid var(--border);background:var(--surface);overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;}
+.admin-tabs::-webkit-scrollbar{display:none;}
+.admin-tab{padding:12px 16px;font-size:13px;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:2.5px solid transparent;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;flex-shrink:0;min-height:44px;}
+.admin-tab:hover{color:var(--text);}
+.admin-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-mora-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:9px;margin-left:5px;animation:pulse-dot 1.5s infinite;}
+
+/* ── Content ── */
+.admin-content{flex:1;padding:16px;max-width:900px;width:100%;margin:0 auto;}
+@media(max-width:600px){.admin-content{padding:12px;}}
+.tab-panel{display:none !important;}
+.tab-panel.active{display:block !important;}
+
+/* ── Section ── */
+.section{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-bottom:16px;overflow:hidden;}
+.section-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.section-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
+.section-body{padding:16px 18px;}
+
+/* ── Stats cards ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;}
+@media(max-width:400px){.stats-grid{grid-template-columns:1fr 1fr;}}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:flex-end;min-height:80px;}
+.stat-value{font-size:15px;font-weight:800;font-family:'Syne',sans-serif;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.stat-label{font-size:11px;color:var(--muted);margin-top:4px;font-weight:600;}
+
+/* ── User list ── */
+.user-list{display:flex;flex-direction:column;gap:8px;}
+.user-row{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border-radius:10px;border:1px solid var(--border);flex-wrap:wrap;}
+.user-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0;}
+.user-info{flex:1;min-width:0;}
+.user-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.user-email{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.user-meta{font-size:10px;color:var(--muted);margin-top:2px;}
+.user-actions{display:flex;gap:6px;flex-shrink:0;}
+.user-btn{font-size:11px;font-weight:700;padding:7px 12px;border-radius:7px;border:none;cursor:pointer;font-family:inherit;transition:all .15s;min-height:34px;}
+.user-btn.approve{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);}
+.user-btn.approve:hover{background:rgba(34,197,94,.25);}
+.user-btn.revoke{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+.user-btn.revoke:hover{background:rgba(239,68,68,.2);}
+.user-badge-status{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;}
+.user-badge-status.pending{background:rgba(245,166,35,.15);color:var(--accent2);}
+.user-badge-status.approved{background:rgba(34,197,94,.12);color:var(--green);}
+.user-badge-status.admin{background:rgba(74,124,255,.15);color:var(--accent);}
+
+/* ── Settings inputs ── */
+.setting-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.setting-row:last-child{border-bottom:none;}
+.setting-label{font-size:13px;font-weight:600;flex:1;}
+.setting-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.setting-input{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;width:180px;transition:border-color .2s;}
+@media(max-width:500px){.setting-input{width:100%;}.setting-row{flex-direction:column;align-items:flex-start;}}
+.setting-input:focus{border-color:var(--accent);}
+.setting-btn{padding:8px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.toggle-wrap{display:flex;align-items:center;gap:8px;}
+.toggle{width:40px;height:22px;background:var(--border);border-radius:11px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;border:none;}
+.toggle.on{background:var(--accent);}
+.toggle::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:3px;left:3px;transition:transform .2s;}
+.toggle.on::after{transform:translateX(18px);}
+
+/* ── Products table ── */
+.prod-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.products-table{width:100%;border-collapse:collapse;font-size:12px;min-width:500px;}
+.products-table th{text-align:left;padding:8px 10px;color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);}
+.products-table td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.04);}
+.products-table tr:last-child td{border-bottom:none;}
+.product-toggle{padding:4px 10px;border-radius:6px;border:none;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;}
+.product-toggle.active{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.2);}
+.product-toggle.inactive{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+.search-products{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;font-family:inherit;outline:none;margin-bottom:12px;}
+.search-products:focus{border-color:var(--accent);}
+
+/* ── Orders table ── */
+.orders-list{display:flex;flex-direction:column;gap:8px;}
+.order-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.order-row-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.order-total{font-size:15px;font-weight:800;color:var(--accent2);}
+.order-meta{font-size:11px;color:var(--muted);}
+.order-items{font-size:11px;color:var(--muted);line-height:1.6;}
+.order-via{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;}
+.order-via.whatsapp{background:rgba(37,211,102,.1);color:#25d366;}
+.order-via.pdf{background:rgba(74,124,255,.1);color:var(--accent);}
+
+/* ── Filter bar ── */
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.filter-btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;min-height:36px;}
+.filter-btn:hover{color:var(--text);border-color:var(--accent);}
+.filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* ── Chart ── */
+.chart-wrap{height:180px;display:flex;align-items:flex-end;gap:6px;padding:12px 0 0;}
+.bar-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;}
+.bar{background:var(--accent);border-radius:4px 4px 0 0;width:100%;min-height:4px;transition:height .4s ease;}
+.bar-label{font-size:9px;color:var(--muted);text-align:center;}
+.bar-val{font-size:9px;font-weight:700;color:var(--accent2);}
+
+/* ── Ranking ── */
+.rank-list{display:flex;flex-direction:column;gap:6px;}
+.rank-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface);border-radius:8px;}
+.rank-pos{font-size:12px;font-weight:800;color:var(--muted);width:20px;flex-shrink:0;}
+.rank-name{flex:1;font-size:12px;font-weight:600;}
+.rank-val{font-size:12px;font-weight:800;color:var(--accent2);}
+.rank-bar-wrap{width:80px;height:4px;background:var(--border);border-radius:2px;flex-shrink:0;}
+.rank-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s;}
+  .abandoned-list{display:flex;flex-direction:column;gap:8px;}
+  .abandoned-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .abandoned-product{font-size:13px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+  .abandoned-sku{font-size:10px;color:var(--muted);font-weight:600;background:var(--tag-bg);padding:2px 6px;border-radius:4px;}
+  .abandoned-users{display:flex;flex-direction:column;gap:4px;}
+  .abandoned-user{display:flex;align-items:center;justify-content:space-between;font-size:11px;padding:4px 8px;background:var(--card);border-radius:6px;}
+  .abandoned-user-name{font-weight:600;color:var(--text);}
+  .abandoned-user-time{color:var(--muted);}
+
+@media(max-width:600px){
+  .two-col{grid-template-columns:1fr !important;}
+  .heatmap{grid-template-columns:repeat(12,1fr);}
+  .heat-labels{grid-template-columns:repeat(12,1fr);}
+}
+/* ── Heatmap ── */
+.heatmap{display:grid;grid-template-columns:repeat(24,1fr);gap:3px;padding:8px 0;}
+.heat-cell{aspect-ratio:1;border-radius:3px;background:var(--border);}
+.heat-labels{display:grid;grid-template-columns:repeat(24,1fr);gap:3px;}
+.heat-label{font-size:8px;color:var(--muted);text-align:center;}
+
+/* ── Empty & loading ── */
+.empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;}
+.loading{text-align:center;padding:30px;color:var(--muted);font-size:13px;}
+
+/* ── Cta Cte ── */
+.ctacte-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;}
+@media(max-width:560px){.ctacte-grid{grid-template-columns:1fr;}}
+.client-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:border-color .15s;}
+.client-card:hover{border-color:var(--accent);}
+.client-card.mora{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.04);}
+.client-card-name{font-size:14px;font-weight:800;margin-bottom:4px;}
+.client-card-tel{font-size:11px;color:var(--muted);margin-bottom:8px;}
+.client-card-saldo{font-size:18px;font-weight:800;}
+.client-card-saldo.deuda{color:var(--red);}
+.client-card-saldo.cero{color:var(--green);}
+.client-card-meta{font-size:11px;color:var(--muted);margin-top:4px;}
+.client-card-mora-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);margin-top:6px;}
+
+/* Modal cta cte */
+.ctacte-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:flex-end;justify-content:center;overflow-y:auto;}
+.ctacte-modal-bg.open{display:flex;}
+.ctacte-modal{background:var(--surface);border:1px solid var(--border);border-radius:16px 16px 0 0;width:100%;max-width:560px;display:flex;flex-direction:column;gap:0;animation:sheetUp .25s cubic-bezier(.34,1.56,.64,1);max-height:90vh;overflow-y:auto;}
+@media(min-width:600px){
+  .ctacte-modal-bg{align-items:center;padding:20px;}
+  .ctacte-modal{border-radius:16px;margin:auto;max-height:85vh;}
+}
+@keyframes sheetUp{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.ctacte-modal-hdr{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.ctacte-modal-title{font-size:16px;font-weight:800;}
+.ctacte-modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 6px;}
+.ctacte-modal-close:hover{color:var(--text);}
+.ctacte-modal-body{padding:16px 20px;display:flex;flex-direction:column;gap:14px;}
+.ctacte-saldo-box{background:var(--card);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;}
+.ctacte-saldo-label{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.ctacte-saldo-val{font-size:22px;font-weight:800;}
+.ctacte-saldo-val.deuda{color:var(--red);}
+.ctacte-saldo-val.cero{color:var(--green);}
+
+/* Movimientos */
+.mov-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;}
+.mov-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--card);border-radius:8px;font-size:12px;}
+.mov-icon{font-size:16px;flex-shrink:0;}
+.mov-ref{flex:1;min-width:0;}
+.mov-ref-main{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mov-ref-date{font-size:10px;color:var(--muted);}
+.mov-amount{font-weight:800;flex-shrink:0;}
+.mov-amount.venta{color:var(--red);}
+.mov-amount.pago{color:var(--green);}
+
+/* Registrar pago */
+.pago-form{background:var(--card);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;}
+.pago-form-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.pago-row{display:flex;gap:8px;flex-wrap:wrap;}
+@media(max-width:480px){.pago-row{flex-direction:column;}.pago-btn{width:100%;}}
+.pago-inp{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;color:var(--text);font-family:inherit;outline:none;transition:border .2s;}
+.pago-inp:focus{border-color:var(--accent);}
+.pago-sel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13px;font-weight:600;color:var(--text);font-family:inherit;outline:none;cursor:pointer;}
+.pago-btn{background:var(--accent);border:none;border-radius:8px;color:#000;font-size:13px;font-weight:800;padding:9px 18px;cursor:pointer;transition:opacity .15s;white-space:nowrap;}
+.pago-btn:hover{opacity:.85;}
+.pago-btn:disabled{opacity:.4;cursor:not-allowed;}
+.pago-nota{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;resize:none;}
+.pago-nota:focus{border-color:var(--accent);}
+
+/* Ordenes pendientes */
+.orders-pending{display:flex;flex-direction:column;gap:6px;}
+.order-pending-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--card);border-radius:8px;font-size:12px;}
+.order-pending-chk{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);}
+.order-pending-info{flex:1;min-width:0;}
+.order-pending-ticket{font-weight:700;}
+.order-pending-date{font-size:10px;color:var(--muted);}
+.order-pending-total{font-weight:800;color:var(--red);flex-shrink:0;}
+
+/* Búsqueda clientes */
+.client-search-wrap{position:relative;margin-bottom:12px;}
+.client-search-inp{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);font-family:inherit;outline:none;transition:border .2s;}
+.client-search-inp:focus{border-color:var(--accent);}
+.ctacte-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+@media(max-width:360px){.ctacte-summary{grid-template-columns:1fr 1fr;}.ctacte-summary .ctacte-kpi:last-child{grid-column:1/-1;}}
+.ctacte-kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;}
+.ctacte-kpi-val{font-size:20px;font-weight:800;margin-bottom:2px;}
+.ctacte-kpi-lbl{font-size:11px;color:var(--muted);}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:999;pointer-events:none;opacity:0;transition:opacity .3s;}
+.toast.show{opacity:1;}
+.online-dot{width:8px;height:8px;background:var(--green);border-radius:50%;display:inline-block;animation:pulse-dot 1.5s infinite;}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(1.3);}}
+.back-top{position:fixed;bottom:max(24px,env(safe-area-inset-bottom));right:16px;width:44px;height:44px;background:rgba(28,31,42,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.07) !important;border-radius:50%;color:rgba(240,242,255,.6);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:150;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .25s,transform .25s;}
+.back-top.visible{opacity:1;pointer-events:auto;transform:translateY(0);}
+.back-top:active{transform:scale(.88);}
+</style>
+</head>
+<body>
+
+<!-- Auth gate -->
+<div id="authGate">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <img src="https://favicon.im/beepex.com.ar?larger=true" alt="Beepex" onerror="this.style.display='none'">
+      <span>Beepex Admin</span>
+    </div>
+    <div class="auth-title">Acceso restringido</div>
+    <input class="auth-input" id="loginEmail" type="email" placeholder="Email" autocomplete="email">
+    <input class="auth-input" id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="auth-msg" id="loginMsg"></div>
+    <button class="auth-btn" onclick="doLogin()">Ingresar</button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <header class="admin-header">
+    <div class="admin-header-left">
+      <img src="https://favicon.im/beepex.com.ar?larger=true" alt="Beepex" onerror="this.style.display='none'">
+      <span class="admin-header-title">Beepex Admin</span>
+      <span class="admin-header-badge">⚙️ Admin</span>
+    </div>
+    <div class="admin-header-right">
+      <a class="admin-back-btn" href="beepex-cuyo.html">← Catálogo</a>
+      <button class="admin-signout" onclick="doSignOut()">Salir</button>
+    </div>
+  </header>
+
+  <div class="admin-tabs" id="adminTabs">
+    <button class="admin-tab active" onclick="switchTab('usuarios',this)">👥 Usuarios</button>
+    <button class="admin-tab" onclick="switchTab('catalogo',this)">📦 Catálogo</button>
+    <button class="admin-tab" onclick="switchTab('productos',this)">🗂️ Productos</button>
+    <button class="admin-tab" onclick="switchTab('estadisticas',this)">📊 Estadísticas</button>
+    <button class="admin-tab" id="tab-btn-ctacte" onclick="switchTab('ctacte',this)">💰 Cta Cte<span class="tab-mora-badge" id="moraBadgeTab" style="display:none"></span></button>
+  </div>
+
+  <div class="admin-content">
+
+    <!-- TAB USUARIOS -->
+    <div class="tab-panel active" id="tab-usuarios" style="display:block">
+      <div class="stats-grid" id="userStats"></div>
+
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title" style="display:flex;align-items:center;gap:8px;">
+            <span class="online-dot"></span> Usuarios en línea
+          </span>
+          <span id="onlineCount" style="font-size:12px;color:var(--green);font-weight:700;"></span>
+        </div>
+        <div class="section-body">
+          <div class="user-list" id="onlineList"><div class="loading">Cargando...</div></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">⏳ Pendientes de aprobación</span>
+          <span id="pendingCount" style="font-size:12px;color:var(--accent2);font-weight:700;"></span>
+        </div>
+        <div class="section-body">
+          <div class="user-list" id="pendingList"><div class="loading">Cargando...</div></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">✅ Usuarios aprobados</span>
+          <span id="approvedCount" style="font-size:12px;color:var(--green);font-weight:700;"></span>
+        </div>
+        <div class="section-body">
+          <div class="user-list" id="approvedList"><div class="loading">Cargando...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB CATÁLOGO -->
+    <div class="tab-panel" id="tab-catalogo">
+      <div class="section">
+        <div class="section-header"><span class="section-title">⚙️ Configuración general</span></div>
+        <div class="section-body">
+          <div class="setting-row">
+            <div><div class="setting-label">Mes del catálogo</div><div class="setting-sub">Se muestra en el header y en el PDF</div></div>
+            <input class="setting-input" id="settingMonth" placeholder="Ej: Abril 2026">
+            <button class="setting-btn" onclick="saveSetting('catalog_month','settingMonth')">Guardar</button>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Mensaje de bienvenida</div><div class="setting-sub">Texto en la pantalla de bienvenida</div></div>
+            <input class="setting-input" id="settingWelcome" placeholder="Bienvenido al catálogo">
+            <button class="setting-btn" onclick="saveSetting('welcome_message','settingWelcome')">Guardar</button>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">WhatsApp vendedor</div><div class="setting-sub">Número para alertas de mora (ej: 5492615551234)</div></div>
+            <input class="setting-input" id="settingWAVendedor" placeholder="5492615551234">
+            <button class="setting-btn" onclick="saveSetting('pos_whatsapp_vendedor','settingWAVendedor')">Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header"><span class="section-title">📢 Banner temporal</span></div>
+        <div class="section-body">
+          <div class="setting-row">
+            <div><div class="setting-label">Texto del banner</div><div class="setting-sub">Visible en la parte superior del catálogo</div></div>
+            <input class="setting-input" id="settingBanner" placeholder="Ej: Cierre de lista viernes 14hs">
+            <button class="setting-btn" onclick="saveSetting('banner_text','settingBanner')">Guardar</button>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Banner activo</div><div class="setting-sub">Mostrar u ocultar el banner</div></div>
+            <div class="toggle-wrap">
+              <button class="toggle" id="bannerToggle" onclick="toggleBanner()"></button>
+              <span id="bannerToggleLabel" style="font-size:12px;color:var(--muted);">Inactivo</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Margen de ganancia</div><div class="setting-sub">Mostrar u ocultar el margen en el modal +info</div></div>
+            <div class="toggle-wrap">
+              <button class="toggle" id="margenToggle" onclick="toggleMargen()"></button>
+              <span id="margenToggleLabel" style="font-size:12px;color:var(--muted);">Inactivo</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Mostrar productos NOSTOCK</div><div class="setting-sub">Por defecto ocultos en el catálogo mayorista</div></div>
+            <div class="toggle-wrap">
+              <button class="toggle" id="nostockToggle" onclick="toggleNostock()"></button>
+              <span id="nostockToggleLabel" style="font-size:12px;color:var(--muted);">Oculto</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">🔌 Productos activos/inactivos</span>
+          <span id="disabledCount" style="font-size:12px;color:var(--red);font-weight:700;"></span>
+        </div>
+        <div class="section-body">
+          <input class="search-products" id="searchProducts" placeholder="🔍 Buscar por nombre o SKU..." oninput="filterProducts()">
+          <div id="productsList"><div class="loading">Cargando...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB PRODUCTOS -->
+    <div class="tab-panel" id="tab-productos">
+      <div class="section">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+          <h3 style="margin:0;font-size:15px;">🗂️ Gestión de Productos</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-sm" onclick="downloadProductsExcel()">⬇️ Descargar Excel</button>
+            <button class="btn-sm" style="background:var(--accent2);color:#fff;" onclick="downloadExcelClientes()">💎 Excel Clientes (Fotos)</button>
+            <label class="btn-sm" style="cursor:pointer;">
+              ⬆️ Subir Excel
+              <input type="file" id="excelUploadInput" accept=".xlsx,.xls" style="display:none;">
+            </label>
+          </div>
+        </div>
+
+        <!-- Stats rápidas -->
+        <div id="prodStats" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>
+
+        <!-- Buscador -->
+        <input type="text" id="prodSearch" placeholder="🔍 Buscar por nombre o SKU..."
+          style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box;margin-bottom:12px;"
+          oninput="filterProdTable()">
+
+        <!-- Tabla -->
+        <div style="overflow-x:auto;">
+          <div class="prod-table-wrap"><table id="prodTable" style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;">
+            <thead>
+              <tr style="border-bottom:2px solid var(--border);text-align:left;">
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;">SKU</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;">Nombre</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;">Marca</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;text-align:right;">Precio</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;text-align:right;">PVP</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;text-align:center;">IVA%</th>
+                <th style="padding:8px 6px;color:var(--muted);font-weight:600;text-align:center;">Stock</th>
+              </tr>
+            </thead>
+            <tbody id="prodTableBody">
+              <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </div>
+
+      <!-- Modal preview de Excel -->
+      <div id="excelPreviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;overflow-y:auto;padding:20px;">
+        <div style="max-width:800px;margin:0 auto;background:var(--surface);border-radius:14px;padding:24px;">
+          <h3 style="margin:0 0 16px;font-size:16px;">📋 Preview de cambios</h3>
+          <div id="excelPreviewContent"></div>
+          <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+            <button class="btn-sm" onclick="document.getElementById('excelPreviewModal').style.display='none'">Cancelar</button>
+            <button class="btn-sm" style="background:var(--accent);color:#fff;" onclick="confirmExcelImport()">✅ Confirmar importación</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB ESTADÍSTICAS -->
+    <div class="tab-panel" id="tab-estadisticas">
+      <div class="filter-bar" id="periodFilter">
+        <button class="filter-btn active" onclick="setPeriod('today',this)">Hoy</button>
+        <button class="filter-btn" onclick="setPeriod('week',this)">Semana</button>
+        <button class="filter-btn" onclick="setPeriod('month',this)">Mes</button>
+        <button class="filter-btn" onclick="setPeriod('year',this)">Año</button>
+        <button class="filter-btn" onclick="setPeriod('all',this)">Todo</button>
+      </div>
+
+      <div id="statsDiag" style="font-size:11px;color:var(--muted);padding:4px 0 8px;font-family:monospace;display:none;"></div>
+      <div class="stats-grid" id="statsCards"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;" class="two-col">
+        <div class="section">
+          <div class="section-header"><span class="section-title">🏆 Más pedidos</span></div>
+          <div class="section-body"><div class="rank-list" id="topOrdered"></div></div>
+        </div>
+        <div class="section">
+          <div class="section-header"><span class="section-title">👁 Más vistos</span></div>
+          <div class="section-body"><div class="rank-list" id="topViewed"></div></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;" class="two-col">
+        <div class="section">
+          <div class="section-header"><span class="section-title">👤 Usuarios activos</span></div>
+          <div class="section-body"><div class="rank-list" id="topUsers"></div></div>
+        </div>
+        <div class="section">
+          <div class="section-header"><span class="section-title">🛒 En carrito, sin pedir</span></div>
+          <div class="section-body"><div class="rank-list" id="cartAbandoned"></div></div>
+        </div>
+      </div>
+
+      <div class="section" style="margin-bottom:16px;">
+        <div class="section-header"><span class="section-title">📈 Evolución mensual</span></div>
+        <div class="section-body"><div class="chart-wrap" id="monthlyChart"></div></div>
+      </div>
+
+      <div class="section" style="margin-bottom:16px;">
+        <div class="section-header"><span class="section-title">🕐 Actividad por hora</span></div>
+        <div class="section-body">
+          <div class="heatmap" id="heatmap"></div>
+          <div class="heat-labels" id="heatLabels"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">📋 Todos los pedidos</span>
+          <span id="ordersCount" style="font-size:12px;color:var(--muted);font-weight:700;"></span>
+        </div>
+        <div class="section-body">
+          <div class="orders-list" id="allOrders"><div class="loading">Cargando...</div></div>
+        </div>
+      </div>
+
+      <!-- KPIs POS -->
+      <div class="section" style="margin-top:16px;">
+        <div class="section-header"><span class="section-title">🏪 Ventas POS</span></div>
+        <div class="section-body">
+          <div class="stats-grid" id="posStatsCards" style="margin-bottom:12px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;" class="two-col">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🏆 Top clientes</div>
+              <div class="rank-list" id="posTopClientes"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">📋 Últimas ventas POS</div>
+              <div id="posUltimasVentas"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB CTA CTE -->
+    <div class="tab-panel" id="tab-ctacte">
+      <!-- Alertas mora -->
+      <div id="moraAlertBar" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:12px 16px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--red);">⚠️ Clientes en mora: <span id="moraCount">0</span></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Deuda vencida hace más de 30 días</div>
+        </div>
+        <button class="setting-btn" style="background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);" onclick="generarAlertasMora()">🔔 Enviar alertas WA</button>
+      </div>
+
+      <!-- KPIs resumen -->
+      <div class="ctacte-summary" id="ctacteSummary">
+        <div class="ctacte-kpi"><div class="ctacte-kpi-val" id="kpiDeudaTotal" style="color:var(--red)">-</div><div class="ctacte-kpi-lbl">Deuda total</div></div>
+        <div class="ctacte-kpi"><div class="ctacte-kpi-val" id="kpiClientesMora" style="color:var(--accent2)">-</div><div class="ctacte-kpi-lbl">En mora</div></div>
+        <div class="ctacte-kpi"><div class="ctacte-kpi-val" id="kpiPagosHoy" style="color:var(--green)">-</div><div class="ctacte-kpi-lbl">Cobrado hoy</div></div>
+      </div>
+
+      <!-- Búsqueda -->
+      <div class="client-search-wrap">
+        <input class="client-search-inp" id="clientSearchInp" type="text"
+          placeholder="Buscar cliente por nombre o teléfono..."
+          oninput="filterClients()">
+      </div>
+
+      <!-- Grid de clientes -->
+      <div class="ctacte-grid" id="ctacteGrid">
+        <div class="loading">Cargando clientes...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal Cta Cte por cliente -->
+<div class="ctacte-modal-bg" id="ctacteModalBg" onclick="if(event.target===this)closeCtaCteModal()">
+  <div class="ctacte-modal" id="ctacteModal">
+    <div class="ctacte-modal-hdr">
+      <div class="ctacte-modal-title" id="ctacteModalTitle">Cuenta Corriente</div>
+      <button class="ctacte-modal-close" onclick="closeCtaCteModal()">✕</button>
+    </div>
+    <div class="ctacte-modal-body">
+      <!-- Saldo -->
+      <div class="ctacte-saldo-box">
+        <div>
+          <div class="ctacte-saldo-label">Saldo actual</div>
+          <div class="ctacte-saldo-val" id="ctacteModalSaldo">$0</div>
+        </div>
+        <div style="text-align:right">
+          <div class="ctacte-saldo-label">Último pago</div>
+          <div style="font-size:13px;font-weight:600;color:var(--muted)" id="ctacteModalUltPago">—</div>
+        </div>
+      </div>
+
+      <!-- Registrar pago -->
+      <div class="pago-form" id="pagoForm">
+        <div class="pago-form-title">💳 Registrar pago</div>
+        <div class="pago-row">
+          <input class="pago-inp" id="pagoMonto" type="number" placeholder="Monto $" min="0" inputmode="numeric">
+          <select class="pago-sel" id="pagoTipo">
+            <option value="efectivo">💵 Efectivo</option>
+            <option value="transferencia">📲 Transfer.</option>
+            <option value="cta_cte">📒 Cta Cte</option>
+          </select>
+          <button class="pago-btn" id="pagoBtn" onclick="registrarPago()">Registrar</button>
+        </div>
+        <textarea class="pago-nota" id="pagoNota" rows="2" placeholder="Nota (opcional)"></textarea>
+
+        <!-- Imputar a órdenes específicas -->
+        <div id="ordenesSection" style="display:none">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
+            Imputar a órdenes (opcional)
+          </div>
+          <div class="orders-pending" id="ordenesPendientes"></div>
+        </div>
+      </div>
+
+      <!-- Movimientos -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+          Movimientos
+        </div>
+        <div class="mov-list" id="movList">
+          <div class="loading">Cargando...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<button class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+<script>
+const SUPABASE_URL='https://mmerrzniuxbrjryhcsda.supabase.co';
+const SUPABASE_ANON='sb_publishable_oJzr70DjfOZsK4mjFX5rRw_5hc03thM';
+
+let currentUser=null;
+let isAdmin=false;
+let activePeriod='today';
+let allOrdersData={orders:[],views:[],cartEvts:[],profiles:[]};
+let allUsersData=[];
+
+// ── Formato ──
+function fmt(n){ return new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0); }
+function fmtDate(d){ return new Date(d).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+function fmtDateTime(d){ return new Date(d).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+
+function showToast(msg,dur=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),dur);
+}
+
+// ── Auth ──
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pwd=document.getElementById('loginPassword').value;
+  const msg=document.getElementById('loginMsg');
+  if(!email||!pwd){ msg.textContent='Completá los campos'; return; }
+  msg.textContent='Verificando...'; msg.style.color='var(--muted)';
+  try{
+    const res=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},
+      body:JSON.stringify({email,password:pwd})
+    });
+    const data=await res.json();
+    if(!res.ok){ msg.textContent=data.error_description||'Email o contraseña incorrectos'; msg.style.color='var(--red)'; return; }
+    localStorage.setItem('admin_token', data.access_token);
+    localStorage.setItem('admin_refresh', data.refresh_token);
+    currentUser=data.user;
+    await checkAdminAccess();
+  } catch(e){ msg.textContent='Error de conexión'; msg.style.color='var(--red)'; }
+}
+
+async function checkAdminAccess(){
+  const token=localStorage.getItem('admin_token');
+  if(!token||!currentUser) return;
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}&select=is_admin,nombre`,{
+    headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+  });
+  const rows=await res.json();
+  const profile=Array.isArray(rows)?rows[0]:null;
+  if(!profile?.is_admin){
+    document.getElementById('loginMsg').textContent='No tenés acceso al panel admin';
+    document.getElementById('loginMsg').style.color='var(--red)';
+    localStorage.removeItem('admin_token');
+    return;
+  }
+  isAdmin=true;
+  document.getElementById('authGate').style.display='none';
+  document.getElementById('app').classList.add('visible');
+  loadAll();
+}
+
+async function restoreSession(){
+  const token=localStorage.getItem('admin_token');
+  if(!token) return;
+  try{
+    const payload=JSON.parse(atob(token.split('.')[1]));
+    const expiresIn=(payload.exp*1000)-Date.now();
+    if(expiresIn > 0){
+      currentUser={id:payload.sub, email:payload.email};
+      if(expiresIn < 10*60*1000) await refreshSession();
+      await checkAdminAccess();
+    } else {
+      // Token expirado — intentar refresh
+      const ok=await refreshSession();
+      if(ok){
+        const newToken=localStorage.getItem('admin_token');
+        const newPayload=JSON.parse(atob(newToken.split('.')[1]));
+        currentUser={id:newPayload.sub, email:newPayload.email};
+        await checkAdminAccess();
+      } else {
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_refresh');
+      }
+    }
+  } catch(e){ localStorage.removeItem('admin_token'); }
+}
+
+function doSignOut(){
+  localStorage.removeItem('admin_token');
+  localStorage.removeItem('admin_refresh');
+  currentUser=null; isAdmin=false;
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('authGate').style.display='flex';
+}
+
+// ── API helper ──
+async function api(path, opts={}){
+  const token=localStorage.getItem('admin_token');
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{
+    ...opts,
+    headers:{
+      'apikey':SUPABASE_ANON,
+      'Authorization':`Bearer ${token}`,
+      'Content-Type':'application/json',
+      ...(opts.headers||{})
+    }
+  });
+  if(opts.method && opts.method!=='GET') return res;
+  return res.json();
+}
+
+// ── Tabs ──
+function switchTab(tab, el){
+  // Acotar SOLO a los tab-panel dentro de admin-content
+  const content = document.querySelector('.admin-content');
+  if(!content) return;
+  content.querySelectorAll(':scope > .tab-panel').forEach(p=>{
+    p.classList.remove('active');
+    p.style.display = 'none';
+  });
+  document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
+
+  const panel = document.getElementById('tab-'+tab);
+  if(panel){
+    panel.classList.add('active');
+    panel.style.display = 'block';
+  }
+
+  const btn = el || [...document.querySelectorAll('.admin-tab')].find(b=>{
+    const oc = b.getAttribute('onclick')||'';
+    return oc.includes("'"+tab+"'");
+  });
+  if(btn) btn.classList.add('active');
+
+  if(tab==='productos')    loadProdTable();
+  if(tab==='ctacte'){ loadCtaCte(); checkMoraBadge(); }
+  if(tab==='estadisticas'){
+    if(allOrdersData && allOrdersData.orders && allOrdersData.orders.length > 0){
+      renderStats();
+    } else {
+      loadStats();
+    }
+  }
+}
+
+// ── CTA CTE ─────────────────────────────────────────────────────────────────
+let allClientsData = [];
+let activeClientId = null;
+
+async function loadCtaCte(){
+  const grid = document.getElementById('ctacteGrid');
+  grid.innerHTML = '<div class="loading">Cargando clientes...</div>';
+
+  const token = localStorage.getItem('admin_token');
+  if(!token){ grid.innerHTML='<div class="empty">Sin sesión activa</div>'; return; }
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?select=*&order=nombre`, {
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    const data = await res.json();
+    // Mostrar respuesta cruda si hay error de API
+    if(!Array.isArray(data)){
+      grid.innerHTML='<div class="empty">Error API: '+(data.message||data.error||JSON.stringify(data).slice(0,120))+'</div>';
+      return;
+    }
+    allClientsData = data;
+
+    if(!allClientsData.length){
+      grid.innerHTML='<div class="empty">No hay clientes registrados aún.<br><small style="color:var(--muted)">Creá clientes desde el POS.</small></div>';
+      document.getElementById('kpiDeudaTotal').textContent = fmt(0);
+      document.getElementById('kpiClientesMora').textContent = '0';
+      document.getElementById('kpiPagosHoy').textContent = fmt(0);
+      return;
+    }
+
+    await enrichClientSaldos();
+    renderCtaCteGrid(allClientsData);
+    renderCtaCteKPIs();
+  } catch(err) {
+    grid.innerHTML = '<div class="empty">Error al cargar clientes: '+(err.message||err)+'</div>';
+  }
+}
+
+async function enrichClientSaldos(){
+  const token = localStorage.getItem('admin_token');
+  // Traer saldos desde account_movements (vista materializada)
+  let movs = [];
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/account_movements?select=client_id,monto`, {
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    const data = await res.json();
+    movs = Array.isArray(data) ? data : [];
+  } catch(e) { movs = []; }
+  if(!movs.length) {
+    // Si la vista no tiene datos, saldos quedan en 0
+    allClientsData = allClientsData.map(c=>({...c, saldo:0, ultimo_pago:null}));
+  }
+  if(!Array.isArray(movs) || !movs.length) {
+    // Sin movimientos — todos los saldos en 0, continuar
+    allClientsData = allClientsData.map(c=>({...c, saldo: c.saldo||0, ultimo_pago: c.ultimo_pago||null}));
+    return;
+  }
+
+  // Agrupar por client_id
+  const saldos = {};
+  movs.forEach(m => {
+    saldos[m.client_id] = (saldos[m.client_id] || 0) + (m.monto || 0);
+  });
+
+  // Traer último pago por cliente
+  const [pagosRes, ordersRes] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/payments?select=client_id,fecha&order=fecha.desc`, {
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    }),
+    fetch(`${SUPABASE_URL}/rest/v1/pos_orders?select=client_id,fecha&estado=eq.cerrada&order=fecha.asc`, {
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    })
+  ]);
+  const pagos = await pagosRes.json();
+  const orders = await ordersRes.json();
+
+  const ultimoPago = {};
+  if(Array.isArray(pagos)){
+    pagos.forEach(p => { if(!ultimoPago[p.client_id]) ultimoPago[p.client_id] = p.fecha; });
+  }
+  // Primera venta cerrada por cliente (para calcular mora cuando no hay pagos)
+  const primeraVenta = {};
+  if(Array.isArray(orders)){
+    orders.forEach(o => { if(!primeraVenta[o.client_id]) primeraVenta[o.client_id] = o.fecha; });
+  }
+
+  allClientsData = allClientsData.map(c => ({
+    ...c,
+    saldo: saldos[c.id] || 0,
+    ultimo_pago: ultimoPago[c.id] || null,
+    primera_venta: primeraVenta[c.id] || null
+  }));
+}
+
+// Helper: calcular si un cliente está en mora
+// Usa ultimo_pago si existe, sino primera_venta como referencia
+function calcMora(cliente, diasLimite=30){
+  const ahora = new Date();
+  const saldo = cliente.saldo || 0;
+  if(saldo <= 0) return {mora:false, dias:0};
+  const ref = cliente.ultimo_pago
+    ? new Date(cliente.ultimo_pago)
+    : (cliente.primera_venta ? new Date(cliente.primera_venta) : null);
+  if(!ref) return {mora:false, dias:0}; // sin venta ni pago → no es mora aún
+  const dias = Math.floor((ahora - ref) / (1000*60*60*24));
+  return {mora: dias > diasLimite, dias};
+}
+
+function renderCtaCteKPIs(){
+  const deudaTotal = allClientsData.reduce((s,c)=>s+(c.saldo>0?c.saldo:0),0);
+  const ahora = new Date();
+  const enMora = allClientsData.filter(c => calcMora(c, 30).mora).length;
+
+  document.getElementById('kpiDeudaTotal').textContent = fmt(deudaTotal);
+  document.getElementById('kpiClientesMora').textContent = enMora;
+
+  // Cobrado hoy
+  const token = localStorage.getItem('admin_token');
+  const hoy = new Date().toISOString().slice(0,10);
+  fetch(`${SUPABASE_URL}/rest/v1/payments?fecha=gte.${hoy}T00:00:00&select=monto`, {
+    headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+  }).then(r=>r.json()).then(data=>{
+    const total = Array.isArray(data) ? data.reduce((s,p)=>s+p.monto,0) : 0;
+    document.getElementById('kpiPagosHoy').textContent = fmt(total);
+  }).catch(()=>{});
+}
+
+function renderCtaCteGrid(clients){
+  const grid = document.getElementById('ctacteGrid');
+  if(!clients.length){
+    grid.innerHTML='<div class="empty">No hay clientes registrados aún.<br>Creá clientes desde el POS.</div>';
+    return;
+  }
+  const ahora = new Date();
+  grid.innerHTML = clients.map(c=>{
+    const saldo = c.saldo || 0;
+    const {mora, dias: diasSinPago} = calcMora(c, 30);
+    return `
+      <div class="client-card${mora?' mora':''}" onclick="openCtaCteModal('${c.id}')">
+        <div class="client-card-name">${c.nombre}</div>
+        <div class="client-card-tel">${c.telefono||c.email||'Sin contacto'}</div>
+        <div class="client-card-saldo ${saldo>0?'deuda':'cero'}">${fmt(Math.abs(saldo))}</div>
+        <div class="client-card-meta">
+          ${saldo>0?'Debe':'Sin deuda'}
+          ${c.ultimo_pago?' · Últ. pago: '+fmtDate(c.ultimo_pago):''}
+          ${c.limite_credito?` · Límite: ${fmt(c.limite_credito)}`:''}
+        </div>
+        ${mora?`<div class="client-card-mora-badge">⚠️ Mora ${diasSinPago>0?'+'+diasSinPago+' días':'+30 días'}</div>`:''}
+      </div>`;
+  }).join('');
+}
+
+function filterClients(){
+  const q = document.getElementById('clientSearchInp').value.toLowerCase().trim();
+  const filtered = q
+    ? allClientsData.filter(c =>
+        c.nombre.toLowerCase().includes(q) ||
+        (c.telefono||'').includes(q) ||
+        (c.email||'').toLowerCase().includes(q))
+    : allClientsData;
+  renderCtaCteGrid(filtered);
+}
+
+async function openCtaCteModal(clientId){
+  activeClientId = clientId;
+  const client = allClientsData.find(c=>c.id===clientId);
+  if(!client) return;
+
+  document.getElementById('ctacteModalTitle').textContent = client.nombre;
+  document.getElementById('ctacteModalBg').classList.add('open');
+
+  const saldo = client.saldo || 0;
+  const saldoEl = document.getElementById('ctacteModalSaldo');
+  saldoEl.textContent = fmt(Math.abs(saldo));
+  saldoEl.className = 'ctacte-saldo-val ' + (saldo>0?'deuda':'cero');
+
+  document.getElementById('ctacteModalUltPago').textContent =
+    client.ultimo_pago ? fmtDate(client.ultimo_pago) : 'Sin pagos';
+
+  // Limpiar form pago
+  document.getElementById('pagoMonto').value = saldo > 0 ? Math.round(saldo) : '';
+  document.getElementById('pagoNota').value = '';
+
+  // Cargar movimientos y órdenes pendientes en paralelo
+  await Promise.all([loadMovimientos(clientId), loadOrdenesPendientes(clientId)]);
+}
+
+async function loadMovimientos(clientId){
+  const token = localStorage.getItem('admin_token');
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/account_movements?client_id=eq.${clientId}&order=fecha.desc&limit=50`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+  );
+  const movs = await res.json();
+  const list = document.getElementById('movList');
+  if(!Array.isArray(movs)||!movs.length){
+    list.innerHTML='<div class="empty">Sin movimientos registrados</div>';
+    return;
+  }
+  list.innerHTML = movs.map(m=>{
+    const esVenta = m.tipo==='venta';
+    const monto = Math.abs(m.monto);
+    return `
+      <div class="mov-row">
+        <div class="mov-icon">${esVenta?'🧾':'💳'}</div>
+        <div class="mov-ref">
+          <div class="mov-ref-main">${esVenta?('Ticket '+m.referencia):('Pago · '+m.referencia)}</div>
+          <div class="mov-ref-date">${fmtDate(m.fecha)}</div>
+        </div>
+        <div class="mov-amount ${esVenta?'venta':'pago'}">${esVenta?'+':'-'}${fmt(monto)}</div>
+      </div>`;
+  }).join('');
+}
+
+async function loadOrdenesPendientes(clientId){
+  const token = localStorage.getItem('admin_token');
+  // Órdenes cerradas con saldo pendiente (sin pago completo)
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/pos_orders?client_id=eq.${clientId}&estado=eq.cerrada&select=id,numero_ticket,ticket_display,fecha,total&order=fecha.desc&limit=20`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+  );
+  const orders = await res.json();
+  const sec = document.getElementById('ordenesSection');
+  const list = document.getElementById('ordenesPendientes');
+
+  if(!Array.isArray(orders)||!orders.length){
+    sec.style.display='none'; return;
+  }
+  sec.style.display='block';
+  list.innerHTML = orders.map(o=>`
+    <div class="order-pending-row">
+      <input type="checkbox" class="order-pending-chk" id="ord-${o.id}" value="${o.id}">
+      <div class="order-pending-info">
+        <div class="order-pending-ticket">#${o.ticket_display}</div>
+        <div class="order-pending-date">${fmtDate(o.fecha)}</div>
+      </div>
+      <div class="order-pending-total">${fmt(o.total)}</div>
+      <button onclick="descargarTicketPOS('${o.id}','${o.ticket_display}','${o.fecha}',${o.total})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;flex-shrink:0;" title="Descargar PDF">📄</button>
+    </div>`).join('');
+}
+
+async function registrarPago(){
+  const monto = parseFloat(document.getElementById('pagoMonto').value);
+  const tipo  = document.getElementById('pagoTipo').value;
+  const nota  = document.getElementById('pagoNota').value.trim();
+  const token = localStorage.getItem('admin_token');
+
+  if(!monto||monto<=0){ showToast('Ingresá un monto válido'); return; }
+  if(!activeClientId){ showToast('No hay cliente seleccionado'); return; }
+
+  const btn = document.getElementById('pagoBtn');
+  btn.disabled=true; btn.textContent='Guardando...';
+
+  try{
+    // 1. Insertar payment
+    const payRes = await fetch(`${SUPABASE_URL}/rest/v1/payments`,{
+      method:'POST',
+      headers:{
+        'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,
+        'Content-Type':'application/json','Prefer':'return=representation'
+      },
+      body:JSON.stringify({client_id:activeClientId,monto,tipo,nota:nota||null})
+    });
+    const payData = await payRes.json();
+    if(!payRes.ok) throw new Error(payData.message||'Error al guardar pago');
+    const payment = Array.isArray(payData)?payData[0]:payData;
+
+    // 2. Imputar a órdenes seleccionadas (si las hay)
+    const selectedOrders = [...document.querySelectorAll('.order-pending-chk:checked')];
+    if(selectedOrders.length && payment?.id){
+      let remaining = monto;
+      for(const chk of selectedOrders){
+        if(remaining<=0) break;
+        const orderId = chk.value;
+        const ordRow = document.querySelector(`#ord-${orderId}`).closest('.order-pending-row');
+        const ordTotal = parseFloat(ordRow.querySelector('.order-pending-total').textContent.replace(/[^0-9.]/g,'').replace(/\./g,''));
+        const aplicado = Math.min(remaining, ordTotal);
+        remaining -= aplicado;
+        await fetch(`${SUPABASE_URL}/rest/v1/payment_allocations`,{
+          method:'POST',
+          headers:{
+            'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,
+            'Content-Type':'application/json','Prefer':'return=minimal'
+          },
+          body:JSON.stringify({payment_id:payment.id,order_id:orderId,monto_aplicado:aplicado})
+        });
+      }
+    }
+
+    showToast('✅ Pago de '+fmt(monto)+' registrado');
+    // Refrescar
+    await loadCtaCte();
+    await openCtaCteModal(activeClientId);
+
+  }catch(err){
+    showToast('Error: '+(err.message||err));
+  }finally{
+    btn.disabled=false; btn.textContent='Registrar';
+  }
+}
+
+function closeCtaCteModal(){
+  document.getElementById('ctacteModalBg').classList.remove('open');
+  activeClientId=null;
+}
+
+// ── Load all ──
+async function loadAll(){
+  await Promise.all([loadUsers(), loadSettings()]);
+  // Pre-cargar datos de estadísticas en background (no renderiza hasta abrir el tab)
+  loadStats();
+  checkMoraBadge();
+}
+
+// ── USUARIOS ──
+async function loadUsers(){
+  const rows=await api('profiles?select=id,nombre,approved,is_admin,created_at&order=created_at.desc');
+  if(!Array.isArray(rows)) return;
+  allUsersData=rows;
+
+  // Obtener último pedido por usuario
+  const orders=await api('orders?select=user_id,created_at&order=created_at.desc');
+  const lastOrder={};
+  if(Array.isArray(orders)) orders.forEach(o=>{ if(!lastOrder[o.user_id]) lastOrder[o.user_id]=o.created_at; });
+
+  const pending=rows.filter(u=>!u.approved&&!u.is_admin);
+  const approved=rows.filter(u=>u.approved||u.is_admin);
+
+  document.getElementById('pendingCount').textContent=`${pending.length} usuario${pending.length!==1?'s':''}`;
+  document.getElementById('approvedCount').textContent=`${approved.length} usuario${approved.length!==1?'s':''}`;
+
+  // Stats
+  // Obtener presencia
+  const onlineUsers=await loadOnlineUsers();
+  document.getElementById('userStats').innerHTML=`
+    <div class="stat-card"><div class="stat-value">${rows.length}</div><div class="stat-label">Total usuarios</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--green)">${approved.length}</div><div class="stat-label">Aprobados</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--accent2)">${pending.length}</div><div class="stat-label">Pendientes</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--green);display:flex;align-items:center;gap:6px;"><span class="online-dot"></span><span id="onlineStatValue">${onlineUsers.length}</span></div><div class="stat-label">En línea ahora</div></div>
+  `;
+
+  renderUserList('pendingList', pending, lastOrder, true);
+  renderUserList('approvedList', approved, lastOrder, false);
+}
+
+async function loadOnlineUsers(){
+  try{
+    // En línea = last_seen en los últimos 5 minutos
+    const since=new Date(Date.now()-3*60*1000).toISOString();
+    const rows=await api(`presence?last_seen=gte.${since}&select=user_id,last_seen`);
+    if(!Array.isArray(rows)) return [];
+    // Mapear con nombres
+    const nameMap={};
+    allUsersData.forEach(u=>{ nameMap[u.id]=u.nombre||u.id.slice(0,8); });
+    const online=rows.map(r=>({...r, nombre:nameMap[r.user_id]||r.user_id.slice(0,8)}));
+    // Renderizar sección
+    document.getElementById('onlineCount').textContent=`${online.length} ahora`;
+    const statVal=document.getElementById('onlineStatValue');
+    if(statVal) statVal.textContent=online.length;
+    const el=document.getElementById('onlineList');
+    if(!online.length){
+      el.innerHTML='<div class="empty">Sin usuarios en línea en este momento</div>';
+    } else {
+      el.innerHTML=online.map(u=>{
+        const mins=Math.floor((Date.now()-new Date(u.last_seen).getTime())/60000);
+        const timeStr=mins===0?'ahora mismo':`hace ${mins} min`;
+        const initial=(u.nombre||'?').charAt(0).toUpperCase();
+        return `<div class="user-row">
+          <div class="user-avatar" style="background:var(--green);font-size:13px;">${initial}</div>
+          <div class="user-info">
+            <div class="user-name">${u.nombre}</div>
+            <div class="user-meta" style="color:var(--green);">🟢 Activo ${timeStr}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    return online;
+  } catch(e){ return []; }
+}
+
+// Refrescar presencia cada 30 segundos en el admin
+setInterval(async()=>{
+  if(isAdmin) await loadOnlineUsers();
+}, 30*1000);
+
+function renderUserList(containerId, users, lastOrder, isPending){
+  const el=document.getElementById(containerId);
+  if(!users.length){ el.innerHTML=`<div class="empty">${isPending?'No hay usuarios pendientes 🎉':'Sin usuarios'}</div>`; return; }
+  el.innerHTML=users.map(u=>{
+    const initial=(u.nombre||u.id).charAt(0).toUpperCase();
+    const last=lastOrder[u.id]?`Último pedido: ${fmtDate(lastOrder[u.id])}`:`Sin pedidos`;
+    const badge=u.is_admin?'admin':u.approved?'approved':'pending';
+    const badgeText=u.is_admin?'⚙️ Admin':u.approved?'✅ Aprobado':'⏳ Pendiente';
+    return `<div class="user-row">
+      <div class="user-avatar">${initial}</div>
+      <div class="user-info">
+        <div class="user-name">${u.nombre||'Sin nombre'}</div>
+        <div class="user-email">${u.id}</div>
+        <div class="user-meta">${last} · Registro: ${fmtDate(u.created_at)}</div>
+      </div>
+      <span class="user-badge-status ${badge}">${badgeText}</span>
+      <div class="user-actions">
+        ${!u.is_admin && isPending?`<button class="user-btn approve" onclick="approveUser('${u.id}',true)">✓ Aprobar</button>`:''}
+        ${!u.is_admin && u.approved?`<button class="user-btn revoke" onclick="approveUser('${u.id}',false)">✗ Revocar</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function approveUser(userId, approve){
+  const action=approve?'aprobar':'revocar';
+  if(!confirm(`¿${action.charAt(0).toUpperCase()+action.slice(1)} acceso a este usuario?`)) return;
+  const res=await api(`profiles?id=eq.${userId}`,{
+    method:'PATCH',
+    body:JSON.stringify({approved:approve})
+  });
+  if(res.ok||res.status===204){
+    showToast(approve?'✅ Usuario aprobado':'✅ Acceso revocado');
+    loadUsers();
+  } else {
+    showToast('❌ Error al actualizar usuario');
+  }
+}
+
+// ── SETTINGS ──
+async function loadSettings(){
+  const rows=await api('settings?select=key,value');
+  if(!Array.isArray(rows)) return;
+  const s={};
+  rows.forEach(r=>{ s[r.key]=r.value; });
+  if(s.catalog_month) document.getElementById('settingMonth').value=s.catalog_month;
+  if(s.welcome_message) document.getElementById('settingWelcome').value=s.welcome_message;
+  if(s.banner_text) document.getElementById('settingBanner').value=s.banner_text;
+  if(s.pos_whatsapp_vendedor){ const inp=document.getElementById('settingWAVendedor'); if(inp) inp.value=s.pos_whatsapp_vendedor; waVendedor=s.pos_whatsapp_vendedor.trim(); }
+  const bannerOn=s.banner_active==='true';
+  const toggle=document.getElementById('bannerToggle');
+  if(bannerOn) toggle.classList.add('on'); else toggle.classList.remove('on');
+  document.getElementById('bannerToggleLabel').textContent=bannerOn?'Activo':'Inactivo';
+  const margenOn=s.margen_active==='true';
+  const margenToggle=document.getElementById('margenToggle');
+  if(margenOn) margenToggle.classList.add('on'); else margenToggle.classList.remove('on');
+  document.getElementById('margenToggleLabel').textContent=margenOn?'Activo':'Inactivo';
+
+  const nostockOn=s.catalog_show_nostock==='true';
+  const nostockToggle=document.getElementById('nostockToggle');
+  if(nostockOn) nostockToggle.classList.add('on'); else nostockToggle.classList.remove('on');
+  document.getElementById('nostockToggleLabel').textContent=nostockOn?'Visible':'Oculto';
+  // Cargar productos
+  try{ window._disabledSkus=new Set(JSON.parse(s.disabled_skus||'[]')); } catch(e){ window._disabledSkus=new Set(); }
+  await loadProducts();
+}
+
+let allProducts=[];
+async function loadProducts(){
+  try{
+    const token=localStorage.getItem('admin_token');
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado&order=marca.asc,producto.asc`,{
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    if(!Array.isArray(data)||!data.length) throw new Error('Sin datos');
+    allProducts=data;
+    window.allProducts=allProducts;
+    renderProducts(allProducts);
+  } catch(e){
+    console.error('[Admin] loadProducts error:', e);
+    document.getElementById('productsList').innerHTML='<div class="empty">Error al cargar productos: '+e.message+'</div>';
+  }
+}
+
+function filterProducts(){
+  const q=document.getElementById('searchProducts').value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const filtered=allProducts.filter(p=>{
+    const name=(p.producto||p.name||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const sku = p.codigo || p.sku || '';
+    return name.includes(q)||sku.includes(q)||(p.marca||p.brand||'').toLowerCase().includes(q);
+  });
+  renderProducts(filtered);
+}
+
+function renderProducts(list){
+  const disabled=window._disabledSkus||new Set();
+  document.getElementById('disabledCount').textContent=disabled.size>0?`${disabled.size} desactivado${disabled.size!==1?'s':''}`:'' ;
+  if(!list.length){ document.getElementById('productsList').innerHTML='<div class="empty">Sin resultados</div>'; return; }
+  document.getElementById('productsList').innerHTML=list.map(p=>{
+    const sku = p.codigo || p.sku;
+    const name = p.producto || p.name;
+    const isDisabled=disabled.has(sku);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);opacity:${isDisabled?'.45':'1'}">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:1px">${sku}</div>
+      </div>
+      <button class="product-toggle ${isDisabled?'inactive':'active'}" style="flex-shrink:0" onclick="toggleProduct('${sku}')">${isDisabled?'⚫ Inactivo':'🟢 Activo'}</button>
+    </div>`;
+  }).join('');
+}
+
+async function toggleProduct(sku){
+  const disabled=window._disabledSkus||new Set();
+  if(disabled.has(sku)) disabled.delete(sku); else disabled.add(sku);
+  window._disabledSkus=disabled;
+  const arr=Array.from(disabled);
+  const res=await api('settings?key=eq.disabled_skus',{
+    method:'PATCH',
+    body:JSON.stringify({value:JSON.stringify(arr)}),
+    headers:{'Prefer':'return=minimal'}
+  });
+  if(res.ok||res.status===204){
+    showToast(disabled.has(sku)?'⚫ Producto desactivado':'🟢 Producto activado');
+    filterProducts();
+  } else { showToast('❌ Error al guardar'); }
+}
+
+async function saveSetting(key, inputId){
+  const val=document.getElementById(inputId).value.trim();
+  const res=await api(`settings?key=eq.${key}`,{
+    method:'PATCH',
+    body:JSON.stringify({value:val}),
+    headers:{'Prefer':'return=minimal'}
+  });
+  if(res.ok||res.status===204) showToast('✅ Guardado');
+  else showToast('❌ Error al guardar');
+}
+
+async function toggleNostock(){
+  const toggle=document.getElementById('nostockToggle');
+  const isOn=toggle.classList.contains('on');
+  const newVal=isOn?'false':'true';
+  const token=localStorage.getItem('admin_token');
+  const headers={'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};
+  // Upsert directo — funciona tanto si la key existe como si no
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/settings`,{
+    method:'POST', headers, body:JSON.stringify({key:'catalog_show_nostock',value:newVal})
+  });
+  if(res.ok||res.status===201||res.status===204){
+    if(newVal==='true'){ toggle.classList.add('on'); document.getElementById('nostockToggleLabel').textContent='Visible'; }
+    else { toggle.classList.remove('on'); document.getElementById('nostockToggleLabel').textContent='Oculto'; }
+    showToast(newVal==='true'?'👁 NOSTOCK visible en catálogo':'🙈 NOSTOCK oculto en catálogo');
+  } else {
+    const err=await res.text();
+    showToast('❌ Error: '+err);
+  }
+}
+
+async function toggleMargen(){
+  const toggle=document.getElementById('margenToggle');
+  const isOn=toggle.classList.contains('on');
+  const newVal=isOn?'false':'true';
+  const res=await api('settings?key=eq.margen_active',{
+    method:'PATCH',
+    body:JSON.stringify({value:newVal}),
+    headers:{'Prefer':'return=minimal'}
+  });
+  if(res.ok||res.status===204){
+    if(newVal==='true'){ toggle.classList.add('on'); document.getElementById('margenToggleLabel').textContent='Activo'; }
+    else { toggle.classList.remove('on'); document.getElementById('margenToggleLabel').textContent='Inactivo'; }
+    showToast(newVal==='true'?'📈 Margen visible':'📉 Margen oculto');
+  } else { showToast('❌ Error al guardar'); }
+}
+
+async function toggleBanner(){
+  const toggle=document.getElementById('bannerToggle');
+  const isOn=toggle.classList.contains('on');
+  const newVal=isOn?'false':'true';
+  const res=await api('settings?key=eq.banner_active',{
+    method:'PATCH',
+    body:JSON.stringify({value:newVal}),
+    headers:{'Prefer':'return=minimal'}
+  });
+  if(res.ok||res.status===204){
+    if(newVal==='true'){ toggle.classList.add('on'); document.getElementById('bannerToggleLabel').textContent='Activo'; }
+    else { toggle.classList.remove('on'); document.getElementById('bannerToggleLabel').textContent='Inactivo'; }
+    showToast(newVal==='true'?'📢 Banner activado':'Banner desactivado');
+  }
+}
+
+// ── ESTADÍSTICAS ──
+function periodFilter(created_at){
+  const d=new Date(created_at);
+  const now=new Date();
+  // Comparar en zona local usando timestamps de inicio/fin del día
+  if(activePeriod==='today'){
+    const start=new Date(now.getFullYear(),now.getMonth(),now.getDate(),0,0,0);
+    const end=new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59);
+    return d>=start&&d<=end;
+  }
+  if(activePeriod==='week'){
+    const start=new Date(now); start.setDate(start.getDate()-7); start.setHours(0,0,0,0);
+    return d>=start;
+  }
+  if(activePeriod==='month'){
+    const start=new Date(now.getFullYear(),now.getMonth(),1,0,0,0);
+    const end=new Date(now.getFullYear(),now.getMonth()+1,0,23,59,59);
+    return d>=start&&d<=end;
+  }
+  if(activePeriod==='year'){
+    const start=new Date(now.getFullYear(),0,1,0,0,0);
+    const end=new Date(now.getFullYear(),11,31,23,59,59);
+    return d>=start&&d<=end;
+  }
+  return true;
+}
+
+function setPeriod(p, el){
+  activePeriod=p;
+  document.querySelectorAll('#periodFilter .filter-btn').forEach(b=>b.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderStats();
+}
+
+async function loadStats(){
+  // Mostrar loading solo si el tab está activo
+  const statsPanel = document.getElementById('tab-estadisticas');
+  if(statsPanel && statsPanel.classList.contains('active')){
+    document.getElementById('statsCards').innerHTML='<div class="loading">Cargando estadísticas...</div>';
+  }
+  try {
+    const [orders, views, cartEvts, profiles, posOrders, posClients]=await Promise.all([
+      api('orders?select=*&order=created_at.desc'),
+      api('product_views?select=sku,viewed_at'),
+      api('cart_events?select=sku,action,user_id,created_at'),
+      api('profiles?select=id,nombre,approved'),
+      api('pos_orders?select=id,ticket_display,fecha,total,estado,client_id&order=fecha.desc&limit=200'),
+      api('clients?select=id,nombre')
+    ]);
+    allOrdersData={
+      orders:    Array.isArray(orders)     ? orders     : [],
+      views:     Array.isArray(views)      ? views      : [],
+      cartEvts:  Array.isArray(cartEvts)   ? cartEvts   : [],
+      profiles:  Array.isArray(profiles)   ? profiles   : [],
+      posOrders: Array.isArray(posOrders)  ? posOrders  : [],
+      posClients:Array.isArray(posClients) ? posClients : []
+    };
+    // Diagnóstico visible en pantalla
+    const diag = document.getElementById('statsDiag');
+    if(diag){
+      diag.style.display='block';
+      diag.textContent = 'Datos: orders='+allOrdersData.orders.length+
+        ' | views='+allOrdersData.views.length+
+        ' | cartEvts='+allOrdersData.cartEvts.length+
+        ' | profiles='+allOrdersData.profiles.length;
+    }
+    renderStats();
+  } catch(err) {
+    const diag = document.getElementById('statsDiag');
+    if(diag){ diag.style.display='block'; diag.textContent='ERROR: '+err.message; }
+    const sc = document.getElementById('statsCards');
+    if(sc) sc.innerHTML='<div class="empty">Error al cargar estadísticas: '+err.message+'</div>';
+  }
+}
+
+function renderStats(){
+  if(!allOrdersData || !allOrdersData.orders){
+    const sc = document.getElementById('statsCards');
+    if(sc) sc.innerHTML='<div class="loading">Cargando estadísticas...</div>';
+    return;
+  }
+  const { orders, views, cartEvts, profiles }=allOrdersData;
+  if(!orders) return;
+  const filtOrders=orders.filter(o=>periodFilter(o.created_at));
+  const filtViews=views.filter(v=>periodFilter(v.viewed_at));
+
+  // Stats cards
+  const totalRev=filtOrders.reduce((a,o)=>a+(o.total||0),0);
+  const uniqueUsers=new Set(filtOrders.map(o=>o.user_id)).size;
+  const convRate=filtViews.length>0?Math.round((filtOrders.length/filtViews.length)*100):0;
+  document.getElementById('statsCards').innerHTML=`
+    <div class="stat-card"><div class="stat-value" style="color:var(--accent2)">${fmt(totalRev)}</div><div class="stat-label">Facturado</div></div>
+    <div class="stat-card"><div class="stat-value">${filtOrders.length}</div><div class="stat-label">Pedidos</div></div>
+    <div class="stat-card"><div class="stat-value">${filtViews.length}</div><div class="stat-label">Vistas de producto</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--green)">${convRate}%</div><div class="stat-label">Conversión</div></div>
+  `;
+
+  // Top pedidos por SKU
+  const skuCount={};
+  filtOrders.forEach(o=>{ (o.items||[]).forEach(i=>{ skuCount[i.name]=(skuCount[i.name]||0)+(i.qty||1); }); });
+  renderRanking('topOrdered', skuCount, 5, 'unidades');
+
+  // Top vistos
+  // Construir mapa sku→nombre desde allProducts si está disponible
+  const skuNames={};
+  (window.allProducts||allProducts||[]).forEach(p=>{ skuNames[p.sku]=p.name; });
+  const viewCount={};
+  filtViews.forEach(v=>{ const key=skuNames[v.sku]||(v.sku?`SKU ${v.sku}`:'Desconocido'); viewCount[key]=(viewCount[key]||0)+1; });
+  renderRanking('topViewed', viewCount, 5, 'vistas');
+
+  // Top usuarios
+  const userCount={};
+  filtOrders.forEach(o=>{ userCount[o.nombre_cliente||o.user_id]=(userCount[o.nombre_cliente||o.user_id]||0)+1; });
+  renderRanking('topUsers', userCount, 5, 'pedidos');
+
+  // Carrito abandonado — por producto: quién lo tiene y hace cuánto
+  const userOrderedSkus={};
+  orders.forEach(o=>{ (o.items||[]).forEach(i=>{ if(!userOrderedSkus[o.user_id]) userOrderedSkus[o.user_id]=new Set(); userOrderedSkus[o.user_id].add(i.sku); }); });
+  // Mapa userId → nombre
+  const userNames={};
+  profiles.forEach(p=>{ userNames[p.id]=p.nombre||p.id.slice(0,8); });
+  // Por SKU: lista de {userId, nombre, fecha} que lo tienen sin pedir
+  const abandonedBySku={};
+  // Solo el último add por usuario+sku
+  const lastAdd={};
+  cartEvts.filter(e=>e.action==='add').forEach(e=>{
+    const key=`${e.user_id}_${e.sku}`;
+    if(!lastAdd[key]||new Date(e.created_at)>new Date(lastAdd[key].created_at)) lastAdd[key]=e;
+  });
+  Object.values(lastAdd).forEach(e=>{
+    const userOrdered=userOrderedSkus[e.user_id]||new Set();
+    if(!userOrdered.has(e.sku)){
+      if(!abandonedBySku[e.sku]) abandonedBySku[e.sku]=[];
+      abandonedBySku[e.sku].push({userId:e.user_id, nombre:userNames[e.user_id]||e.user_id.slice(0,8), created_at:e.created_at});
+    }
+  });
+  renderAbandoned('cartAbandoned', abandonedBySku);
+
+  // Evolución mensual (últimos 6 meses)
+  renderMonthlyChart(orders);
+
+  // Heatmap por hora
+  renderHeatmap(views);
+
+  // Todos los pedidos
+  renderAllOrders(filtOrders);
+
+  // KPIs POS
+  const posOrders = allOrdersData.posOrders || [];
+  const posClients = allOrdersData.posClients || [];
+  const filtPosOrders = posOrders.filter(o => periodFilter(o.fecha || o.created_at));
+  renderPosKPIs(filtPosOrders, posClients);
+}
+
+function renderPosKPIs(posOrders, posClients){
+  // Map clientId -> nombre
+  const clientMap = {};
+  posClients.forEach(cl => { clientMap[cl.id] = cl.nombre; });
+
+  // KPIs cards
+  const totalVentas = posOrders.reduce((s, o) => s + (o.total || 0), 0);
+  const cantTickets = posOrders.length;
+  const ticketProm  = cantTickets > 0 ? totalVentas / cantTickets : 0;
+  const cerradas    = posOrders.filter(o => o.estado === 'cerrada').length;
+
+  const cardsEl = document.getElementById('posStatsCards');
+  if(cardsEl){
+    cardsEl.innerHTML = cantTickets === 0
+      ? '<div class="empty" style="grid-column:1/-1">Sin ventas POS en este período</div>'
+      : `<div class="stat-card"><div class="stat-value" style="color:var(--accent2)">${fmt(totalVentas)}</div><div class="stat-label">Ventas POS</div></div>
+         <div class="stat-card"><div class="stat-value">${cantTickets}</div><div class="stat-label">Tickets</div></div>
+         <div class="stat-card"><div class="stat-value" style="color:var(--green)">${fmt(ticketProm)}</div><div class="stat-label">Ticket promedio</div></div>
+         <div class="stat-card"><div class="stat-value">${cerradas}</div><div class="stat-label">Cerradas</div></div>`;
+  }
+
+  // Top clientes por monto
+  const byClient = {};
+  posOrders.forEach(o => {
+    if(!o.client_id) return;
+    const nombre = clientMap[o.client_id] || o.client_id.slice(0,8);
+    if(!byClient[nombre]) byClient[nombre] = {monto:0, tickets:0};
+    byClient[nombre].monto  += o.total || 0;
+    byClient[nombre].tickets++;
+  });
+  const topCl = Object.entries(byClient).sort((a,b) => b[1].monto - a[1].monto).slice(0,5);
+  const topClEl = document.getElementById('posTopClientes');
+  if(topClEl){
+    if(!topCl.length){ topClEl.innerHTML='<div class="empty">Sin datos</div>'; }
+    else {
+      const max = topCl[0][1].monto;
+      topClEl.innerHTML = topCl.map(([nombre, d], i) => `
+        <div class="rank-row">
+          <span class="rank-pos">${i+1}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;">
+              <span class="rank-name" style="flex:1">${nombre}</span>
+              <span style="font-size:12px;font-weight:700;color:var(--accent2);white-space:nowrap">${fmt(d.monto)}</span>
+            </div>
+            <div class="rank-bar-wrap"><div class="rank-bar" style="width:${Math.round(d.monto/max*100)}%"></div></div>
+            <span style="font-size:10px;color:var(--muted)">${d.tickets} ticket${d.tickets!==1?'s':''}</span>
+          </div>
+        </div>`).join('');
+    }
+  }
+
+  // Últimas ventas POS
+  const ultEl = document.getElementById('posUltimasVentas');
+  if(ultEl){
+    if(!posOrders.length){ ultEl.innerHTML='<div class="empty">Sin ventas en este período</div>'; return; }
+    ultEl.innerHTML = posOrders.slice(0,8).map(o => {
+      const nombre = clientMap[o.client_id] || '—';
+      const fecha  = o.fecha ? new Date(o.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}) : '—';
+      const hora   = o.fecha ? new Date(o.fecha).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : '';
+      return `<div class="order-row" style="margin-bottom:6px;">
+        <div class="order-row-header">
+          <div>
+            <span style="font-size:12px;font-weight:700;">${nombre}</span>
+            ${o.ticket_display ? `<span style="font-size:10px;color:var(--muted);margin-left:6px">#${o.ticket_display}</span>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="order-total">${fmt(o.total||0)}</span>
+            <button onclick="descargarTicketPOS('${o.id}','${o.ticket_display||''}','${o.fecha||''}',${o.total||0})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar PDF">📄</button>
+          </div>
+        </div>
+        <div class="order-meta">${fecha} ${hora}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ── Tickets PDF Admin ────────────────────────────────────────────────────────
+const IMG_BASE_ADMIN = 'https://fmz-mza.github.io/Beepexcuyo/images/SKU_';
+
+function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMonto, total){
+  const {jsPDF} = window.jspdf;
+  const ANCHO = 72; // ancho útil en mm (80 - 4 margen cada lado)
+
+  // ── Paso 1: calcular altura real antes de crear el doc ──
+  // Estimamos height mínima para calcular luego; usamos doc temporal
+  let yCalc = 8;
+  yCalc += 5 + 4 + 4; // header
+  if(numero) yCalc += 4;
+  yCalc += 4; // fecha
+  if(cliente) yCalc += 4;
+  yCalc += 4; // separador
+
+  // Pre-calcular líneas de cada item para altura exacta
+  const tmpDoc = new jsPDF({unit:'mm', format:[80, 400]});
+  const itemLines = items.map(i => {
+    const nombre = i.nombre || i.name || '';
+    tmpDoc.setFontSize(8);
+    const lines = tmpDoc.splitTextToSize(nombre, ANCHO);
+    return lines;
+  });
+  itemLines.forEach((lines, idx) => {
+    yCalc += lines.length * 3.8; // líneas de nombre
+    if(items[idx].sku) yCalc += 3.5; // SKU
+    yCalc += 4.5; // qty x precio
+  });
+
+  yCalc += 4; // separador items
+  yCalc += 4; // cant productos
+  if(descMonto > 0) yCalc += 8;
+  yCalc += 5 + 4 + 6; // total + separador + pie
+
+  const pageH = Math.ceil(yCalc) + 6; // margen inferior
+
+  // ── Paso 2: crear doc con tamaño exacto ──
+  const doc = new jsPDF({unit:'mm', format:[80, pageH]});
+  let y = 8;
+
+  // Header
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('BEEPEX CUYO', 40, y, {align:'center'}); y+=5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text(titulo, 40, y, {align:'center'}); y+=4;
+  doc.setLineWidth(.3); doc.line(4,y,76,y); y+=4;
+
+  // Encabezado
+  doc.setFont('helvetica','bold');
+  if(numero){ doc.text((titulo.includes('POS')?'Ticket #':'Pedido #')+numero, 4, y); y+=4; }
+  doc.setFont('helvetica','normal');
+  if(fecha){ doc.text(new Date(fecha).toLocaleString('es-AR'), 4, y); y+=4; }
+  if(cliente){ doc.text('Cliente: '+cliente, 4, y); y+=4; }
+  doc.line(4,y,76,y); y+=4;
+
+  // Items — nombres completos con wrap automático
+  items.forEach((i, idx) => {
+    const p   = i.precio_modificado ?? i.precio_unitario ?? i.price ?? 0;
+    const qty = i.cantidad ?? i.qty ?? 1;
+    const sku = i.sku || '';
+    const nombreLines = itemLines[idx];
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    nombreLines.forEach(line => { doc.text(line, 4, y); y+=3.8; });
+    if(sku){
+      doc.setFontSize(7); doc.setTextColor(120,120,140);
+      doc.text('SKU: '+sku, 4, y);
+      doc.setTextColor(0,0,0); doc.setFontSize(8); y+=3.5;
+    }
+    doc.text('  '+qty+' x '+fmtN(p)+' = '+fmtN(p*qty), 4, y); y+=4.5;
+  });
+
+  doc.line(4,y,76,y); y+=4;
+
+  // Cantidad total de productos
+  const totalUnidades = items.reduce((s,i)=>s+(i.cantidad??i.qty??1),0);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text(`${items.length} producto${items.length!==1?'s':''} · ${totalUnidades} unidad${totalUnidades!==1?'es':''}`, 4, y); y+=4;
+
+  // Totales
+  if(descMonto > 0){
+    doc.text('Subtotal: '+fmtN(subtotal), 4, y); y+=4;
+    doc.text('Descuento: -'+fmtN(descMonto), 4, y); y+=4;
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('TOTAL: '+fmtN(total), 4, y); y+=5;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.line(4,y,76,y); y+=4;
+  doc.text('Beepex Cuyo', 40, y, {align:'center'});
+
+  return doc;
+}
+
+function fmtN(n){ return '$'+(Math.round(n)||0).toLocaleString('es-AR'); }
+
+async function descargarTicketPOS(orderId, ticket, fecha, total){
+  const token = localStorage.getItem('admin_token');
+  try{
+    // Cargar items de la orden
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=nombre,cantidad,precio_unitario,precio_modificado,sku`,
+      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+    );
+    const items = await res.json();
+    if(!Array.isArray(items)||!items.length){ showToast('Sin items para esta venta'); return; }
+
+    // Buscar nombre del cliente
+    const orderRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${orderId}&select=client_id,subtotal,descuento_monto`,
+      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+    );
+    const orderData = await orderRes.json();
+    const order = Array.isArray(orderData) ? orderData[0] : null;
+    const clientId = order?.client_id;
+    let clienteNombre = '';
+    if(clientId){
+      const clRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/clients?id=eq.${clientId}&select=nombre`,
+        {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+      );
+      const clData = await clRes.json();
+      clienteNombre = Array.isArray(clData)&&clData[0] ? clData[0].nombre : '';
+    }
+
+    const subtotal = order?.subtotal || total;
+    const descMonto = order?.descuento_monto || 0;
+    const doc = buildAdminPDF('Punto de Venta', ticket, fecha, clienteNombre, items, subtotal, descMonto, total);
+    doc.save('ticket-'+ticket+'.pdf');
+    showToast('📄 Ticket #'+ticket+' descargado');
+  }catch(e){ showToast('Error: '+e.message); }
+}
+
+async function descargarPedidoCatalogo(order){
+  try{
+    const items = Array.isArray(order.items) ? order.items : [];
+    if(!items.length){ showToast('Sin items en este pedido'); return; }
+    // Mapear campos del catálogo (items jsonb tiene: name, qty, price, sku)
+    const mappedItems = items.map(i=>({
+      nombre: i.name || i.nombre || '',
+      sku: i.sku || '',
+      cantidad: i.qty || i.cantidad || 1,
+      precio_unitario: i.price || i.precio_unitario || 0,
+      precio_modificado: null
+    }));
+    const doc = buildAdminPDF('Pedido Catálogo', order.id?.slice(0,8), order.created_at, order.nombre_cliente, mappedItems, order.total, 0, order.total);
+    doc.save('pedido-'+(order.nombre_cliente||'cliente').replace(/\s+/g,'-')+'-'+new Date(order.created_at).toISOString().slice(0,10)+'.pdf');
+    showToast('📄 Pedido descargado');
+  }catch(e){ showToast('Error: '+e.message); }
+}
+
+function renderAbandoned(containerId, data){
+  const el=document.getElementById(containerId);
+  const entries=Object.entries(data).sort((a,b)=>b[1].length-a[1].length);
+  if(!entries.length){ el.innerHTML=`<div class="empty">Sin productos en carrito pendientes</div>`; return; }
+  const skuNamesMap={}; (window.allProducts||allProducts||[]).forEach(p=>{ skuNamesMap[p.sku]=p.name; });
+  el.innerHTML=`<div class="abandoned-list">${entries.map(([sku, users])=>{
+    const productName=skuNamesMap[sku]||`SKU ${sku}`;
+    const timeAgo=(d)=>{
+      const diff=Date.now()-new Date(d).getTime();
+      const mins=Math.floor(diff/60000);
+      if(mins<60) return `hace ${mins}m`;
+      const hrs=Math.floor(mins/60);
+      if(hrs<24) return `hace ${hrs}h`;
+      return `hace ${Math.floor(hrs/24)}d`;
+    };
+    return `<div class="abandoned-row">
+      <div class="abandoned-product">
+        <span>${productName}</span>
+        <span class="abandoned-sku">${users.length} usuario${users.length!==1?'s':''}</span>
+      </div>
+      <div class="abandoned-users">
+        ${users.map(u=>`<div class="abandoned-user">
+          <span class="abandoned-user-name">👤 ${u.nombre}</span>
+          <span class="abandoned-user-time">${timeAgo(u.created_at)}</span>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderRanking(containerId, data, limit, unit){
+  const el=document.getElementById(containerId);
+  const sorted=Object.entries(data).sort((a,b)=>b[1]-a[1]).slice(0,limit);
+  if(!sorted.length){ el.innerHTML=`<div class="empty">Sin datos</div>`; return; }
+  const max=sorted[0][1];
+  el.innerHTML=sorted.map(([name,val],i)=>`
+    <div class="rank-row">
+      <span class="rank-pos">${i+1}</span>
+      <span class="rank-name">${name}</span>
+      <div class="rank-bar-wrap"><div class="rank-bar-fill" style="width:${Math.round(val/max*100)}%"></div></div>
+      <span class="rank-val">${val} ${unit}</span>
+    </div>`).join('');
+}
+
+function renderMonthlyChart(orders){
+  const months=[];
+  const now=new Date();
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push({ label:d.toLocaleDateString('es-AR',{month:'short'}), month:d.getMonth(), year:d.getFullYear(), total:0, count:0 });
+  }
+  orders.forEach(o=>{
+    const d=new Date(o.created_at);
+    const m=months.find(m=>m.month===d.getMonth()&&m.year===d.getFullYear());
+    if(m){ m.total+=o.total||0; m.count++; }
+  });
+  const maxVal=Math.max(...months.map(m=>m.total),1);
+  document.getElementById('monthlyChart').innerHTML=months.map(m=>`
+    <div class="bar-col">
+      <span class="bar-val">${m.count>0?fmt(m.total):''}</span>
+      <div class="bar" style="height:${Math.round(m.total/maxVal*140)}px;"></div>
+      <span class="bar-label">${m.label}</span>
+    </div>`).join('');
+}
+
+function renderHeatmap(views){
+  const hours=Array(24).fill(0);
+  views.forEach(v=>{ const h=new Date(v.viewed_at).getHours(); hours[h]++; });
+  const max=Math.max(...hours,1);
+  document.getElementById('heatmap').innerHTML=hours.map((h,i)=>{
+    const intensity=Math.round(h/max*100);
+    return `<div class="heat-cell" title="${i}hs: ${h} vistas" style="background:rgba(74,124,255,${intensity/100});"></div>`;
+  }).join('');
+  document.getElementById('heatLabels').innerHTML=Array.from({length:24},(_,i)=>`<div class="heat-label">${i}</div>`).join('');
+}
+
+function renderAllOrders(orders){
+  const el=document.getElementById('allOrders');
+  document.getElementById('ordersCount').textContent=`${orders.length} pedido${orders.length!==1?'s':''}`;
+  if(!orders.length){ el.innerHTML=`<div class="empty">Sin pedidos en este período</div>`; return; }
+  el.innerHTML=orders.map(o=>{
+    const items=Array.isArray(o.items)?o.items:[];
+    const itemsStr=items.map(i=>`${i.qty}× ${i.name}`).join(', ');
+    const via=o.via||'whatsapp';
+    return `<div class="order-row">
+      <div class="order-row-header">
+        <div>
+          <span style="font-size:13px;font-weight:700;">${o.nombre_cliente||'Sin nombre'}</span>
+          <span class="order-via ${via}" style="margin-left:8px;">${via==='pdf'?'📄 PDF':'💬 WhatsApp'}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="order-total">${fmt(o.total)}</span>
+          <button onclick="descargarPedidoCatalogo(${JSON.stringify(o).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar PDF">📄</button>
+        </div>
+      </div>
+      <div class="order-meta">${fmtDateTime(o.created_at)} · ${items.length} producto${items.length!==1?'s':''}</div>
+      <div class="order-items" style="margin-top:4px;">${itemsStr}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Responsive ──
+const mq=window.matchMedia('(max-width:600px)');
+function handleMQ(e){ document.querySelectorAll('.two-col').forEach(el=>{ el.style.gridTemplateColumns=e.matches?'1fr':'1fr 1fr'; }); }
+mq.addListener(handleMQ); handleMQ(mq);
+
+// ── Refresh session ──
+async function refreshSession(){
+  const refreshToken=localStorage.getItem('admin_refresh');
+  if(!refreshToken) return false;
+  try{
+    const res=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},
+      body:JSON.stringify({refresh_token:refreshToken})
+    });
+    if(!res.ok) throw new Error('refresh failed');
+    const data=await res.json();
+    localStorage.setItem('admin_token', data.access_token);
+    localStorage.setItem('admin_refresh', data.refresh_token);
+    if(data.user) currentUser=data.user;
+    return true;
+  } catch(e){
+    console.warn('Admin session refresh failed:', e.message);
+    return false;
+  }
+}
+
+async function checkAndRefreshToken(){
+  const token=localStorage.getItem('admin_token');
+  if(!token) return;
+  try{
+    const payload=JSON.parse(atob(token.split('.')[1]));
+    const expiresIn=(payload.exp*1000)-Date.now();
+    if(expiresIn < 10*60*1000){
+      const ok=await refreshSession();
+      if(!ok){
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_refresh');
+        currentUser=null; isAdmin=false;
+        document.getElementById('app').classList.remove('visible');
+        document.getElementById('authGate').style.display='flex';
+        showToast('⏱ Sesión expirada, ingresá de nuevo');
+      }
+    }
+  } catch(e){}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB PRODUCTOS
+// ══════════════════════════════════════════════════════════════════════════════
+let prodData = [];
+let excelPendingImport = null; // datos preparados para confirmar
+
+async function loadProdTable(){
+  const tbody = document.getElementById('prodTableBody');
+  if(!tbody) return;
+  // Vincular input de Excel (por si acaso)
+  const inp = document.getElementById('excelUploadInput');
+  if(inp && !inp._bound){
+    inp._bound = true;
+    inp.addEventListener('change', handleExcelUpload);
+  }
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">Cargando...</td></tr>';
+  try{
+    const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado&order=marca.asc,producto.asc`,{
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    prodData = await res.json();
+    renderProdStats();
+    renderProdTable(prodData);
+  } catch(e){
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--red);">Error al cargar: ${e.message}</td></tr>`;
+  }
+}
+
+function renderProdStats(){
+  const el = document.getElementById('prodStats');
+  if(!el) return;
+  const total = prodData.length;
+  const enStock = prodData.filter(p=>p.stock==='STOCK').length;
+  const sinStock = prodData.filter(p=>p.stock==='NOSTOCK').length;
+  const preventa = prodData.filter(p=>p.stock==='PREVENTA').length;
+  const beepaw = prodData.filter(p=>p.brand==='BEEPAW').length;
+  el.innerHTML = [
+    ['📦 Total', total, ''],
+    ['✅ En stock', enStock, 'color:var(--green)'],
+    ['❌ Sin stock', sinStock, 'color:var(--red)'],
+    ['⏳ Preventa', preventa, 'color:var(--accent)'],
+    ['🐾 BEEPAW', beepaw, ''],
+    ['🔷 Genéricos', total-beepaw, ''],
+  ].map(([label,val,style])=>`
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;min-width:90px;">
+      <div style="font-size:18px;font-weight:700;${style}">${val}</div>
+      <div style="font-size:11px;color:var(--muted);">${label}</div>
+    </div>`).join('');
+}
+
+function renderProdTable(data){
+  const tbody = document.getElementById('prodTableBody');
+  if(!tbody) return;
+  if(!data.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">Sin resultados</td></tr>'; return; }
+  const stockColor = s => s==='STOCK'?'var(--green)':s==='PREVENTA'?'var(--accent)':'var(--red)';
+  tbody.innerHTML = data.map(p=>`
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:7px 6px;color:var(--muted);font-family:monospace;">${p.sku}</td>
+      <td style="padding:7px 6px;">${p.name}</td>
+      <td style="padding:7px 6px;"><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--border);">${p.brand}</span></td>
+      <td style="padding:7px 6px;text-align:right;">$${p.price.toLocaleString('es-AR')}</td>
+      <td style="padding:7px 6px;text-align:right;">${p.pvp?'$'+p.pvp.toLocaleString('es-AR'):'-'}</td>
+      <td style="padding:7px 6px;text-align:center;">${p.iva}%</td>
+      <td style="padding:7px 6px;text-align:center;"><span style="color:${stockColor(p.stock)};font-size:11px;font-weight:600;">${p.stock}</span></td>
+    </tr>`).join('');
+}
+
+function filterProdTable(){
+  const q = document.getElementById('prodSearch').value.toLowerCase();
+  if(!q){ renderProdTable(prodData); return; }
+  renderProdTable(prodData.filter(p=>p.name.toLowerCase().includes(q)||p.sku.includes(q)));
+}
+
+// ── Descargar Excel desde Supabase ────────────────────────────────────────────
+async function downloadProductsExcel(){
+  showToast('⏳ Preparando Excel...');
+  try{
+    // Cargar SheetJS dinámicamente
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res; s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+    const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,description:descripcion,ean,stock_fisico,ingresos,stock_ingresos,rubro&order=marca.asc,producto.asc`,{
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
+    });
+    const data = await resp.json();
+    if(!Array.isArray(data)) throw new Error(data.message || 'Error al descargar productos');
+    console.log('Productos descargados:', data.length);
+
+    const wb = XLSX.utils.book_new();
+    const mapped = data.map(p=>({
+      'MARCA': p.brand,
+      'CÓDIGO': p.sku,
+      'PRODUCTO': p.name,
+      'RUBRO': p.rubro || '',
+      'DESCRIPCIÓN': p.description || '',
+      'PRECIO PESOS': p.price,
+      'PVP': p.pvp || '',
+      'IVA': p.iva,
+      'ESTADO STOCK': p.stock,
+      'STOCK FÍSICO': p.stock_fisico || 0,
+      'FECHA INGRESO': p.ingresos || '',
+      'STOCK INGRESOS': p.stock_ingresos || 0,
+      'CÓDIGO EAN': p.ean || ''
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mapped), 'PRODUCTOS');
+    XLSX.writeFile(wb, `BEEPEX_productos_${new Date().toISOString().slice(0,10)}.xlsx`);
+    showToast('✅ Excel descargado');
+  } catch(e){ showToast('❌ Error: '+e.message); }
+}
+
+// ── Excel para Clientes (Pre-generado en Storage) ───────────────────────────
+async function downloadExcelClientes(){
+  showToast('⏳ Iniciando descarga de lista de precios...');
+  try {
+    // Apuntamos al archivo central generado por el script de automatización
+    const fileUrl = `${SUPABASE_URL}/storage/v1/object/public/reportes/Beepex.xlsx?t=${Date.now()}`;
+    
+    const res = await fetch(fileUrl);
+    if(!res.ok) throw new Error('El archivo Beepex.xlsx no se encontró en el servidor. Asegúrate de que el script de automatización haya corrido.');
+    
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    // Nombre dinámico solicitado: Beepex-(Fecha).xlsx
+    const fecha = new Date().toISOString().slice(0, 10);
+    a.download = `Beepex-${fecha}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    showToast('✅ Lista descargada con éxito');
+  } catch (e) {
+    console.error(e);
+    showToast('❌ Error: ' + e.message);
+  }
+}
+
+// ── Upload Excel y preview ────────────────────────────────────────────────────
+async function handleExcelUpload(event){
+  console.log('handleExcelUpload llamado', event);
+  const file = event.target ? event.target.files[0] : event.files?.[0];
+  console.log('Archivo:', file?.name);
+  if(!file) return;
+  if(event.target) event.target.value='';
+  showToast('⏳ Procesando Excel...');
+  try{
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res; s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+    console.log('XLSX cargado:', !!window.XLSX);
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    console.log('Hojas:', wb.SheetNames);
+    const rows0 = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null});
+    console.log('Primera hoja, filas:', rows0.length);
+    if(rows0.length) console.log('Primera fila:', JSON.stringify(rows0[0]));
+    const incoming = [];
+
+    function parseIva(val){
+      if(val===null||val===undefined) return 21;
+      if(typeof val==='number') return val<1?Math.round(val*100*10)/10:val;
+      const s=String(val).replace('%','').replace(',','.').trim();
+      const n=parseFloat(s);
+      return isNaN(n)?21:(n<1?Math.round(n*100*10)/10:n);
+    }
+    function parseStock(val){
+      if(!val) return 'NOSTOCK';
+      const s=String(val).toUpperCase().trim();
+      if(s==='NOSTOCK'||s==='SIN STOCK'||s==='SIN_STOCK') return 'NOSTOCK';
+      if(s==='PREVENTA') return 'PREVENTA';
+      if(s==='STOCK'||s==='EN STOCK') return 'STOCK';
+      // fallback con includes (para el Excel original de Beepex)
+      if(s.includes('PREVENTA')) return 'PREVENTA';
+      if(s.includes('SIN')||s.includes('NO')) return 'NOSTOCK';
+      if(s.includes('STOCK')) return 'STOCK';
+      return 'NOSTOCK';
+    }
+
+    function getSku(r){
+      // Buscar columna CÓDIGO con o sin tilde
+      const val = r['CÓDIGO']||r['CODIGO']||r['C\u00d3DIGO']||r['sku']||r['SKU']||null;
+      if(!val) return null;
+      const n = parseFloat(String(val).trim());
+      return (!isNaN(n) && n>=1000) ? String(Math.round(n)) : null;
+    }
+    function getPrice(r, ...keys){
+      for(const k of keys){
+        const v = r[k];
+        if(v!==null&&v!==undefined&&v!==''){
+          const n = parseFloat(String(v).replace(/[.$\s]/g,'').replace(',','.'));
+          if(!isNaN(n)&&n>0) return Math.round(n);
+        }
+      }
+      return null;
+    }
+
+    // Leer hoja única (nuevo formato) o hojas separadas (formato viejo)
+    const sheetName = wb.SheetNames.includes('BEEPAW') ? null  // hojas separadas
+      : wb.SheetNames[0]; // hoja única
+
+    if(sheetName !== null){
+      // Nuevo formato: hoja única con columna MARCA
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{defval:null});
+      rows.forEach(r=>{
+        const sku = getSku(r);
+        if(!sku) return;
+        const price = getPrice(r,'PRECIO EN PESOS','PRECIO EN $','precio');
+        if(!price) return;
+        const marca = (r['MARCA']||'').toString().trim().toUpperCase()||'GENERICO';
+        // STOCK puede contener fecha ej: "PREVENTA (06/05/2026)" — se conserva completo
+        const stockRaw = (r['STOCK']||'').toString().trim();
+        const pvpRaw = r['PRECIO VENTA PUBLICO'];
+        let pvp = 0;
+        if(pvpRaw && String(pvpRaw).toUpperCase()!=='SIN PVP'){
+          pvp = Math.round(parseFloat(String(pvpRaw).replace(/[.$\s]/g,'').replace(',','.'))||0);
+        }
+        incoming.push({
+          sku,
+          name:(r['PRODUCTO']||'').toString().replace(/\n/g,' ').trim(),
+          brand:marca,
+          price:Math.round(price),
+          pvp,
+          iva:parseIva(r['IVA']),
+          stock:stockRaw||'STOCK',
+          description:(r['DESCRIPCIÓN']||'').toString().replace(/\n/g,' ').trim(),
+          ean:(r['CODIGO EAN']?String(r['CODIGO EAN']).split('.')[0].trim():''),
+          rubro:(r['RUBRO']||'').toString().trim().toUpperCase(),
+          stock_fisico:(r['STOCK/INGRESO']||'').toString().trim(),
+          ingresos:(r['INGRESOS']||'').toString().trim(),
+          stock_ingresos:(r['STOCK INGRESOS']||'').toString().trim(),
+        });
+      });
+    } else {
+      // Formato viejo: hojas BEEPAW y GENERICOS separadas
+      ['BEEPAW','GENERICOS'].forEach(sheet=>{
+        if(!wb.SheetNames.includes(sheet)) return;
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet],{defval:null});
+        rows.forEach(r=>{
+          const sku = getSku(r);
+          if(!sku) return;
+          const price = getPrice(r,'PRECIO EN PESOS','PRECIO EN $','precio');
+          if(!price) return;
+          incoming.push({
+            sku,
+            name:(r['PRODUCTO']||'').toString().replace(/\n/g,' ').trim(),
+            brand:sheet==='BEEPAW'?'BEEPAW':'GENERICO',
+            price:Math.round(price),
+            pvp:Math.round(r['PRECIO VENTA PUBLICO']||0),
+            iva:parseIva(r['IVA']),
+            stock:parseStock(r['STOCK']),
+            description:(r['DESCRIPCIÓN']||'').toString().replace(/\n/g,' ').trim(),
+            ean:(r['CODIGO EAN']?String(Math.round(r['CODIGO EAN'])):''),
+            rubro:'', stock_fisico:'', ingresos:'', stock_ingresos:''
+          });
+        });
+      });
+    }
+
+    if(!incoming.length){ showToast('❌ No se encontraron productos válidos'); return; }
+
+    // Comparar con actuales
+    const currentMap = Object.fromEntries(prodData.map(p=>[p.sku,p]));
+    const incomingSkus = new Set(incoming.map(p=>p.sku));
+    const nuevos = incoming.filter(p=>!currentMap[p.sku]);
+    const actualizados = incoming.filter(p=>{
+      const c=currentMap[p.sku];
+      if(!c) return false;
+      return c.price!==p.price||c.pvp!==p.pvp||c.stock!==p.stock||c.iva!==p.iva||c.name!==p.name||c.rubro!==p.rubro||c.brand!==p.brand;
+    });
+    const faltantes = prodData.filter(p=>!incomingSkus.has(p.sku)&&p.stock!=='NOSTOCK');
+
+    excelPendingImport = { incoming, faltantes };
+
+    // Mostrar preview
+    const fmt = n => '$'+n.toLocaleString('es-AR');
+    const stockBadge = s => {
+      const c = s==='STOCK'?'var(--green)':s==='PREVENTA'?'var(--accent)':'var(--red)';
+      return `<span style="color:${c};font-size:11px;font-weight:600;">${s}</span>`;
+    };
+
+    let html = `<div style="margin-bottom:12px;font-size:13px;color:var(--muted);">
+      📊 <b>${incoming.length}</b> productos en el Excel · 
+      🟢 <b>${nuevos.length}</b> nuevos · 
+      🟡 <b>${actualizados.length}</b> con cambios · 
+      🔴 <b>${faltantes.length}</b> faltantes → NOSTOCK
+    </div>`;
+
+    if(nuevos.length){
+      html += `<h4 style="color:var(--green);margin:12px 0 6px;">🟢 Nuevos (${nuevos.length})</h4>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <tr style="border-bottom:1px solid var(--border);"><th>SKU</th><th>Nombre</th><th>Marca</th><th>Precio</th><th>Stock</th></tr>
+        ${nuevos.slice(0,30).map(p=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${p.sku}</td><td style="padding:4px 6px;">${p.name}</td><td style="padding:4px 6px;">${p.brand}</td><td style="padding:4px 6px;">${fmt(p.price)}</td><td style="padding:4px 6px;">${stockBadge(p.stock)}</td></tr>`).join('')}
+        ${nuevos.length>30?`<tr><td colspan="5" style="padding:4px 6px;color:var(--muted);">...y ${nuevos.length-30} más</td></tr>`:''}
+      </table></div>`;
+    }
+
+    if(actualizados.length){
+      html += `<h4 style="color:var(--accent);margin:16px 0 6px;">🟡 Con cambios (${actualizados.length})</h4>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <tr style="border-bottom:1px solid var(--border);"><th>SKU</th><th>Nombre</th><th>Precio actual → nuevo</th><th>Stock actual → nuevo</th></tr>
+        ${actualizados.slice(0,30).map(p=>{
+          const c=currentMap[p.sku];
+          const precioChg=c.price!==p.price?`<span style="color:var(--muted);">${fmt(c.price)}</span> → <b>${fmt(p.price)}</b>`:fmt(p.price);
+          const stockChg=c.stock!==p.stock?`${stockBadge(c.stock)} → ${stockBadge(p.stock)}`:stockBadge(p.stock);
+          return `<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${p.sku}</td><td style="padding:4px 6px;">${p.name}</td><td style="padding:4px 6px;">${precioChg}</td><td style="padding:4px 6px;">${stockChg}</td></tr>`;
+        }).join('')}
+        ${actualizados.length>30?`<tr><td colspan="4" style="padding:4px 6px;color:var(--muted);">...y ${actualizados.length-30} más</td></tr>`:''}
+      </table></div>`;
+    }
+
+    if(faltantes.length){
+      html += `<h4 style="color:var(--red);margin:16px 0 6px;">🔴 Faltantes → NOSTOCK (${faltantes.length})</h4>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <tr style="border-bottom:1px solid var(--border);"><th>SKU</th><th>Nombre</th><th>Marca</th></tr>
+        ${faltantes.slice(0,30).map(p=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${p.sku}</td><td style="padding:4px 6px;">${p.name}</td><td style="padding:4px 6px;">${p.brand}</td></tr>`).join('')}
+        ${faltantes.length>30?`<tr><td colspan="3" style="padding:4px 6px;color:var(--muted);">...y ${faltantes.length-30} más</td></tr>`:''}
+      </table></div>`;
+    }
+
+    document.getElementById('excelPreviewContent').innerHTML = html;
+    document.getElementById('excelPreviewModal').style.display = 'block';
+    showToast(`✅ ${incoming.length} productos listos para importar`);
+  } catch(e){ showToast('❌ Error: '+e.message); console.error(e); }
+}
+
+// ── Confirmar importación ─────────────────────────────────────────────────────
+async function confirmExcelImport(){
+  if(!excelPendingImport) return;
+  const {incoming, faltantes} = excelPendingImport;
+  const token = localStorage.getItem('admin_token')||SUPABASE_ANON;
+  const headers = {'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};
+  showToast('⏳ Importando...');
+  document.getElementById('excelPreviewModal').style.display = 'none';
+
+  try{
+    // Upsert todos los productos del Excel
+    // Mapear a nombres de base de datos
+    const toDb = p => ({
+      codigo: p.sku,
+      producto: p.name,
+      marca: p.brand,
+      precio_pesos: p.price,
+      precio_pvp: p.pvp,
+      iva: p.iva.toString(),
+      stock_estado: p.stock,
+      descripcion: p.description,
+      ean: p.ean,
+      rubro: p.rubro,
+      stock_fisico: p.stock_fisico,
+      ingresos: p.ingresos,
+      stock_ingresos: p.stock_ingresos
+    });
+
+    const CHUNK = 50;
+    for(let i=0;i<incoming.length;i+=CHUNK){
+      const dbChunk = incoming.slice(i,i+CHUNK).map(toDb);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/productos`,{
+        method:'POST', headers, body:JSON.stringify(dbChunk)
+      });
+      if(!res.ok){ const err=await res.text(); throw new Error(err); }
+    }
+    // Pasar faltantes a NOSTOCK
+    for(const p of faltantes){
+      await fetch(`${SUPABASE_URL}/rest/v1/productos?codigo=eq.${p.sku}`,{
+        method:'PATCH', headers, body:JSON.stringify({stock_estado:'NOSTOCK'})
+      });
+    }
+    excelPendingImport = null;
+    showToast(`✅ Importación completada — ${incoming.length} productos actualizados`);
+    await loadProdTable();
+  } catch(e){ showToast('❌ Error en importación: '+e.message); console.error(e); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── ALERTAS MORA ─────────────────────────────────────────────────────────────
+let waVendedor = '';
+
+async function checkMoraBadge(){
+  try {
+    const token = localStorage.getItem('admin_token');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/clientes_en_mora`, {
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+      body: JSON.stringify({dias: 30})
+    });
+    const data = await res.json();
+    const mora = Array.isArray(data) ? data : [];
+    const badge  = document.getElementById('moraBadgeTab');
+    const bar    = document.getElementById('moraAlertBar');
+    const count  = document.getElementById('moraCount');
+    if(mora.length > 0){
+      if(badge){ badge.textContent = mora.length; badge.style.display = 'inline-flex'; }
+      if(bar)  { bar.style.display = 'flex'; }
+      if(count){ count.textContent = mora.length; }
+    } else {
+      if(badge) badge.style.display = 'none';
+      if(bar)   bar.style.display   = 'none';
+    }
+    return mora;
+  } catch(e){ return []; }
+}
+
+async function generarAlertasMora(){
+  const token = localStorage.getItem('admin_token');
+  const btn = document.querySelector('[onclick="generarAlertasMora()"]');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Generando...'; }
+
+  try {
+    // 1. Traer clientes en mora
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/clientes_en_mora`, {
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+      body: JSON.stringify({dias: 30})
+    });
+    const mora = await res.json();
+    if(!Array.isArray(mora) || !mora.length){
+      showToast('✅ No hay clientes en mora');
+      return;
+    }
+
+    // 2. Verificar cuáles ya recibieron alerta hoy
+    const hoy = new Date().toISOString().slice(0,10);
+    const alertasRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/debt_alerts?canal=eq.whatsapp&enviada_at=gte.${hoy}T00:00:00&select=client_id`,
+      { headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`} }
+    );
+    const alertasHoy = await alertasRes.json();
+    const yaAvisados = new Set((Array.isArray(alertasHoy)?alertasHoy:[]).map(a=>a.client_id));
+
+    // 3. Filtrar los que NO recibieron alerta hoy
+    const pendientes = mora.filter(m => !yaAvisados.has(m.client_id));
+    if(!pendientes.length){
+      showToast('ℹ️ Todos los morosos ya recibieron alerta hoy');
+      return;
+    }
+
+    // 4. Mensaje resumen al vendedor
+    if(waVendedor){
+      let msgVendedor = '🐾 *BEEPEX CUYO — Clientes en mora*\n';
+      msgVendedor += `📅 ${new Date().toLocaleDateString('es-AR')}\n`;
+      msgVendedor += `⚠️ ${pendientes.length} cliente(s) con deuda vencida > 30 días\n\n`;
+      pendientes.forEach((m, i) => {
+        msgVendedor += `${i+1}. *${m.nombre}*\n`;
+        msgVendedor += `   💰 Deuda: ${fmt(m.saldo)}\n`;
+        if(m.dias_mora) msgVendedor += `   📆 Días: ${m.dias_mora}\n`;
+        if(m.telefono)  msgVendedor += `   📱 ${m.telefono}\n`;
+        msgVendedor += '\n';
+      });
+      msgVendedor += '━━━━━━━━━━━━━━\n_Enviado desde Beepex Admin_';
+      window.open(`https://wa.me/${waVendedor}?text=${encodeURIComponent(msgVendedor)}`, '_blank');
+      await new Promise(r => setTimeout(r, 800));
+    }
+
+    // 5. Mensajes individuales a cada cliente moroso + registro
+    for(const m of pendientes){
+      const tel = m.telefono_wa || normalizarWA(m.telefono||'');
+      if(tel){
+        let msgCliente  = `Hola *${m.nombre}* 👋\n\n`;
+        msgCliente += `Te contactamos de *Beepex Cuyo* para avisarte que tenés una deuda pendiente de *${fmt(m.saldo)}*`;
+        if(m.dias_mora) msgCliente += ` (vencida hace ${m.dias_mora} días)`;
+        msgCliente += `.\n\nComunicate con nosotros para regularizar tu cuenta.\n\n🐾 _Beepex Cuyo_`;
+        window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgCliente)}`, '_blank');
+        await new Promise(r => setTimeout(r, 600));
+      }
+      // Registrar en debt_alerts
+      await fetch(`${SUPABASE_URL}/rest/v1/debt_alerts`, {
+        method:'POST',
+        headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({ client_id: m.client_id, canal: 'whatsapp', dias_mora: m.dias_mora ?? null })
+      });
+    }
+
+    showToast(`✅ ${pendientes.length} alerta(s) WA generadas`, 4000);
+    await checkMoraBadge();
+
+  } catch(err){
+    showToast('❌ Error: '+(err.message||err));
+    console.error(err);
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '🔔 Enviar alertas WA'; }
+  }
+}
+
+function normalizarWA(tel){
+  if(!tel) return '';
+  const d = tel.replace(/\D/g,'');
+  if(d.startsWith('549')) return d;
+  if(d.startsWith('54'))  return '549'+d.slice(2);
+  if(d.startsWith('0'))   return '549'+d.slice(1);
+  return '549'+d;
+}
+
+// Chequear cada 5 minutos
+setInterval(checkAndRefreshToken, 5*60*1000);
+
+// ── Init ──
+window.addEventListener('scroll',()=>{
+  const bt=document.getElementById('backTop');
+  if(window.scrollY>300) bt.classList.add('visible'); else bt.classList.remove('visible');
+});
+restoreSession();
+</script>
+</body>
+</html>
