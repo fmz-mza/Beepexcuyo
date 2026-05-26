@@ -75,6 +75,7 @@ function fmt(n) {
 // ── 5. Generar HTML del estado ────────────────────────────────────────────────
 function buildHTML(products) {
   const today = new Date().toLocaleDateString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
     weekday: 'long', day: 'numeric', month: 'long'
   });
 
@@ -96,14 +97,12 @@ function buildHTML(products) {
     const stockClass = isPreventa ? 'preventa' : 'in-stock';
     const stockText = isPreventa ? '🕐 Preventa' : '✅ En Stock';
     const nombre = p.producto.length > 55 ? p.producto.slice(0, 52) + '…' : p.producto;
-    const marca = (p.marca || 'Genéricos').toUpperCase();
     return `
       <div class="card">
         <div class="img-wrap">
           <img src="${imgUrl}" alt="${nombre}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><rect width=%22200%22 height=%22200%22 fill=%22%23f5f5f7%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2240%22>🐾</text></svg>'"/>
         </div>
         <div class="info">
-          <div class="brand">${marca}</div>
           <div class="name">${nombre}</div>
           <div class="price-stock-row">
             <div class="price">${fmt(p.precio_pesos)}</div>
@@ -254,9 +253,9 @@ function buildHTML(products) {
   }
 
   .img-wrap img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .info {
@@ -264,12 +263,6 @@ function buildHTML(products) {
     display: flex;
     flex-direction: column;
     gap: 8px;
-  }
-
-  .brand {
-    font-size: 11px; font-weight: 700;
-    color: #7096ff; text-transform: uppercase;
-    letter-spacing: 1.5px;
   }
 
   .name {
