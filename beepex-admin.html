@@ -2486,7 +2486,7 @@ async function descargarTicketPOSExcel(orderId, ticket){
     showToast('⏳ Preparando Excel...');
     // Traer order_items con JOIN a productos
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=sku,nombre,cantidad,precio_unitario,precio_modificado,productos!inner(descripcion,iva,marca)`,
+      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=sku,nombre,cantidad,precio_unitario,precio_modificado,productos(descripcion,iva,marca)`,
       {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
     );
     const items = await res.json();
