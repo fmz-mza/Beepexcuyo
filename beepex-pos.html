@@ -262,11 +262,6 @@ input,select,textarea{font-family:inherit;}
 .toast.err{border-color:rgba(239,68,68,.4);color:var(--red);}
 ::-webkit-scrollbar{width:3px;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-  .iva-toggle{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:600;transition:all .2s;white-space:nowrap;user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-  .iva-toggle:active{transform:scale(.95);}
-  .iva-toggle .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background .2s;}
-  .iva-toggle.active .dot{background:var(--green);}
-  .iva-toggle.active{border-color:var(--green);color:var(--green);}
 </style>
 </head>
 <body>
@@ -289,8 +284,8 @@ input,select,textarea{font-family:inherit;}
     <div class="hdr-logo">🐾 <span>POS</span></div>
     <div class="hdr-badge">PUNTO DE VENTA</div>
     <div class="conn-dot" id="connDot"></div>
-    <div class="iva-toggle" id="ivaToggle" onclick="toggleIVA()">
-      <div class="dot" id="ivaDot"></div>
+    <div class="iva-toggle" id="ivaToggle" onclick="toggleIVA()" style="margin-left:10px;display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:700;">
+      <div class="dot" id="ivaDot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);"></div>
       <span id="ivaLabel">Sin IVA</span>
     </div>
     <div class="hdr-right">
@@ -397,7 +392,10 @@ input,select,textarea{font-family:inherit;}
           <div class="resumen-box" id="resumenBox"></div>
         </div>
         <button class="confirm-btn" id="confirmBtn" onclick="confirmSale()" disabled>✓ Confirmar venta</button>
-        <button class="cancel-btn" onclick="cancelOrder()">Cancelar pedido</button>
+        <div style="display:flex;gap:8px;">
+          <button class="cancel-btn" onclick="cancelOrder()" style="flex:1;">Cancelar pedido</button>
+          <button class="cancel-btn" onclick="downloadCartExcel()" style="flex:1;background:var(--accent);" title="Descargar carrito en Excel">📊 Excel Venta</button>
+        </div>
       </div>
     </div>
 
@@ -464,7 +462,56 @@ input,select,textarea{font-family:inherit;}
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js">
+// ── Descargar carrito en Excel ────────────────────────────────────────────────
+async function downloadCartExcel(){
+  if(!cart || cart.length === 0){ showToast('El pedido está vacío'); return; }
+  try {
+    // Cargar SheetJS dinámicamente
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res; s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+    
+    // Mapear items del carrito con datos completos
+    const mapped = cart.map(item => {
+      const p = item.product;
+      const precio = item.precio_modificado ?? item.precio_unitario ?? p.precio_pesos;
+      const iva = p.iva || 0;
+      return {
+        'SKU': p.codigo,
+        'NOMBRE': p.producto,
+        'DESCRIPCIÓN': p.descripcion || '',
+        'PRECIO PESOS': precio,
+        'PVP': p.precio_pvp || '',
+        'IVA (%)': iva,
+        'CANTIDAD': item.cantidad,
+        'SUBTOTAL': precio * item.cantidad,
+        'MARCA': p.marca || ''
+      };
+    });
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(mapped);
+    
+    // Auto-ajustar ancho de columnas
+    const colWidths = { A: 12, B: 25, C: 20, D: 15, E: 12, F: 10, G: 10, H: 15, I: 15 };
+    ws['!cols'] = Object.values(colWidths).map(w => ({ wch: w }));
+    
+    XLSX.utils.book_append_sheet(wb, ws, 'PEDIDO');
+    const filename = `Pedido_${new Date().toISOString().slice(0,10)}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    showToast('✅ Excel descargado: ' + filename);
+  } catch(e) {
+    showToast('❌ Error: ' + e.message);
+  }
+}
+
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 'use strict';
@@ -510,8 +557,13 @@ window.addEventListener('offline',()=>setOnline(false));
 
 function toggleIVA(){
   includeIVA = !includeIVA;
-  document.getElementById('ivaToggle').classList.toggle('active', includeIVA);
-  document.getElementById('ivaLabel').textContent = includeIVA ? 'Con IVA' : 'Sin IVA';
+  const dot = document.getElementById('ivaDot');
+  const lbl = document.getElementById('ivaLabel');
+  const btn = document.getElementById('ivaToggle');
+  dot.style.background = includeIVA ? 'var(--accent2)' : 'var(--muted)';
+  lbl.textContent = includeIVA ? 'Con IVA' : 'Sin IVA';
+  btn.style.color = includeIVA ? 'var(--accent2)' : 'var(--text)';
+  btn.style.borderColor = includeIVA ? 'var(--accent2)' : 'var(--border)';
   renderProds(products);
   renderCart();
 }
@@ -1169,28 +1221,6 @@ function showSuccess(ticket, total, pagado){
 }
 function newSale(){document.getElementById('successBg').classList.remove('open');lastTicket=null;}
 
-
-// Helper: enriquece y ordena items del ticket (marca desde products, orden BEEPAW primero, SKU asc)
-function enrichItems(items){
-  const prodMap = {};
-  products.forEach(p => { prodMap[String(p.codigo)] = p; });
-  return items
-    .map(i => {
-      const p = prodMap[String(i.sku)] || {};
-      return { ...i, marca: p.marca || 'GENÉRICOS', codigo: i.sku };
-    })
-    .sort((a,b)=>{
-      const ma = a.marca.toUpperCase() === 'BEEPAW' ? 0 : 1;
-      const mb = b.marca.toUpperCase() === 'BEEPAW' ? 0 : 1;
-      if(ma !== mb) return ma - mb;
-      return String(a.sku).localeCompare(String(b.sku), undefined, {numeric:true});
-    });
-}
-function groupByMarca(items){
-  const groups = {};
-  items.forEach(i => { (groups[i.marca] = groups[i.marca] || []).push(i); });
-  return groups;
-}
 function buildTicketLines(){
   // Helper compartido por PDF y WA
   const t = lastTicket;
@@ -1220,22 +1250,13 @@ async function compartirPDF(){
   if(client){ doc.text('Cliente: '+client.nombre, 4, y); y+=4; }
   doc.line(4,y,76,y); y+=4;
 
-  // Items agrupados por marca: BEEPAW primero, luego resto, por SKU asc
-  const enrichedPdf = enrichItems(items);
-  const groupsPdf = groupByMarca(enrichedPdf);
-  Object.entries(groupsPdf).forEach(([brand, list])=>{
-    doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
-    doc.text('[ '+brand+' ]', 4, y); y+=3.5;
-    doc.setFont('helvetica','normal');
-    list.forEach(i=>{
-      const p = i.precio_modificado ?? i.precio_unitario;
-      doc.setFontSize(7.5);
-      // Nombre completo con wrap automático
-      const lines = doc.splitTextToSize(i.nombre+' (SKU '+i.sku+')', 72);
-      lines.forEach(l=>{ doc.text(l, 4, y); y+=3.5; });
-      doc.text('  '+i.cantidad+' x '+fmt(p)+' = '+fmt(p*i.cantidad), 4, y); y+=4;
-    });
-    y+=1;
+  // Items
+  items.forEach(i=>{
+    const p = i.precio_modificado ?? i.precio_unitario;
+    doc.setFontSize(8);
+    const nm = i.nombre.length>30 ? i.nombre.slice(0,30)+'…' : i.nombre;
+    doc.text(nm, 4, y); y+=3.5;
+    doc.text('  '+i.cantidad+' x '+fmt(p)+' = '+fmt(p*i.cantidad), 4, y); y+=4;
   });
   doc.line(4,y,76,y); y+=4;
 
@@ -1359,61 +1380,50 @@ function shareWA(){
   if(lastTicket.soloPago){ shareWASoloPago(); return; }
   const {t, client, ml} = buildTicketLines();
   const {order, items, totalVenta, total, pagado, saldoAnterior, saldoRestante} = t;
-  const today = new Date(order.fecha).toLocaleDateString('es-AR');
-  const totalU = items.reduce((a,i)=>a+i.cantidad, 0);
 
-  // Agrupar items: BEEPAW primero, luego resto, ordenados por SKU asc
-  const enriched = enrichItems(items);
-  const groups = groupByMarca(enriched);
+  let msg = '\uD83D\uDC3E *BEEPEX CUYO*\n';
+  msg += 'Ticket #'+order.ticket_display+'\n';
+  msg += '\uD83D\uDCC5 '+new Date(order.fecha).toLocaleDateString('es-AR')+'\n';
+  if(client) msg += '\uD83D\uDC64 '+client.nombre+'\n';
+  msg += '━━━━━━━━━━━━━━\n';
 
-  let msg = '\uD83D\uDC3E *TICKET BEEPEX CUYO*\n';
-  msg += '━━━━━━━━━━━━━━━━━━\n';
-  msg += '\uD83C\uDFAB Ticket #'+order.ticket_display+'\n';
-  msg += '\uD83D\uDCC5 *Fecha:* '+today+'\n';
-  if(client) msg += '\uD83D\uDC64 *Cliente:* '+client.nombre+'\n';
-  msg += '\uD83D\uDCB0 *Precios:* '+(includeIVA?'Con IVA':'Sin IVA')+'\n';
-  msg += '━━━━━━━━━━━━━━━━━━\n\n';
-
-  Object.entries(groups).forEach(([brand, list])=>{
-    msg += '\uD83D\uDCE6 *'+brand+'*\n';
-    list.forEach(i=>{
-      const p = i.precio_modificado ?? i.precio_unitario;
-      msg += '\u2022 '+i.nombre+' (SKU '+i.sku+')\n';
-      msg += '  Cant: '+i.cantidad+' × '+fmt(p)+' = *'+fmt(p*i.cantidad)+'*\n';
-    });
-    msg += '\n';
+  items.forEach(i=>{
+    const p = i.precio_modificado ?? i.precio_unitario;
+    msg += '\u2022 '+i.nombre+'\n  '+i.cantidad+' × '+fmt(p)+' = '+fmt(p*i.cantidad)+'\n';
   });
-  msg += '━━━━━━━━━━━━━━━━━━\n';
+
+  msg += '━━━━━━━━━━━━━━\n';
   if(t.descMonto > 0){
-    msg += '\uD83D\uDCCA *Subtotal:* '+fmt(t.subtotal)+'\n';
+    msg += 'Subtotal: '+fmt(t.subtotal)+'\n';
     const descLbl = t.descTipo==='pct' ? 'Descuento ('+t.descPct+'%): -'+fmt(t.descMonto) : 'Descuento: -'+fmt(t.descMonto);
-    msg += '\uD83C\uDFF7 *'+descLbl+'*\n';
+    msg += descLbl+'\n';
   }
+  msg += 'Venta: '+fmt(totalVenta)+'\n';
   if(saldoAnterior > 0){
-    msg += '\uD83D\uDED2 *Venta:* '+fmt(totalVenta)+'\n';
-    msg += '\uD83D\uDCCB *Saldo anterior:* '+fmt(saldoAnterior)+'\n';
-    msg += '\u2705 *TOTAL COBRADO ('+totalU+' producto'+(totalU!==1?'s':'')+'):* *'+fmt(total)+'*\n';
+    msg += 'Saldo anterior: '+fmt(saldoAnterior)+'\n';
+    msg += '*TOTAL COBRADO: '+fmt(total)+'*\n';
   } else {
-    msg += '\u2705 *TOTAL ('+totalU+' producto'+(totalU!==1?'s':'')+'):* *'+fmt(total)+'*\n';
+    msg += '*TOTAL: '+fmt(total)+'*\n';
   }
-  msg += '\uD83D\uDCB3 *Método:* '+(ml[t.payMethod]||t.payMethod)+'\n';
+  msg += 'Método: '+(ml[t.payMethod]||t.payMethod)+'\n';
   if(pagado > 0 && t.payMethod !== 'cta_cte'){
-    msg += '\uD83D\uDCB5 *Recibido:* '+fmt(pagado)+'\n';
+    msg += 'Recibido: '+fmt(pagado)+'\n';
     if(saldoAnterior > 0){
       if(saldoRestante > 0)
-        msg += '\u26A0 *Saldo restante cta cte:* '+fmt(saldoRestante)+'\n';
+        msg += '\u26A0 Saldo restante cta cte: '+fmt(saldoRestante)+'\n';
       else
-        msg += '\u2705 *Cuenta cancelada*\n';
+        msg += '\u2705 Cuenta cancelada\n';
     } else {
       const diff = total - pagado;
-      if(diff > 0) msg += '\uD83D\uDCCC *Queda a cta cte:* '+fmt(diff)+'\n';
-      else if(diff < 0) msg += '\uD83D\uDCB8 *Vuelto:* '+fmt(Math.abs(diff))+'\n';
+      if(diff > 0) msg += 'Queda a cta cte: '+fmt(diff)+'\n';
+      else if(diff < 0) msg += 'Vuelto: '+fmt(Math.abs(diff))+'\n';
     }
   } else if(t.payMethod === 'cta_cte'){
-    msg += '\uD83D\uDCCC *Total a cta cte:* '+fmt(totalVenta)+'\n';
+    msg += 'Total a cta cte: '+fmt(totalVenta)+'\n';
   }
 
-  const wa = client?.telefono_wa || client?.telefono || WA_NUMBER;
+  const wa = client?.telefono_wa || WA_NUMBER;
+  // location.href — no abre ventana nueva, WhatsApp app en mobile
   window.location.href = 'https://api.whatsapp.com/send/?phone='+wa+'&text='+encodeURIComponent(msg);
 }
 
@@ -1421,21 +1431,19 @@ function shareWASoloPago(){
   const t = lastTicket;
   const client = clients.find(x=>x.id===t.clientId);
   const ml = {efectivo:'Efectivo', transferencia:'Transferencia', cta_cte:'Cuenta Corriente'};
-  const today = new Date(t.fecha).toLocaleDateString('es-AR');
 
-  let msg = '\uD83D\uDC3E *COMPROBANTE BEEPEX CUYO*\n';
-  msg += '━━━━━━━━━━━━━━━━━━\n';
-  msg += '\uD83D\uDCC5 *Fecha:* '+today+'\n';
-  if(client) msg += '\uD83D\uDC64 *Cliente:* '+client.nombre+'\n';
-  msg += '━━━━━━━━━━━━━━━━━━\n\n';
-  msg += '\uD83D\uDCCB *Pago de cuenta corriente*\n\n';
-  msg += '\uD83D\uDCCA *Saldo anterior:* '+fmt(t.saldoAnterior)+'\n';
-  msg += '\uD83D\uDCB5 *Abono recibido:* '+fmt(t.saldoCobrado)+'\n';
-  msg += '\uD83D\uDCB3 *Método:* '+(ml[t.payMethod]||t.payMethod)+'\n';
-  if(t.pagado > t.saldoCobrado) msg += '\uD83D\uDCB8 *Vuelto:* '+fmt(t.pagado - t.saldoCobrado)+'\n';
-  msg += '━━━━━━━━━━━━━━━━━━\n';
+  let msg = '\uD83D\uDC3E *BEEPEX CUYO*\n';
+  msg += 'Comprobante de Pago\n';
+  msg += '\uD83D\uDCC5 '+new Date(t.fecha).toLocaleDateString('es-AR')+'\n';
+  if(client) msg += '\uD83D\uDC64 '+client.nombre+'\n';
+  msg += '━━━━━━━━━━━━━━\n';
+  msg += 'Saldo anterior: '+fmt(t.saldoAnterior)+'\n';
+  msg += 'Abono recibido: '+fmt(t.saldoCobrado)+'\n';
+  msg += 'Método: '+(ml[t.payMethod]||t.payMethod)+'\n';
+  if(t.pagado > t.saldoCobrado) msg += 'Vuelto: '+fmt(t.pagado - t.saldoCobrado)+'\n';
+  msg += '━━━━━━━━━━━━━━\n';
   if(t.saldoRestante > 0)
-    msg += '\u26A0 *Saldo restante:* '+fmt(t.saldoRestante)+'\n';
+    msg += '\u26A0 Saldo restante: '+fmt(t.saldoRestante)+'\n';
   else
     msg += '\u2705 *Cuenta cancelada*\n';
 
