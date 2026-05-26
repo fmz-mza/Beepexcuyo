@@ -2484,13 +2484,25 @@ async function descargarTicketPOSExcel(orderId, ticket){
   const token = localStorage.getItem('admin_token');
   try {
     showToast('⏳ Preparando Excel...');
-    // Traer order_items con JOIN a productos
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=sku,nombre,cantidad,precio_unitario,precio_modificado,productos(descripcion,iva,marca)`,
+    
+    // 1. Traer items de la orden
+    const res1 = await fetch(
+      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=sku,nombre,cantidad,precio_unitario,precio_modificado`,
       {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
     );
-    const items = await res.json();
+    const items = await res1.json();
     if(!Array.isArray(items)||!items.length){ showToast('Sin items para esta venta'); return; }
+    
+    // 2. Traer datos de productos (para descripción, iva, marca)
+    const skus = items.map(i => i.sku).filter(Boolean);
+    const prodQuery = skus.map(s => `codigo=eq.${s}`).join('&');
+    const res2 = await fetch(
+      `${SUPABASE_URL}/rest/v1/productos?${prodQuery}&select=codigo,descripcion,iva,marca`,
+      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+    );
+    const prods = await res2.json();
+    const prodMap = {};
+    prods.forEach(p => { prodMap[p.codigo] = p; });
     
     if(!window.XLSX){
       await new Promise((res,rej)=>{
@@ -2502,7 +2514,7 @@ async function descargarTicketPOSExcel(orderId, ticket){
     }
     
     const mapped = items.map(i => {
-      const prod = i.productos || {};
+      const prod = prodMap[i.sku] || {};
       return {
         'SKU': i.sku || '',
         'NOMBRE': i.nombre || '',
@@ -2518,14 +2530,14 @@ async function descargarTicketPOSExcel(orderId, ticket){
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(mapped);
     ws['!cols'] = [
-      { wch: 12 },  // SKU
-      { wch: 25 },  // NOMBRE
-      { wch: 20 },  // DESCRIPCIÓN
-      { wch: 15 },  // MARCA
-      { wch: 10 },  // CANTIDAD
-      { wch: 15 },  // PRECIO PESOS
-      { wch: 18 },  // PRECIO MODIFICADO
-      { wch: 10 }   // IVA
+      { wch: 12 },
+      { wch: 25 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 18 },
+      { wch: 10 }
     ];
     
     XLSX.utils.book_append_sheet(wb, ws, 'VENTA');
