@@ -2501,15 +2501,19 @@ async function descargarTicketPOSExcel(orderId, ticket){
     if(!Array.isArray(items)||!items.length){ showToast('Sin items para esta venta'); return; }
     console.log('[descargarTicketPOSExcel] items:', items);
     
-    // 2. Traer datos de productos (para descripción, iva, marca, precio_pvp)
+    // 2. Traer datos de productos por SKU (codigo)
     const skus = items.map(i => i.sku).filter(Boolean);
-    const prodQuery = skus.map(s => `codigo=eq.${s}`).join('&');
-    const res2 = await fetch(
-      `${SUPABASE_URL}/rest/v1/productos?${prodQuery}&select=codigo,descripcion,iva,marca,precio_pvp`,
-      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
-    );
-    const prods = await res2.json();
-    console.log('[descargarTicketPOSExcel] productos:', prods);
+    let prods = [];
+    if(skus.length > 0){
+      // Intentar con OR: codigo O producto
+      const orClauses = skus.map(s => `codigo.eq.${s},producto.ilike.%${encodeURIComponent(items.find(i=>i.sku===s).nombre)}%`).join('&or=');
+      const res2 = await fetch(
+        `${SUPABASE_URL}/rest/v1/productos?or=(${orClauses})&select=codigo,producto,descripcion,iva,marca,precio_pvp`,
+        {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
+      );
+      prods = await res2.json();
+      console.log('[descargarTicketPOSExcel] productos encontrados:', prods);
+    }
     const prodMap = {};
     prods.forEach(p => { prodMap[p.codigo] = p; });
     
