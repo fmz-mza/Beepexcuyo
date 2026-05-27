@@ -47,33 +47,37 @@ async function descargarTicketPOSExcel(orderId, ticket){
       'IVA (%)': i.iva || 0
     }));
     
-    // Construir headers y datos con orden específico
-    headers = ['SKU', 'NOMBRE', 'DESCRIPCIÓN', 'IVA (%)', 'PRECIO PESOS', 'PVP', 'MARCA', 'CANTIDAD'];
-    if(mapped.some(i => i['PRECIO MODIFICADO'])) headers.splice(4, 0, 'PRECIO MODIFICADO');
+    // Orden de columnas final
+    headers = ['SKU', 'NOMBRE', 'CANTIDAD', 'PRECIO PESOS'];
+    if(mapped.some(i => i['PRECIO MODIFICADO'])) headers.push('PRECIO MODIFICADO');
+    if(hasProdData) headers.push('DESCRIPCIÓN', 'MARCA', 'PVP', 'IVA (%)');
     
+    // Datos de productos (sin totales)
     const dataRows = mapped.map(row => headers.map(h => row[h] ?? ''));
     
-    // Filas de totales
+    // Construir totales
+    const totalCantidad = mapped.reduce((sum, i) => sum + (i['CANTIDAD'] || 0), 0);
+    const totalPrecio = mapped.reduce((sum, i) => sum + ((i['PRECIO PESOS'] || 0) * (i['CANTIDAD'] || 0)), 0);
+    
     const totalRows = [];
-    if(mapped[mapped.length - 1]['SKU'] === 'TOTAL') {
-      totalRows.push(headers.map(h => mapped[mapped.length - 1][h] ?? ''));
-      let idx = mapped.length - 2;
-      while(idx >= 0 && (mapped[idx]['SKU'] === 'SUBTOTAL S/IVA' || mapped[idx]['SKU'] === 'IVA' || mapped[idx]['SKU'] === 'TOTAL C/IVA')){
-        if(tieneIVA || mapped[idx]['SKU'] === 'TOTAL') {
-          totalRows.push(headers.map(h => mapped[idx][h] ?? ''));
-        }
-        idx--;
-      }
+    totalRows.push(['TOTAL', '', totalCantidad, totalPrecio, ...(headers.slice(4).map(() => ''))]);
+    
+    if(tieneIVA){
+      const montoIVA = mapped.reduce((sum, i) => {
+        const iva = (i['IVA (%)'] || 0) / 100;
+        const precio = (i['PRECIO PESOS'] || 0) * (i['CANTIDAD'] || 0);
+        return sum + (precio * iva);
+      }, 0);
+      totalRows.push(['SUBTOTAL S/IVA', '', '', totalPrecio, ...(headers.slice(4).map(() => ''))]);
+      totalRows.push(['IVA', '', '', montoIVA, ...(headers.slice(4).map(() => ''))]);
+      totalRows.push(['TOTAL C/IVA', '', '', totalPrecio + montoIVA, ...(headers.slice(4).map(() => ''))]);
     }
     
-    // Armar tabla: header + segunda fila + datos + totales
+    // Armar tabla con headers estéticos
     const wsData = [
-      [{ v: '🐾 Beepex Cuyo', t: 's', s: {font:{bold:true}, alignment:{horizontal:'center'}} }],
-      headers.map(h => ({ v: h, s: {font:{bold:true}, alignment:{horizontal:'center'}} })),
-      ...dataRows.filter((_, i) => {
-        const row = mapped[i];
-        return row['SKU'] !== 'TOTAL' && row['SKU'] !== 'SUBTOTAL S/IVA' && row['SKU'] !== 'IVA' && row['SKU'] !== 'TOTAL C/IVA';
-      }).map(row => row.map(v => ({ v, s: {alignment:{horizontal:'center'}} }))),
+      [{ v: '🐾 Beepex Cuyo', t: 's', s: {font:{bold:true, sz:14}, alignment:{horizontal:'center'}} }],
+      headers.map(h => ({ v: h, s: {font:{bold:true}, alignment:{horizontal:'center'}, fill:{fgColor:{rgb:'D3D3D3'}}} })),
+      ...dataRows.map(row => row.map(v => ({ v, s: {alignment:{horizontal:'center'}} }))),
       [],
       ...totalRows.map(row => row.map(v => ({ v, s: {alignment:{horizontal:'center'}, font:{bold:true}} })))
     ];
@@ -2556,24 +2560,47 @@ async function descargarTicketPOSExcel(orderId, ticket){
     // Construir filas dinámicamente: mostrar precio_modificado solo si existe
     const hasProdData = Object.keys(prodMap).length > 0;
     let headers = [];  // Definir aquí para usar después
-    const mapped = items.map(i => {
+    
+    // Enriquecer items con datos de productos
+    const enriched = items.map(i => {
       const prod = prodMap[i.sku] || {};
-      const row = {
-        'SKU': i.sku || '',
-        'NOMBRE': i.nombre || '',
-        'CANTIDAD': i.cantidad || 0,
-        'PRECIO PESOS': i.precio_unitario || 0
+      return {
+        sku: i.sku || '',
+        nombre: i.nombre || '',
+        cantidad: i.cantidad || 0,
+        precio_unitario: i.precio_unitario || 0,
+        precio_modificado: i.precio_modificado || null,
+        descripcion: prod.descripcion || '',
+        marca: prod.marca || '',
+        pvp: prod.precio_pvp || '',
+        iva: prod.iva || 0
       };
-      // Mostrar precio_modificado solo si existe y es diferente
+    });
+    
+    // Ordenar: BEEPAW primero (marcaAsc=0), luego GENÉRICOS (marcaAsc=1), por SKU numérico asc
+    enriched.sort((a,b) => {
+      const marcaA = (a.marca || '').toUpperCase() === 'BEEPAW' ? 0 : 1;
+      const marcaB = (b.marca || '').toUpperCase() === 'BEEPAW' ? 0 : 1;
+      if(marcaA !== marcaB) return marcaA - marcaB;
+      return parseInt(a.sku) - parseInt(b.sku);
+    });
+    
+    // Mapear a filas con orden específico de columnas
+    const mapped = enriched.map(i => {
+      const row = {
+        'SKU': i.sku,
+        'NOMBRE': i.nombre,
+        'CANTIDAD': i.cantidad,
+        'PRECIO PESOS': i.precio_unitario
+      };
       if(i.precio_modificado && i.precio_modificado !== i.precio_unitario){
         row['PRECIO MODIFICADO'] = i.precio_modificado;
       }
-      // Agregar datos de productos solo si se encontraron
       if(hasProdData){
-        row['DESCRIPCIÓN'] = prod.descripcion || '';
-        row['MARCA'] = prod.marca || '';
-        row['PVP'] = prod.precio_pvp || '';
-        row['IVA (%)'] = prod.iva || 0;
+        row['DESCRIPCIÓN'] = i.descripcion;
+        row['MARCA'] = i.marca;
+        row['PVP'] = i.pvp;
+        row['IVA (%)'] = i.iva;
       }
       return row;
     });
