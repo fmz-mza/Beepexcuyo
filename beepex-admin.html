@@ -47,15 +47,42 @@ async function descargarTicketPOSExcel(orderId, ticket){
       'IVA (%)': i.iva || 0
     }));
     
-    // Agregar header estético al inicio
+    // Construir headers y datos con orden específico
+    const headers = ['SKU', 'NOMBRE', 'DESCRIPCIÓN', 'IVA (%)', 'PRECIO PESOS', 'PVP', 'MARCA', 'CANTIDAD'];
+    if(mapped.some(i => i['PRECIO MODIFICADO'])) headers.splice(4, 0, 'PRECIO MODIFICADO');
+    
+    const dataRows = mapped.map(row => headers.map(h => row[h] ?? ''));
+    
+    // Filas de totales
+    const totalRows = [];
+    if(mapped[mapped.length - 1]['SKU'] === 'TOTAL') {
+      totalRows.push(headers.map(h => mapped[mapped.length - 1][h] ?? ''));
+      let idx = mapped.length - 2;
+      while(idx >= 0 && (mapped[idx]['SKU'] === 'SUBTOTAL S/IVA' || mapped[idx]['SKU'] === 'IVA' || mapped[idx]['SKU'] === 'TOTAL C/IVA')){
+        if(tieneIVA || mapped[idx]['SKU'] === 'TOTAL') {
+          totalRows.push(headers.map(h => mapped[idx][h] ?? ''));
+        }
+        idx--;
+      }
+    }
+    
+    // Armar tabla: header + segunda fila + datos + totales
     const wsData = [
-      [{ v: '🐾 BEEPEX CUYO', t: 's' }],
-      [''],
-      ...XLSX.utils.sheet_to_json(XLSX.utils.json_to_sheet(mapped), {header:1})
+      [{ v: '🐾 Beepex Cuyo', t: 's', s: {font:{bold:true}, alignment:{horizontal:'center'}} }],
+      headers.map(h => ({ v: h, s: {font:{bold:true}, alignment:{horizontal:'center'}} })),
+      ...dataRows.filter((_, i) => {
+        const row = mapped[i];
+        return row['SKU'] !== 'TOTAL' && row['SKU'] !== 'SUBTOTAL S/IVA' && row['SKU'] !== 'IVA' && row['SKU'] !== 'TOTAL C/IVA';
+      }).map(row => row.map(v => ({ v, s: {alignment:{horizontal:'center'}} }))),
+      [],
+      ...totalRows.map(row => row.map(v => ({ v, s: {alignment:{horizontal:'center'}, font:{bold:true}} })))
     ];
     
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Fusionar celda para Beepex Cuyo
+    ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:headers.length-1}}];
     ws['!cols'] = [
       { wch: 12 },  // SKU
       { wch: 25 },  // NOMBRE
@@ -2587,17 +2614,19 @@ async function descargarTicketPOSExcel(orderId, ticket){
     
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(mapped);
-    ws['!cols'] = [
-      { wch: 12 },  // SKU
-      { wch: 25 },  // NOMBRE
-      { wch: 20 },  // DESCRIPCIÓN
-      { wch: 15 },  // MARCA
-      { wch: 10 },  // CANTIDAD
-      { wch: 15 },  // PRECIO PESOS
-      { wch: 18 },  // PRECIO MODIFICADO (si existe)
-      { wch: 12 },  // PVP
-      { wch: 10 }   // IVA
-    ];
+    // Anchos dinámicos según columnas
+    const colWidths = {
+      'SKU': 12,
+      'NOMBRE': 25,
+      'DESCRIPCIÓN': 35,
+      'IVA (%)': 10,
+      'PRECIO PESOS': 15,
+      'PRECIO MODIFICADO': 18,
+      'PVP': 12,
+      'MARCA': 12,
+      'CANTIDAD': 10
+    };
+    ws['!cols'] = headers.map(h => ({ wch: colWidths[h] || 12 }));
     
     XLSX.utils.book_append_sheet(wb, ws, 'VENTA');
     XLSX.writeFile(wb, `Ticket_${ticket}_${new Date().toISOString().slice(0,10)}.xlsx`);
