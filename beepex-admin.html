@@ -2577,6 +2577,8 @@ async function limpiezaEliminarSeleccionados(section){
         r.ok ? ok++ : err++;
       }
       if(section === 'pos'){
+        // Borrar en orden por FK: payment_allocations → order_items → pos_orders
+        await api(`payment_allocations?order_id=eq.${id}`, {method:'DELETE'});
         await api(`order_items?order_id=eq.${id}`, {method:'DELETE'});
         const r = await api(`pos_orders?id=eq.${id}`, {method:'DELETE'});
         r.ok ? ok++ : err++;
