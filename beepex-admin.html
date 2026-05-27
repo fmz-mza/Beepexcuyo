@@ -2501,14 +2501,14 @@ async function descargarTicketPOSExcel(orderId, ticket){
     if(!Array.isArray(items)||!items.length){ showToast('Sin items para esta venta'); return; }
     console.log('[descargarTicketPOSExcel] items:', items);
     
-    // 2. Traer datos de productos por SKU (codigo)
+    // 2. Traer datos de productos por SKU (codigo) usando IN
     const skus = items.map(i => i.sku).filter(Boolean);
     let prods = [];
     if(skus.length > 0){
-      // Construir query simple: codigo=eq.11575,codigo=eq.11437,etc
-      const codeFilters = skus.map(s => `codigo=eq.${s}`).join('&');
+      // Usar operador IN: codigo=in.(11575,11437,10904,...)
+      const skuList = '(' + skus.join(',') + ')';
       const res2 = await fetch(
-        `${SUPABASE_URL}/rest/v1/productos?${codeFilters}&select=codigo,producto,descripcion,iva,marca,precio_pvp`,
+        `${SUPABASE_URL}/rest/v1/productos?codigo=in.${skuList}&select=codigo,producto,descripcion,iva,marca,precio_pvp`,
         {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
       );
       prods = await res2.json();
@@ -2527,13 +2527,12 @@ async function descargarTicketPOSExcel(orderId, ticket){
     }
     
     // Construir filas dinámicamente: mostrar precio_modificado solo si existe
+    const hasProdData = Object.keys(prodMap).length > 0;
     const mapped = items.map(i => {
       const prod = prodMap[i.sku] || {};
       const row = {
         'SKU': i.sku || '',
         'NOMBRE': i.nombre || '',
-        'DESCRIPCIÓN': prod.descripcion || '',
-        'MARCA': prod.marca || '',
         'CANTIDAD': i.cantidad || 0,
         'PRECIO PESOS': i.precio_unitario || 0
       };
@@ -2541,8 +2540,13 @@ async function descargarTicketPOSExcel(orderId, ticket){
       if(i.precio_modificado && i.precio_modificado !== i.precio_unitario){
         row['PRECIO MODIFICADO'] = i.precio_modificado;
       }
-      row['PVP'] = prod.precio_pvp || '';
-      row['IVA (%)'] = prod.iva || 0;
+      // Agregar datos de productos solo si se encontraron
+      if(hasProdData){
+        row['DESCRIPCIÓN'] = prod.descripcion || '';
+        row['MARCA'] = prod.marca || '';
+        row['PVP'] = prod.precio_pvp || '';
+        row['IVA (%)'] = prod.iva || 0;
+      }
       return row;
     });
     
