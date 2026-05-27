@@ -47,8 +47,15 @@ async function descargarTicketPOSExcel(orderId, ticket){
       'IVA (%)': i.iva || 0
     }));
     
+    // Agregar header estético al inicio
+    const wsData = [
+      [{ v: '🐾 BEEPEX CUYO', t: 's' }],
+      [''],
+      ...XLSX.utils.sheet_to_json(XLSX.utils.json_to_sheet(mapped), {header:1})
+    ];
+    
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(mapped);
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
     ws['!cols'] = [
       { wch: 12 },  // SKU
       { wch: 25 },  // NOMBRE
@@ -2492,6 +2499,7 @@ async function descargarTicketPOSExcel(orderId, ticket){
     );
     const items = await res1.json();
     if(!Array.isArray(items)||!items.length){ showToast('Sin items para esta venta'); return; }
+    console.log('[descargarTicketPOSExcel] items:', items);
     
     // 2. Traer datos de productos (para descripción, iva, marca, precio_pvp)
     const skus = items.map(i => i.sku).filter(Boolean);
@@ -2501,6 +2509,7 @@ async function descargarTicketPOSExcel(orderId, ticket){
       {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
     );
     const prods = await res2.json();
+    console.log('[descargarTicketPOSExcel] productos:', prods);
     const prodMap = {};
     prods.forEach(p => { prodMap[p.codigo] = p; });
     
