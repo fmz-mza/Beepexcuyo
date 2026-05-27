@@ -48,7 +48,7 @@ async function descargarTicketPOSExcel(orderId, ticket){
     }));
     
     // Construir headers y datos con orden específico
-    const headers = ['SKU', 'NOMBRE', 'DESCRIPCIÓN', 'IVA (%)', 'PRECIO PESOS', 'PVP', 'MARCA', 'CANTIDAD'];
+    headers = ['SKU', 'NOMBRE', 'DESCRIPCIÓN', 'IVA (%)', 'PRECIO PESOS', 'PVP', 'MARCA', 'CANTIDAD'];
     if(mapped.some(i => i['PRECIO MODIFICADO'])) headers.splice(4, 0, 'PRECIO MODIFICADO');
     
     const dataRows = mapped.map(row => headers.map(h => row[h] ?? ''));
@@ -2555,6 +2555,7 @@ async function descargarTicketPOSExcel(orderId, ticket){
     
     // Construir filas dinámicamente: mostrar precio_modificado solo si existe
     const hasProdData = Object.keys(prodMap).length > 0;
+    let headers = [];  // Definir aquí para usar después
     const mapped = items.map(i => {
       const prod = prodMap[i.sku] || {};
       const row = {
