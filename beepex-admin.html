@@ -11,130 +11,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js">
-// ═══════════════════════════════════════════════════════
-// LIMPIEZA DE PRUEBAS
-// ═══════════════════════════════════════════════════════
-const _limpiezaData = { usuarios: [], catalogo: [], pos: [] };
-
-function _limpiezaRow(id, cols, section){
-  return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;">
-    <input type="checkbox" data-id="${id}" data-section="${section}" style="width:16px;height:16px;accent-color:var(--red);flex-shrink:0;">
-    <span style="font-size:12px;color:var(--text);flex:1;">${cols}</span>
-  </label>`;
-}
-
-async function limpiezaLoadUsuarios(){
-  const token = localStorage.getItem('admin_token');
-  const el = document.getElementById('limpieza-usuarios-list');
-  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,email,nombre,created_at&order=created_at.desc`,
-    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
-  const data = await res.json();
-  _limpiezaData.usuarios = data;
-  if(!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin usuarios</div>'; return; }
-  el.innerHTML = data.map(u =>
-    _limpiezaRow(u.id,
-      `<b>${u.email||u.nombre||'Sin email'}</b> <span style="color:var(--muted);">${new Date(u.created_at).toLocaleDateString('es-AR')}</span>`,
-      'usuarios')
-  ).join('');
-}
-
-async function limpiezaLoadCatalogo(){
-  const token = localStorage.getItem('admin_token');
-  const el = document.getElementById('limpieza-catalogo-list');
-  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=id,nombre_cliente,total,via,created_at&order=created_at.desc&limit=100`,
-    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
-  const data = await res.json();
-  _limpiezaData.catalogo = data;
-  if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin pedidos</div>'; return; }
-  el.innerHTML = data.map(o =>
-    _limpiezaRow(o.id,
-      `<b>${o.nombre_cliente||'Sin nombre'}</b> · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.created_at).toLocaleDateString('es-AR')} · ${o.via||''}</span>`,
-      'catalogo')
-  ).join('');
-}
-
-async function limpiezaLoadPOS(){
-  const token = localStorage.getItem('admin_token');
-  const el = document.getElementById('limpieza-pos-list');
-  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?select=id,ticket_display,fecha,total,client_id,clients(nombre)&order=fecha.desc&limit=100`,
-    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
-  const data = await res.json();
-  _limpiezaData.pos = data;
-  if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin ventas</div>'; return; }
-  el.innerHTML = data.map(o => {
-    const cliente = o.clients?.nombre || 'Sin cliente';
-    return _limpiezaRow(o.id,
-      `<b>${o.ticket_display||o.id.slice(0,8)}</b> · ${cliente} · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.fecha).toLocaleDateString('es-AR')}</span>`,
-      'pos');
-  }).join('');
-}
-
-function limpiezaBuscarDuplicados(section){
-  const data = _limpiezaData[section];
-  if(!data.length){ showToast('Cargá los datos primero'); return; }
-
-  let keyFn;
-  if(section === 'usuarios') keyFn = u => (u.email||'').toLowerCase().trim();
-  if(section === 'catalogo') keyFn = o => `${o.nombre_cliente||''}_${o.total||0}_${(o.created_at||'').slice(0,10)}`;
-  if(section === 'pos')      keyFn = o => `${o.client_id||''}_${o.total||0}_${(o.fecha||'').slice(0,10)}`;
-
-  const seen = {}, dupeIds = new Set();
-  data.forEach(item => {
-    const k = keyFn(item);
-    if(seen[k]) dupeIds.add(item.id);
-    else seen[k] = true;
-  });
-
-  if(!dupeIds.size){ showToast('✅ Sin duplicados encontrados'); return; }
-
-  // Marcar checkboxes de duplicados
-  const listEl = document.getElementById(`limpieza-${section}-list`);
-  listEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
-    if(dupeIds.has(cb.dataset.id)) cb.checked = true;
-  });
-  showToast(`⚠️ ${dupeIds.size} duplicado(s) marcados`);
-}
-
-async function limpiezaEliminarSeleccionados(section){
-  const checks = document.querySelectorAll(`#limpieza-${section}-list input[type=checkbox]:checked`);
-  if(!checks.length){ showToast('Seleccioná al menos un item'); return; }
-  if(!confirm(`¿Eliminar ${checks.length} item(s) de ${section}? Esta acción no se puede deshacer.`)) return;
-
-  const token = localStorage.getItem('admin_token');
-  const ids = [...checks].map(c => c.dataset.id);
-  let ok = 0, err = 0;
-
-  for(const id of ids){
-    try {
-      if(section === 'usuarios'){
-        const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`,
-          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
-        r.ok ? ok++ : err++;
-      }
-      if(section === 'catalogo'){
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${id}`,
-          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
-        r.ok ? ok++ : err++;
-      }
-      if(section === 'pos'){
-        await fetch(`${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${id}`,
-          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${id}`,
-          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
-        r.ok ? ok++ : err++;
-      }
-    } catch(e){ err++; }
-  }
-
-  showToast(`✅ Eliminados: ${ok}${err ? ' | ❌ Errores: '+err : ''}`);
-  if(section === 'usuarios') limpiezaLoadUsuarios();
-  if(section === 'catalogo') limpiezaLoadCatalogo();
-  if(section === 'pos')      limpiezaLoadPOS();
-}
-
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -2593,6 +2469,131 @@ window.addEventListener('scroll',()=>{
   if(window.scrollY>300) bt.classList.add('visible'); else bt.classList.remove('visible');
 });
 restoreSession();
+
+// ═══════════════════════════════════════════════════════
+// LIMPIEZA DE PRUEBAS
+// ═══════════════════════════════════════════════════════
+const _limpiezaData = { usuarios: [], catalogo: [], pos: [] };
+
+function _limpiezaRow(id, cols, section){
+  return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+    <input type="checkbox" data-id="${id}" data-section="${section}" style="width:16px;height:16px;accent-color:var(--red);flex-shrink:0;">
+    <span style="font-size:12px;color:var(--text);flex:1;">${cols}</span>
+  </label>`;
+}
+
+async function limpiezaLoadUsuarios(){
+  const token = localStorage.getItem('admin_token');
+  const el = document.getElementById('limpieza-usuarios-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,email,nombre,created_at&order=created_at.desc`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+  const data = await res.json();
+  _limpiezaData.usuarios = data;
+  if(!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin usuarios</div>'; return; }
+  el.innerHTML = data.map(u =>
+    _limpiezaRow(u.id,
+      `<b>${u.email||u.nombre||'Sin email'}</b> <span style="color:var(--muted);">${new Date(u.created_at).toLocaleDateString('es-AR')}</span>`,
+      'usuarios')
+  ).join('');
+}
+
+async function limpiezaLoadCatalogo(){
+  const token = localStorage.getItem('admin_token');
+  const el = document.getElementById('limpieza-catalogo-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=id,nombre_cliente,total,via,created_at&order=created_at.desc&limit=100`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+  const data = await res.json();
+  _limpiezaData.catalogo = data;
+  if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin pedidos</div>'; return; }
+  el.innerHTML = data.map(o =>
+    _limpiezaRow(o.id,
+      `<b>${o.nombre_cliente||'Sin nombre'}</b> · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.created_at).toLocaleDateString('es-AR')} · ${o.via||''}</span>`,
+      'catalogo')
+  ).join('');
+}
+
+async function limpiezaLoadPOS(){
+  const token = localStorage.getItem('admin_token');
+  const el = document.getElementById('limpieza-pos-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?select=id,ticket_display,fecha,total,client_id,clients(nombre)&order=fecha.desc&limit=100`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+  const data = await res.json();
+  _limpiezaData.pos = data;
+  if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin ventas</div>'; return; }
+  el.innerHTML = data.map(o => {
+    const cliente = o.clients?.nombre || 'Sin cliente';
+    return _limpiezaRow(o.id,
+      `<b>${o.ticket_display||o.id.slice(0,8)}</b> · ${cliente} · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.fecha).toLocaleDateString('es-AR')}</span>`,
+      'pos');
+  }).join('');
+}
+
+function limpiezaBuscarDuplicados(section){
+  const data = _limpiezaData[section];
+  if(!data.length){ showToast('Cargá los datos primero'); return; }
+
+  let keyFn;
+  if(section === 'usuarios') keyFn = u => (u.email||'').toLowerCase().trim();
+  if(section === 'catalogo') keyFn = o => `${o.nombre_cliente||''}_${o.total||0}_${(o.created_at||'').slice(0,10)}`;
+  if(section === 'pos')      keyFn = o => `${o.client_id||''}_${o.total||0}_${(o.fecha||'').slice(0,10)}`;
+
+  const seen = {}, dupeIds = new Set();
+  data.forEach(item => {
+    const k = keyFn(item);
+    if(seen[k]) dupeIds.add(item.id);
+    else seen[k] = true;
+  });
+
+  if(!dupeIds.size){ showToast('✅ Sin duplicados encontrados'); return; }
+
+  // Marcar checkboxes de duplicados
+  const listEl = document.getElementById(`limpieza-${section}-list`);
+  listEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    if(dupeIds.has(cb.dataset.id)) cb.checked = true;
+  });
+  showToast(`⚠️ ${dupeIds.size} duplicado(s) marcados`);
+}
+
+async function limpiezaEliminarSeleccionados(section){
+  const checks = document.querySelectorAll(`#limpieza-${section}-list input[type=checkbox]:checked`);
+  if(!checks.length){ showToast('Seleccioná al menos un item'); return; }
+  if(!confirm(`¿Eliminar ${checks.length} item(s) de ${section}? Esta acción no se puede deshacer.`)) return;
+
+  const token = localStorage.getItem('admin_token');
+  const ids = [...checks].map(c => c.dataset.id);
+  let ok = 0, err = 0;
+
+  for(const id of ids){
+    try {
+      if(section === 'usuarios'){
+        const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`,
+          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+        r.ok ? ok++ : err++;
+      }
+      if(section === 'catalogo'){
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${id}`,
+          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+        r.ok ? ok++ : err++;
+      }
+      if(section === 'pos'){
+        await fetch(`${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${id}`,
+          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${id}`,
+          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+        r.ok ? ok++ : err++;
+      }
+    } catch(e){ err++; }
+  }
+
+  showToast(`✅ Eliminados: ${ok}${err ? ' | ❌ Errores: '+err : ''}`);
+  if(section === 'usuarios') limpiezaLoadUsuarios();
+  if(section === 'catalogo') limpiezaLoadCatalogo();
+  if(section === 'pos')      limpiezaLoadPOS();
+}
+
 </script>
 </body>
 </html>
