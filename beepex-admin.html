@@ -2505,10 +2505,10 @@ async function descargarTicketPOSExcel(orderId, ticket){
     const skus = items.map(i => i.sku).filter(Boolean);
     let prods = [];
     if(skus.length > 0){
-      // Intentar con OR: codigo O producto
-      const orClauses = skus.map(s => `codigo.eq.${s},producto.ilike.%${encodeURIComponent(items.find(i=>i.sku===s).nombre)}%`).join('&or=');
+      // Construir query simple: codigo=eq.11575,codigo=eq.11437,etc
+      const codeFilters = skus.map(s => `codigo=eq.${s}`).join('&');
       const res2 = await fetch(
-        `${SUPABASE_URL}/rest/v1/productos?or=(${orClauses})&select=codigo,producto,descripcion,iva,marca,precio_pvp`,
+        `${SUPABASE_URL}/rest/v1/productos?${codeFilters}&select=codigo,producto,descripcion,iva,marca,precio_pvp`,
         {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
       );
       prods = await res2.json();
