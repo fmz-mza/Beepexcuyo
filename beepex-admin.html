@@ -11,110 +11,128 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js">
+// ═══════════════════════════════════════════════════════
+// LIMPIEZA DE PRUEBAS
+// ═══════════════════════════════════════════════════════
+const _limpiezaData = { usuarios: [], catalogo: [], pos: [] };
 
+function _limpiezaRow(id, cols, section){
+  return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+    <input type="checkbox" data-id="${id}" data-section="${section}" style="width:16px;height:16px;accent-color:var(--red);flex-shrink:0;">
+    <span style="font-size:12px;color:var(--text);flex:1;">${cols}</span>
+  </label>`;
+}
 
-// ── Descargar venta POS en Excel ──────────────────────────────────────────────
-async function descargarTicketPOSExcel(orderId, ticket){
+async function limpiezaLoadUsuarios(){
   const token = localStorage.getItem('admin_token');
-  try {
-    showToast('⏳ Preparando Excel...');
-    // Cargar items de la orden
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=sku,nombre,descripcion,cantidad,precio_unitario,precio_modificado,iva`,
-      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
-    );
-    const items = await res.json();
-    if(!Array.isArray(items)||!items.length){ showToast('Sin items para esta venta'); return; }
-    
-    // Cargar SheetJS dinámicamente
-    if(!window.XLSX){
-      await new Promise((res,rej)=>{
-        const s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        s.onload=res; s.onerror=rej;
-        document.head.appendChild(s);
-      });
-    }
-    
-    // Mapear items
-    const mapped = items.map(i => ({
-      'SKU': i.sku || '',
-      'NOMBRE': i.nombre || '',
-      'DESCRIPCIÓN': i.descripcion || '',
-      'CANTIDAD': i.cantidad || 0,
-      'PRECIO PESOS': i.precio_unitario || 0,
-      'PRECIO MODIFICADO': i.precio_modificado || '',
-      'IVA (%)': i.iva || 0
-    }));
-    
-    // Orden de columnas EXACTO
-    headers = ['SKU', 'NOMBRE', 'DESCRIPCIÓN', 'IVA (%)', 'PRECIO PESOS'];
-    if(mapped.some(i => i['PRECIO MODIFICADO'])) headers.push('PRECIO MODIFICADO');
-    headers.push('PVP', 'MARCA', 'CANTIDAD');
-    
-    // Datos de productos (sin totales)
-    const dataRows = mapped.map(row => headers.map(h => row[h] ?? ''));
-    
-    // Construir totales
-    const totalCantidad = mapped.reduce((sum, i) => sum + (i['CANTIDAD'] || 0), 0);
-    const totalPrecio = mapped.reduce((sum, i) => sum + ((i['PRECIO PESOS'] || 0) * (i['CANTIDAD'] || 0)), 0);
-    
-    const totalRows = [];
-    if(tieneIVA){
-      const montoIVA = mapped.reduce((sum, i) => {
-        const iva = (i['IVA (%)'] || 0) / 100;
-        const precio = (i['PRECIO PESOS'] || 0) * (i['CANTIDAD'] || 0);
-        return sum + (precio * iva);
-      }, 0);
-      const totalConIVA = totalPrecio + montoIVA;
-      totalRows.push(['TOTAL', '', '', '', totalPrecio, ...(headers.slice(5).map(() => ''))]);
-    } else {
-      totalRows.push(['TOTAL', '', '', '', totalPrecio, ...(headers.slice(5).map(() => ''))]);
-    }
-    
-    // Metadata de la venta
-    const fechaVenta = new Date(order.fecha).toLocaleDateString('es-AR');
-    const numeroTicket = order.ticket_display || '';
-    const ivaLabel = tieneIVA ? 'Si' : 'No';
-    const clienteNombre = client?.nombre || 'S/N';
-    
-    // Armar tabla con headers estéticos
-    const wsData = [
-      [{ v: '🐾 Beepex Cuyo', t: 's', s: {font:{bold:true, sz:14}, alignment:{horizontal:'center'}} }],
-      [
-        { v: `Fecha: ${fechaVenta}`, s: {font:{bold:true}, alignment:{horizontal:'left'}} },
-        { v: `Número de Pedido: ${numeroTicket}`, s: {font:{bold:true}, alignment:{horizontal:'left'}} },
-        { v: `Cliente: ${clienteNombre}`, s: {font:{bold:true}, alignment:{horizontal:'left'}} },
-        { v: `Con IVA: ${ivaLabel}`, s: {font:{bold:true}, alignment:{horizontal:'left'}} }
-      ],
-      [],
-      headers.map(h => ({ v: h, s: {font:{bold:true}, alignment:{horizontal:'center'}, fill:{fgColor:{rgb:'D3D3D3'}}} })),
-      ...dataRows.map(row => row.map(v => ({ v, s: {alignment:{horizontal:'center'}} }))),
-      [],
-      ...totalRows.map(row => row.map(v => ({ v, s: {alignment:{horizontal:'center'}, font:{bold:true}} })))
-    ];
-    
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    
-    // Fusionar celda para Beepex Cuyo
-    ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:headers.length-1}}];
-    ws['!cols'] = [
-      { wch: 12 },  // SKU
-      { wch: 25 },  // NOMBRE
-      { wch: 20 },  // DESCRIPCIÓN
-      { wch: 10 },  // CANTIDAD
-      { wch: 15 },  // PRECIO PESOS
-      { wch: 18 },  // PRECIO MODIFICADO
-      { wch: 10 }   // IVA
-    ];
-    
-    XLSX.utils.book_append_sheet(wb, ws, 'VENTA');
-    XLSX.writeFile(wb, `Ticket_${ticket}_${new Date().toISOString().slice(0,10)}.xlsx`);
-    showToast('✅ Excel descargado');
-  } catch(e) {
-    showToast('❌ Error: ' + e.message);
+  const el = document.getElementById('limpieza-usuarios-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,email,nombre,created_at&order=created_at.desc`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+  const data = await res.json();
+  _limpiezaData.usuarios = data;
+  if(!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin usuarios</div>'; return; }
+  el.innerHTML = data.map(u =>
+    _limpiezaRow(u.id,
+      `<b>${u.email||u.nombre||'Sin email'}</b> <span style="color:var(--muted);">${new Date(u.created_at).toLocaleDateString('es-AR')}</span>`,
+      'usuarios')
+  ).join('');
+}
+
+async function limpiezaLoadCatalogo(){
+  const token = localStorage.getItem('admin_token');
+  const el = document.getElementById('limpieza-catalogo-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=id,nombre_cliente,total,via,created_at&order=created_at.desc&limit=100`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+  const data = await res.json();
+  _limpiezaData.catalogo = data;
+  if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin pedidos</div>'; return; }
+  el.innerHTML = data.map(o =>
+    _limpiezaRow(o.id,
+      `<b>${o.nombre_cliente||'Sin nombre'}</b> · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.created_at).toLocaleDateString('es-AR')} · ${o.via||''}</span>`,
+      'catalogo')
+  ).join('');
+}
+
+async function limpiezaLoadPOS(){
+  const token = localStorage.getItem('admin_token');
+  const el = document.getElementById('limpieza-pos-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?select=id,ticket_display,fecha,total,client_id,clients(nombre)&order=fecha.desc&limit=100`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+  const data = await res.json();
+  _limpiezaData.pos = data;
+  if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin ventas</div>'; return; }
+  el.innerHTML = data.map(o => {
+    const cliente = o.clients?.nombre || 'Sin cliente';
+    return _limpiezaRow(o.id,
+      `<b>${o.ticket_display||o.id.slice(0,8)}</b> · ${cliente} · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.fecha).toLocaleDateString('es-AR')}</span>`,
+      'pos');
+  }).join('');
+}
+
+function limpiezaBuscarDuplicados(section){
+  const data = _limpiezaData[section];
+  if(!data.length){ showToast('Cargá los datos primero'); return; }
+
+  let keyFn;
+  if(section === 'usuarios') keyFn = u => (u.email||'').toLowerCase().trim();
+  if(section === 'catalogo') keyFn = o => `${o.nombre_cliente||''}_${o.total||0}_${(o.created_at||'').slice(0,10)}`;
+  if(section === 'pos')      keyFn = o => `${o.client_id||''}_${o.total||0}_${(o.fecha||'').slice(0,10)}`;
+
+  const seen = {}, dupeIds = new Set();
+  data.forEach(item => {
+    const k = keyFn(item);
+    if(seen[k]) dupeIds.add(item.id);
+    else seen[k] = true;
+  });
+
+  if(!dupeIds.size){ showToast('✅ Sin duplicados encontrados'); return; }
+
+  // Marcar checkboxes de duplicados
+  const listEl = document.getElementById(`limpieza-${section}-list`);
+  listEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    if(dupeIds.has(cb.dataset.id)) cb.checked = true;
+  });
+  showToast(`⚠️ ${dupeIds.size} duplicado(s) marcados`);
+}
+
+async function limpiezaEliminarSeleccionados(section){
+  const checks = document.querySelectorAll(`#limpieza-${section}-list input[type=checkbox]:checked`);
+  if(!checks.length){ showToast('Seleccioná al menos un item'); return; }
+  if(!confirm(`¿Eliminar ${checks.length} item(s) de ${section}? Esta acción no se puede deshacer.`)) return;
+
+  const token = localStorage.getItem('admin_token');
+  const ids = [...checks].map(c => c.dataset.id);
+  let ok = 0, err = 0;
+
+  for(const id of ids){
+    try {
+      if(section === 'usuarios'){
+        const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`,
+          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+        r.ok ? ok++ : err++;
+      }
+      if(section === 'catalogo'){
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${id}`,
+          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+        r.ok ? ok++ : err++;
+      }
+      if(section === 'pos'){
+        await fetch(`${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${id}`,
+          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${id}`,
+          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+        r.ok ? ok++ : err++;
+      }
+    } catch(e){ err++; }
   }
+
+  showToast(`✅ Eliminados: ${ok}${err ? ' | ❌ Errores: '+err : ''}`);
+  if(section === 'usuarios') limpiezaLoadUsuarios();
+  if(section === 'catalogo') limpiezaLoadCatalogo();
+  if(section === 'pos')      limpiezaLoadPOS();
 }
 
 </script>
@@ -416,10 +434,58 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <button class="admin-tab" onclick="switchTab('catalogo',this)">📦 Catálogo</button>
     <button class="admin-tab" onclick="switchTab('productos',this)">🗂️ Productos</button>
     <button class="admin-tab" onclick="switchTab('estadisticas',this)">📊 Estadísticas</button>
+    <button class="admin-tab" onclick="switchTab('limpieza',this)">🧹 Limpieza</button>
     <button class="admin-tab" id="tab-btn-ctacte" onclick="switchTab('ctacte',this)">💰 Cta Cte<span class="tab-mora-badge" id="moraBadgeTab" style="display:none"></span></button>
   </div>
 
   <div class="admin-content">
+
+
+    <!-- TAB LIMPIEZA -->
+    <div class="tab-panel" id="tab-limpieza">
+      <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:40px;">
+
+        <!-- USUARIOS -->
+        <div class="card" style="padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:14px;font-weight:700;">👤 Usuarios</div>
+            <div style="display:flex;gap:8px;">
+              <button class="setting-btn" onclick="limpiezaLoadUsuarios()">🔄 Cargar</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaBuscarDuplicados('usuarios')">🔍 Duplicados</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaEliminarSeleccionados('usuarios')">🗑️ Eliminar seleccionados</button>
+            </div>
+          </div>
+          <div id="limpieza-usuarios-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- PEDIDOS CATÁLOGO -->
+        <div class="card" style="padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:14px;font-weight:700;">📦 Pedidos Catálogo</div>
+            <div style="display:flex;gap:8px;">
+              <button class="setting-btn" onclick="limpiezaLoadCatalogo()">🔄 Cargar</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaBuscarDuplicados('catalogo')">🔍 Duplicados</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaEliminarSeleccionados('catalogo')">🗑️ Eliminar seleccionados</button>
+            </div>
+          </div>
+          <div id="limpieza-catalogo-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- VENTAS POS -->
+        <div class="card" style="padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:14px;font-weight:700;">🏪 Ventas POS</div>
+            <div style="display:flex;gap:8px;">
+              <button class="setting-btn" onclick="limpiezaLoadPOS()">🔄 Cargar</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaBuscarDuplicados('pos')">🔍 Duplicados</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaEliminarSeleccionados('pos')">🗑️ Eliminar seleccionados</button>
+            </div>
+          </div>
+          <div id="limpieza-pos-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+        </div>
+
+      </div>
+    </div>
 
     <!-- TAB USUARIOS -->
     <div class="tab-panel active" id="tab-usuarios" style="display:block">
@@ -1140,7 +1206,7 @@ async function loadOrdenesPendientes(clientId){
         <div class="order-pending-date">${fmtDate(o.fecha)}</div>
       </div>
       <div class="order-pending-total">${fmt(o.total)}</div>
-      <button onclick="descargarTicketPOS('${o.id}','${o.ticket_display}','${o.fecha}',${o.total})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;flex-shrink:0;" title="Descargar PDF">📄</button><button onclick="descargarTicketPOSExcel('${o.id}','${o.ticket_display}')" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;flex-shrink:0;" title="Descargar Excel">📊</button>
+      <button onclick="descargarTicketPOS('${o.id}','${o.ticket_display}','${o.fecha}',${o.total})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;flex-shrink:0;" title="Descargar PDF">📄</button>
     </div>`).join('');
 }
 
@@ -1703,7 +1769,6 @@ function renderPosKPIs(posOrders, posClients){
           <div style="display:flex;align-items:center;gap:8px;">
             <span class="order-total">${fmt(o.total||0)}</span>
             <button onclick="descargarTicketPOS('${o.id}','${o.ticket_display||''}','${o.fecha||''}',${o.total||0})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar PDF">📄</button>
-            <button onclick="descargarTicketPOSExcel('${o.id}','${o.ticket_display||''}')" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar Excel">📊</button>
           </div>
         </div>
         <div class="order-meta">${fecha} ${hora}</div>
@@ -2528,155 +2593,6 @@ window.addEventListener('scroll',()=>{
   if(window.scrollY>300) bt.classList.add('visible'); else bt.classList.remove('visible');
 });
 restoreSession();
-
-// ── Descargar venta POS en Excel ──────────────────────────────────────────────
-async function descargarTicketPOSExcel(orderId, ticket){
-  const token = localStorage.getItem('admin_token');
-  try {
-    showToast('⏳ Preparando Excel...');
-    
-    // 1. Traer items de la orden
-    const res1 = await fetch(
-      `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${orderId}&select=sku,nombre,cantidad,precio_unitario,precio_modificado`,
-      {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
-    );
-    const items = await res1.json();
-    if(!Array.isArray(items)||!items.length){ showToast('Sin items para esta venta'); return; }
-    console.log('[descargarTicketPOSExcel] items:', items);
-    
-    // 2. Traer datos de productos por SKU (codigo) usando IN
-    const skus = items.map(i => i.sku).filter(Boolean);
-    let prods = [];
-    if(skus.length > 0){
-      // Usar operador IN: codigo=in.(11575,11437,10904,...)
-      const skuList = '(' + skus.join(',') + ')';
-      const res2 = await fetch(
-        `${SUPABASE_URL}/rest/v1/productos?codigo=in.${skuList}&select=codigo,producto,descripcion,iva,marca,precio_pvp`,
-        {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
-      );
-      prods = await res2.json();
-      console.log('[descargarTicketPOSExcel] productos encontrados:', prods);
-    }
-    const prodMap = {};
-    prods.forEach(p => { prodMap[p.codigo] = p; });
-    
-    if(!window.XLSX){
-      await new Promise((res,rej)=>{
-        const s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        s.onload=res; s.onerror=rej;
-        document.head.appendChild(s);
-      });
-    }
-    
-    // Construir filas dinámicamente: mostrar precio_modificado solo si existe
-    const hasProdData = Object.keys(prodMap).length > 0;
-    let headers = [];  // Definir aquí para usar después
-    
-    // Enriquecer items con datos de productos
-    const enriched = items.map(i => {
-      const prod = prodMap[i.sku] || {};
-      return {
-        sku: i.sku || '',
-        nombre: i.nombre || '',
-        cantidad: i.cantidad || 0,
-        precio_unitario: i.precio_unitario || 0,
-        precio_modificado: i.precio_modificado || null,
-        descripcion: prod.descripcion || '',
-        marca: prod.marca || '',
-        pvp: prod.precio_pvp || '',
-        iva: prod.iva || 0
-      };
-    });
-    
-    // Ordenar: BEEPAW primero (marcaAsc=0), luego GENÉRICOS (marcaAsc=1), por SKU numérico asc
-    enriched.sort((a,b) => {
-      const marcaA = (a.marca || '').toUpperCase() === 'BEEPAW' ? 0 : 1;
-      const marcaB = (b.marca || '').toUpperCase() === 'BEEPAW' ? 0 : 1;
-      if(marcaA !== marcaB) return marcaA - marcaB;
-      return parseInt(a.sku) - parseInt(b.sku);
-    });
-    
-    // Mapear a filas con orden específico de columnas
-    const mapped = enriched.map(i => {
-      const row = {
-        'SKU': i.sku,
-        'NOMBRE': i.nombre,
-        'CANTIDAD': i.cantidad,
-        'PRECIO PESOS': i.precio_unitario
-      };
-      if(i.precio_modificado && i.precio_modificado !== i.precio_unitario){
-        row['PRECIO MODIFICADO'] = i.precio_modificado;
-      }
-      if(hasProdData){
-        row['DESCRIPCIÓN'] = i.descripcion;
-        row['MARCA'] = i.marca;
-        row['PVP'] = i.pvp;
-        row['IVA (%)'] = i.iva;
-      }
-      return row;
-    });
-    
-    // Calcular totales
-    const totalCantidad = items.reduce((sum, i) => sum + (i.cantidad || 0), 0);
-    const totalPrecio = items.reduce((sum, i) => sum + ((i.precio_unitario || 0) * (i.cantidad || 0)), 0);
-    const tieneIVA = items.some(i => prodMap[i.sku]?.iva > 0);
-    
-    // Agregar fila vacía y totales
-    mapped.push({});
-    mapped.push({
-      'SKU': 'TOTAL',
-      'CANTIDAD': totalCantidad,
-      'PRECIO PESOS': totalPrecio
-    });
-    
-    if(tieneIVA){
-      const montoIVA = items.reduce((sum, i) => {
-        const prod = prodMap[i.sku] || {};
-        const iva = (prod.iva || 0) / 100;
-        const precio = (i.precio_unitario || 0) * (i.cantidad || 0);
-        return sum + (precio * iva);
-      }, 0);
-      const totalConIVA = totalPrecio + montoIVA;
-      mapped.push({
-        'SKU': 'SUBTOTAL S/IVA',
-        'PRECIO PESOS': totalPrecio
-      });
-      mapped.push({
-        'SKU': 'IVA',
-        'PRECIO PESOS': montoIVA
-      });
-      mapped.push({
-        'SKU': 'TOTAL C/IVA',
-        'PRECIO PESOS': totalConIVA
-      });
-    }
-    
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(mapped);
-    // Anchos dinámicos según columnas
-    const colWidths = {
-      'SKU': 12,
-      'NOMBRE': 25,
-      'DESCRIPCIÓN': 35,
-      'IVA (%)': 10,
-      'PRECIO PESOS': 15,
-      'PRECIO MODIFICADO': 18,
-      'PVP': 12,
-      'MARCA': 12,
-      'CANTIDAD': 10
-    };
-    ws['!cols'] = headers.map(h => ({ wch: colWidths[h] || 12 }));
-    
-    XLSX.utils.book_append_sheet(wb, ws, 'VENTA');
-    XLSX.writeFile(wb, `Ticket_${ticket}_${new Date().toISOString().slice(0,10)}.xlsx`);
-    showToast('✅ Excel descargado');
-  } catch(e) {
-    showToast('❌ Error: ' + e.message);
-    console.error('descargarTicketPOSExcel error:', e);
-  }
-}
-
 </script>
 </body>
 </html>
