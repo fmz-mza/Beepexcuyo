@@ -2493,11 +2493,11 @@ async function descargarTicketPOSExcel(orderId, ticket){
     const items = await res1.json();
     if(!Array.isArray(items)||!items.length){ showToast('Sin items para esta venta'); return; }
     
-    // 2. Traer datos de productos (para descripción, iva, marca)
+    // 2. Traer datos de productos (para descripción, iva, marca, precio_pvp)
     const skus = items.map(i => i.sku).filter(Boolean);
     const prodQuery = skus.map(s => `codigo=eq.${s}`).join('&');
     const res2 = await fetch(
-      `${SUPABASE_URL}/rest/v1/productos?${prodQuery}&select=codigo,descripcion,iva,marca`,
+      `${SUPABASE_URL}/rest/v1/productos?${prodQuery}&select=codigo,descripcion,iva,marca,precio_pvp`,
       {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}}
     );
     const prods = await res2.json();
@@ -2513,31 +2513,73 @@ async function descargarTicketPOSExcel(orderId, ticket){
       });
     }
     
+    // Construir filas dinámicamente: mostrar precio_modificado solo si existe
     const mapped = items.map(i => {
       const prod = prodMap[i.sku] || {};
-      return {
+      const row = {
         'SKU': i.sku || '',
         'NOMBRE': i.nombre || '',
         'DESCRIPCIÓN': prod.descripcion || '',
         'MARCA': prod.marca || '',
         'CANTIDAD': i.cantidad || 0,
-        'PRECIO PESOS': i.precio_unitario || 0,
-        'PRECIO MODIFICADO': i.precio_modificado || '',
-        'IVA (%)': prod.iva || 0
+        'PRECIO PESOS': i.precio_unitario || 0
       };
+      // Mostrar precio_modificado solo si existe y es diferente
+      if(i.precio_modificado && i.precio_modificado !== i.precio_unitario){
+        row['PRECIO MODIFICADO'] = i.precio_modificado;
+      }
+      row['PVP'] = prod.precio_pvp || '';
+      row['IVA (%)'] = prod.iva || 0;
+      return row;
     });
+    
+    // Calcular totales
+    const totalCantidad = items.reduce((sum, i) => sum + (i.cantidad || 0), 0);
+    const totalPrecio = items.reduce((sum, i) => sum + ((i.precio_unitario || 0) * (i.cantidad || 0)), 0);
+    const tieneIVA = items.some(i => prodMap[i.sku]?.iva > 0);
+    
+    // Agregar fila vacía y totales
+    mapped.push({});
+    mapped.push({
+      'SKU': 'TOTAL',
+      'CANTIDAD': totalCantidad,
+      'PRECIO PESOS': totalPrecio
+    });
+    
+    if(tieneIVA){
+      const montoIVA = items.reduce((sum, i) => {
+        const prod = prodMap[i.sku] || {};
+        const iva = (prod.iva || 0) / 100;
+        const precio = (i.precio_unitario || 0) * (i.cantidad || 0);
+        return sum + (precio * iva);
+      }, 0);
+      const totalConIVA = totalPrecio + montoIVA;
+      mapped.push({
+        'SKU': 'SUBTOTAL S/IVA',
+        'PRECIO PESOS': totalPrecio
+      });
+      mapped.push({
+        'SKU': 'IVA',
+        'PRECIO PESOS': montoIVA
+      });
+      mapped.push({
+        'SKU': 'TOTAL C/IVA',
+        'PRECIO PESOS': totalConIVA
+      });
+    }
     
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(mapped);
     ws['!cols'] = [
-      { wch: 12 },
-      { wch: 25 },
-      { wch: 20 },
-      { wch: 15 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 18 },
-      { wch: 10 }
+      { wch: 12 },  // SKU
+      { wch: 25 },  // NOMBRE
+      { wch: 20 },  // DESCRIPCIÓN
+      { wch: 15 },  // MARCA
+      { wch: 10 },  // CANTIDAD
+      { wch: 15 },  // PRECIO PESOS
+      { wch: 18 },  // PRECIO MODIFICADO (si existe)
+      { wch: 12 },  // PVP
+      { wch: 10 }   // IVA
     ];
     
     XLSX.utils.book_append_sheet(wb, ws, 'VENTA');
