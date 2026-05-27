@@ -47,10 +47,10 @@ async function descargarTicketPOSExcel(orderId, ticket){
       'IVA (%)': i.iva || 0
     }));
     
-    // Orden de columnas final
-    headers = ['SKU', 'NOMBRE', 'CANTIDAD', 'PRECIO PESOS'];
+    // Orden de columnas EXACTO
+    headers = ['SKU', 'NOMBRE', 'DESCRIPCIÓN', 'IVA (%)', 'PRECIO PESOS'];
     if(mapped.some(i => i['PRECIO MODIFICADO'])) headers.push('PRECIO MODIFICADO');
-    if(hasProdData) headers.push('DESCRIPCIÓN', 'MARCA', 'PVP', 'IVA (%)');
+    headers.push('PVP', 'MARCA', 'CANTIDAD');
     
     // Datos de productos (sin totales)
     const dataRows = mapped.map(row => headers.map(h => row[h] ?? ''));
@@ -60,22 +60,34 @@ async function descargarTicketPOSExcel(orderId, ticket){
     const totalPrecio = mapped.reduce((sum, i) => sum + ((i['PRECIO PESOS'] || 0) * (i['CANTIDAD'] || 0)), 0);
     
     const totalRows = [];
-    totalRows.push(['TOTAL', '', totalCantidad, totalPrecio, ...(headers.slice(4).map(() => ''))]);
-    
     if(tieneIVA){
       const montoIVA = mapped.reduce((sum, i) => {
         const iva = (i['IVA (%)'] || 0) / 100;
         const precio = (i['PRECIO PESOS'] || 0) * (i['CANTIDAD'] || 0);
         return sum + (precio * iva);
       }, 0);
-      totalRows.push(['SUBTOTAL S/IVA', '', '', totalPrecio, ...(headers.slice(4).map(() => ''))]);
-      totalRows.push(['IVA', '', '', montoIVA, ...(headers.slice(4).map(() => ''))]);
-      totalRows.push(['TOTAL C/IVA', '', '', totalPrecio + montoIVA, ...(headers.slice(4).map(() => ''))]);
+      const totalConIVA = totalPrecio + montoIVA;
+      totalRows.push(['TOTAL', '', '', '', totalPrecio, ...(headers.slice(5).map(() => ''))]);
+    } else {
+      totalRows.push(['TOTAL', '', '', '', totalPrecio, ...(headers.slice(5).map(() => ''))]);
     }
+    
+    // Metadata de la venta
+    const fechaVenta = new Date(order.fecha).toLocaleDateString('es-AR');
+    const numeroTicket = order.ticket_display || '';
+    const ivaLabel = tieneIVA ? 'Si' : 'No';
+    const clienteNombre = client?.nombre || 'S/N';
     
     // Armar tabla con headers estéticos
     const wsData = [
       [{ v: '🐾 Beepex Cuyo', t: 's', s: {font:{bold:true, sz:14}, alignment:{horizontal:'center'}} }],
+      [
+        { v: `Fecha: ${fechaVenta}`, s: {font:{bold:true}, alignment:{horizontal:'left'}} },
+        { v: `Número de Pedido: ${numeroTicket}`, s: {font:{bold:true}, alignment:{horizontal:'left'}} },
+        { v: `Cliente: ${clienteNombre}`, s: {font:{bold:true}, alignment:{horizontal:'left'}} },
+        { v: `Con IVA: ${ivaLabel}`, s: {font:{bold:true}, alignment:{horizontal:'left'}} }
+      ],
+      [],
       headers.map(h => ({ v: h, s: {font:{bold:true}, alignment:{horizontal:'center'}, fill:{fgColor:{rgb:'D3D3D3'}}} })),
       ...dataRows.map(row => row.map(v => ({ v, s: {alignment:{horizontal:'center'}} }))),
       [],
