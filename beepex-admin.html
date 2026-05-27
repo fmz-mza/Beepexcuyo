@@ -2486,14 +2486,14 @@ async function limpiezaLoadUsuarios(){
   const token = localStorage.getItem('admin_token');
   const el = document.getElementById('limpieza-usuarios-list');
   el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,email,nombre,created_at&order=created_at.desc`,
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,nombre,approved,is_admin,created_at&order=created_at.desc`,
     {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
   const data = await res.json();
   _limpiezaData.usuarios = data;
-  if(!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin usuarios</div>'; return; }
+  if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin usuarios</div>'; return; }
   el.innerHTML = data.map(u =>
     _limpiezaRow(u.id,
-      `<b>${u.email||u.nombre||'Sin email'}</b> <span style="color:var(--muted);">${new Date(u.created_at).toLocaleDateString('es-AR')}</span>`,
+      `<b>${u.nombre||'Sin nombre'}</b> <span style="color:var(--muted);">${u.approved?'✅ Aprobado':'⏳ Pendiente'} · ${new Date(u.created_at).toLocaleDateString('es-AR')}</span>`,
       'usuarios')
   ).join('');
 }
