@@ -2560,29 +2560,25 @@ function limpiezaBuscarDuplicados(section){
 async function limpiezaEliminarSeleccionados(section){
   const checks = document.querySelectorAll(`#limpieza-${section}-list input[type=checkbox]:checked`);
   if(!checks.length){ showToast('Seleccioná al menos un item'); return; }
-  if(!confirm(`¿Eliminar ${checks.length} item(s) de ${section}? Esta acción no se puede deshacer.`)) return;
+  if(!confirm(`¿Eliminar ${checks.length} item(s)? Esta acción no se puede deshacer.`)) return;
 
-  const token = localStorage.getItem('admin_token');
   const ids = [...checks].map(c => c.dataset.id);
   let ok = 0, err = 0;
 
   for(const id of ids){
     try {
       if(section === 'usuarios'){
-        const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`,
-          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+        // Borrar profile (auth.users debe borrarse desde Supabase Dashboard o SQL)
+        const r = await api(`profiles?id=eq.${id}`, {method:'DELETE'});
         r.ok ? ok++ : err++;
       }
       if(section === 'catalogo'){
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${id}`,
-          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+        const r = await api(`orders?id=eq.${id}`, {method:'DELETE'});
         r.ok ? ok++ : err++;
       }
       if(section === 'pos'){
-        await fetch(`${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${id}`,
-          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?id=eq.${id}`,
-          {method:'DELETE', headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+        await api(`order_items?order_id=eq.${id}`, {method:'DELETE'});
+        const r = await api(`pos_orders?id=eq.${id}`, {method:'DELETE'});
         r.ok ? ok++ : err++;
       }
     } catch(e){ err++; }
