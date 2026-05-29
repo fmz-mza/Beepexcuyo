@@ -93,22 +93,8 @@ def limpiar_precio(val):
         return 0
 
 def get_drive_ids_from_netlify():
-    """Extrae el mapeo de IDs de Drive desde la API de Landings o HTML de Netlify"""
+    """Extrae el mapeo de IDs de Drive desde el HTML de Netlify"""
     try:
-        # Intento 1: API de Landings (Nueva fuente dinámica)
-        api_url = "https://beepex.dev/api/landings/products"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        res = requests.get(api_url, headers=headers, timeout=10)
-        if res.status_code == 200:
-            data = res.json()
-            if 'driveMap' in data:
-                print(f"Obtenido driveMap desde API exitosamente ({len(data['driveMap'])} imágenes).")
-                return data['driveMap']
-    except Exception as e:
-        print(f"Error obteniendo driveMap desde API: {e}")
-
-    try:
-        # Intento 2: Scraping HTML (Fallback legacy)
         headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(NETLIFY_SRC_URL, headers=headers, timeout=10)
         html = res.text
@@ -233,27 +219,7 @@ def process_image(drive_id, sku):
         print(f"⚠️ Error procesando {sku}: {e}")
         return None
 
-def cleanup_corrupt_records():
-    """Busca y elimina registros con códigos terminados en .0 que rompen el frontend."""
-    print("🧹 Revisando si existen registros corruptos (SKUs con .0)...")
-    try:
-        res = supabase.table(PRODUCT_TABLE).select("codigo").like("codigo", "%.0").execute()
-        corruptos = res.data
-        if corruptos:
-            print(f"⚠️ Se encontraron {len(corruptos)} registros corruptos. Eliminando...")
-            for item in corruptos:
-                sku = item["codigo"]
-                supabase.table(PRODUCT_TABLE).delete().eq("codigo", sku).execute()
-            print("✅ Limpieza completada.")
-        else:
-            print("✅ No se detectaron registros corruptos.")
-    except Exception as e:
-        print(f"⚠️ Error durante la limpieza automática: {e}")
-
 def run_sync():
-    # 0. Limpieza automática
-    cleanup_corrupt_records()
-    
     print(f"Iniciando sincronización: {datetime.now()}")
     
     # 1. Obtener datos
@@ -312,10 +278,11 @@ def run_sync():
                 regla_trigger = True
                 motivo_regla = "Base+21% (Iden)"
 
-        # REGLA PROTECCIÓN GENÉRICOS (REFINADA 08/05):
+        # REGLA PROTECCIÓN GENÉRICOS (REFINADA 08/05 y ACTUALIZADA 29/05):
         # Si es Genérico >= 11432 y no hay PVP:
         # 1. Si hay Liquidación: Anclamos a 20/30 + 21% (BASE está inflada temporalmente).
-        # 2. Si no hay Liquidación: Usamos BASE + 21% (Protección estándar).
+        # 2. Si Lista Base es mayor que Lista 14/20 y Lista 20/30: Usamos LISTA BASE directo (sin multiplicar por 1.21).
+        # 3. Si Lista Base es igual a las otras listas: Usamos Lista 20/30 * 1.21.
         try:
             val_sku = int(sku)
             if val_sku >= 11432 and "GENERICOS" in marca.upper() and precio_pvp <= 0:
@@ -323,6 +290,14 @@ def run_sync():
                     precio_pesos = int(precio_20_30 * 1.21)
                     regla_trigger = True
                     motivo_regla = "Gen_20/30+21%(Liq)"
+                elif precio_lista_base > precio_14_20 and precio_lista_base > precio_20_30:
+                    precio_pesos = precio_lista_base
+                    regla_trigger = True
+                    motivo_regla = "Gen_Base_Directo"
+                elif precio_lista_base == precio_14_20 == precio_20_30:
+                    precio_pesos = int(precio_20_30 * 1.21)
+                    regla_trigger = True
+                    motivo_regla = "Gen_20/30+21%(Iden)"
                 elif not regla_trigger:
                     precio_pesos = int(precio_lista_base * 1.21)
                     regla_trigger = True
@@ -371,7 +346,7 @@ def run_sync():
 
         # Foto
         foto_id = str(row.get("FOTO", "")).strip()
-        if not foto_id or foto_id.lower() == "prueba" or foto_id.lower() == "nan":
+        if not foto_id or foto_id.lower() == "prueba":
             foto_id = netlify_mapping.get(sku, "")
         
         # 2. Verificar existencia y datos previos para evitar re-procesamiento innecesario
