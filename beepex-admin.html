@@ -2640,11 +2640,19 @@ async function limpiezaConfirmarUnificacion(){
   let ok = 0, err = 0;
   for(const dupId of duplicados){
     try {
+      // Reasignar pos_orders al principal
       await api(`pos_orders?client_id=eq.${dupId}`, {
         method:'PATCH',
         body: JSON.stringify({client_id: principal}),
         headers:{'Content-Type':'application/json','Prefer':'return=minimal'}
       });
+      // Reasignar payments al principal
+      await api(`payments?client_id=eq.${dupId}`, {
+        method:'PATCH',
+        body: JSON.stringify({client_id: principal}),
+        headers:{'Content-Type':'application/json','Prefer':'return=minimal'}
+      });
+      // Ahora borrar el cliente duplicado (ya sin FK dependencies)
       const r = await api(`clients?id=eq.${dupId}`, {method:'DELETE'});
       r.ok ? ok++ : err++;
     } catch(e){ err++; }
