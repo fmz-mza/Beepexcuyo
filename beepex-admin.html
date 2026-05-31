@@ -10,7 +10,8 @@
 <link rel="icon" type="image/png" href="https://favicon.im/beepex.com.ar?larger=true">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js">
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -607,26 +608,43 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
         </div>
       </div>
 
-      <!-- Registrar pago -->
+      <!-- Tabs Pago / Deuda -->
       <div class="pago-form" id="pagoForm">
-        <div class="pago-form-title">💳 Registrar pago</div>
-        <div class="pago-row">
-          <input class="pago-inp" id="pagoMonto" type="number" placeholder="Monto $" min="0" inputmode="numeric">
-          <select class="pago-sel" id="pagoTipo">
-            <option value="efectivo">💵 Efectivo</option>
-            <option value="transferencia">📲 Transfer.</option>
-            <option value="cta_cte">📒 Cta Cte</option>
-          </select>
-          <button class="pago-btn" id="pagoBtn" onclick="registrarPago()">Registrar</button>
+        <!-- Tab switcher -->
+        <div style="display:flex;gap:4px;margin-bottom:12px;background:var(--card);border-radius:10px;padding:4px;">
+          <button id="tabPagoBtn" onclick="switchFormTab('pago')" style="flex:1;padding:7px;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;">💳 Registrar pago</button>
+          <button id="tabDeudaBtn" onclick="switchFormTab('deuda')" style="flex:1;padding:7px;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;background:none;color:var(--muted);">📋 Registrar deuda</button>
         </div>
-        <textarea class="pago-nota" id="pagoNota" rows="2" placeholder="Nota (opcional)"></textarea>
 
-        <!-- Imputar a órdenes específicas -->
-        <div id="ordenesSection" style="display:none">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
-            Imputar a órdenes (opcional)
+        <!-- PANEL PAGO -->
+        <div id="formPagoPanel">
+          <div class="pago-row">
+            <input class="pago-inp" id="pagoMonto" type="number" placeholder="Monto $" min="0" inputmode="numeric">
+            <select class="pago-sel" id="pagoTipo">
+              <option value="efectivo">💵 Efectivo</option>
+              <option value="transferencia">📲 Transfer.</option>
+              <option value="cta_cte">📒 Cta Cte</option>
+            </select>
+            <button class="pago-btn" id="pagoBtn" onclick="registrarPago()">Registrar</button>
           </div>
-          <div class="orders-pending" id="ordenesPendientes"></div>
+          <textarea class="pago-nota" id="pagoNota" rows="2" placeholder="Nota (opcional)"></textarea>
+          <!-- Imputar a órdenes específicas -->
+          <div id="ordenesSection" style="display:none">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
+              Imputar a órdenes (opcional)
+            </div>
+            <div class="orders-pending" id="ordenesPendientes"></div>
+          </div>
+        </div>
+
+        <!-- PANEL DEUDA -->
+        <div id="formDeudaPanel" style="display:none;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Agregá una deuda manual para registrar saldos anteriores al sistema u otros conceptos.</div>
+          <div class="pago-row">
+            <input class="pago-inp" id="deudaMonto" type="number" placeholder="Monto deuda $" min="0" inputmode="numeric">
+            <button class="pago-btn" style="background:var(--red);" id="deudaBtn" onclick="registrarDeuda()">Registrar</button>
+          </div>
+          <textarea class="pago-nota" id="deudaNota" rows="2" placeholder="Concepto (ej: saldo anterior al sistema, mercadería pendiente...)"></textarea>
         </div>
       </div>
 
@@ -1464,12 +1482,9 @@ function renderStats(){
   const totalRev=filtOrders.reduce((a,o)=>a+(o.total||0),0);
   const uniqueUsers=new Set(filtOrders.map(o=>o.user_id)).size;
   const convRate=filtViews.length>0?Math.round((filtOrders.length/filtViews.length)*100):0;
-  const posOrds=(allOrdersData.posOrders||[]).filter(o=>periodFilter(o.fecha||o.created_at));
-  const posOrdsCerradas=posOrds.filter(o=>o.estado==='cerrada');
-  const posRev=posOrdsCerradas.reduce((a,o)=>a+(o.total||0),0);
   document.getElementById('statsCards').innerHTML=`
-    <div class="stat-card"><div class="stat-value" style="color:var(--green)">${fmt(posRev)}</div><div class="stat-label">Ventas POS</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">${posOrdsCerradas.length} ventas cerradas</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--accent2)">${fmt(totalRev)}</div><div class="stat-label">Pedidos Catálogo</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">${filtOrders.length} pedidos</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--accent2)">${fmt(totalRev)}</div><div class="stat-label">Facturado</div></div>
+    <div class="stat-card"><div class="stat-value">${filtOrders.length}</div><div class="stat-label">Pedidos</div></div>
     <div class="stat-card"><div class="stat-value">${filtViews.length}</div><div class="stat-label">Vistas de producto</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--green)">${convRate}%</div><div class="stat-label">Conversión</div></div>
   `;
@@ -1586,7 +1601,7 @@ function renderPosKPIs(posOrders, posClients){
   const ultEl = document.getElementById('posUltimasVentas');
   if(ultEl){
     if(!posOrders.length){ ultEl.innerHTML='<div class="empty">Sin ventas en este período</div>'; return; }
-    ultEl.innerHTML = posOrders.map(o => {
+    ultEl.innerHTML = posOrders.slice(0,8).map(o => {
       const nombre = clientMap[o.client_id] || '—';
       const fecha  = o.fecha ? new Date(o.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}) : '—';
       const hora   = o.fecha ? new Date(o.fecha).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : '';
@@ -2423,6 +2438,58 @@ window.addEventListener('scroll',()=>{
   if(window.scrollY>300) bt.classList.add('visible'); else bt.classList.remove('visible');
 });
 restoreSession();
+
+// ── Form tab switcher (pago / deuda) ─────────────────────────────────────────
+function switchFormTab(tab){
+  const isPago = tab === 'pago';
+  document.getElementById('formPagoPanel').style.display = isPago ? '' : 'none';
+  document.getElementById('formDeudaPanel').style.display = isPago ? 'none' : '';
+  document.getElementById('tabPagoBtn').style.background = isPago ? 'var(--accent)' : 'none';
+  document.getElementById('tabPagoBtn').style.color = isPago ? '#fff' : 'var(--muted)';
+  document.getElementById('tabDeudaBtn').style.background = isPago ? 'none' : 'var(--red)';
+  document.getElementById('tabDeudaBtn').style.color = isPago ? 'var(--muted)' : '#fff';
+}
+
+async function registrarDeuda(){
+  const monto = parseFloat(document.getElementById('deudaMonto').value);
+  const nota  = document.getElementById('deudaNota').value.trim();
+  const token = localStorage.getItem('admin_token');
+
+  if(!monto||monto<=0){ showToast('Ingresá un monto válido'); return; }
+  if(!activeClientId){ showToast('No hay cliente seleccionado'); return; }
+
+  const btn = document.getElementById('deudaBtn');
+  btn.disabled=true; btn.textContent='Guardando...';
+
+  try{
+    // Insertar como payment con monto negativo (débito) y tipo 'deuda_manual'
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/payments`,{
+      method:'POST',
+      headers:{
+        'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,
+        'Content-Type':'application/json','Prefer':'return=minimal'
+      },
+      body:JSON.stringify({
+        client_id: activeClientId,
+        monto: -Math.abs(monto),
+        tipo: 'deuda_manual',
+        nota: nota || 'Deuda manual'
+      })
+    });
+    if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.message||'Error al guardar deuda'); }
+
+    showToast('✅ Deuda de '+fmt(monto)+' registrada');
+    document.getElementById('deudaMonto').value='';
+    document.getElementById('deudaNota').value='';
+    await loadCtaCte();
+    await openCtaCteModal(activeClientId);
+  }catch(err){
+    showToast('Error: '+(err.message||err));
+  }finally{
+    btn.disabled=false; btn.textContent='Registrar';
+  }
+}
+
 </script>
 </body>
 </html>
