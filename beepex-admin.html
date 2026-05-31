@@ -2592,32 +2592,64 @@ async function limpiezaLoadClientes(){
   ).join('');
 }
 
-async function limpiezaUnificarClientes(){
+function limpiezaUnificarClientes(){
   const checks = [...document.querySelectorAll('#limpieza-clientes-list input[type=checkbox]:checked')];
   if(checks.length < 2){ showToast('Seleccioná al menos 2 clientes para unificar'); return; }
-  
+
   const ids = checks.map(c => c.dataset.id);
-  const principal = ids[0];
-  const duplicados = ids.slice(1);
+  const clientesSeleccionados = ids.map(id => _limpiezaData.clientes.find(c=>c.id===id)).filter(Boolean);
+
+  // Mostrar modal para elegir el principal
+  const modalHtml = `
+    <div id="unificarModal" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;width:100%;max-width:420px;">
+        <h3 style="margin:0 0 8px;font-size:16px;">🔀 Unificar clientes</h3>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 16px;">Elegí cuál será el cliente <b>principal</b> que conservará todas las ventas. Los demás serán eliminados.</p>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+          ${clientesSeleccionados.map((c,i) => `
+            <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+              <input type="radio" name="clientePrincipal" value="${c.id}" ${i===0?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;">
+              <div>
+                <div style="font-size:13px;font-weight:600;">${c.nombre||'Sin nombre'}</div>
+                <div style="font-size:11px;color:var(--muted);">${c.telefono||'sin tel'} ${c.email?'· '+c.email:''}</div>
+              </div>
+            </label>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('unificarModal').remove()" style="flex:1;padding:10px;border:1px solid var(--border);background:none;color:var(--text);border-radius:8px;cursor:pointer;">Cancelar</button>
+          <button onclick="limpiezaConfirmarUnificacion()" style="flex:1;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">✅ Confirmar</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  // Guardar ids para usar en confirmar
+  window._unificarIds = ids;
+}
+
+async function limpiezaConfirmarUnificacion(){
+  const principal = document.querySelector('input[name="clientePrincipal"]:checked')?.value;
+  document.getElementById('unificarModal')?.remove();
+  if(!principal) return;
+
+  const duplicados = window._unificarIds.filter(id => id !== principal);
   const nombrePrincipal = _limpiezaData.clientes.find(c=>c.id===principal)?.nombre || principal;
-  
-  if(!confirm(`¿Unificar ${duplicados.length} cliente(s) hacia "${nombrePrincipal}"?
-Todas sus ventas serán reasignadas al cliente principal.`)) return;
-  
+
+  if(!confirm(`¿Unificar ${duplicados.length} cliente(s) en "${nombrePrincipal}"?\nEsta acción no se puede deshacer.`)) return;
+
   let ok = 0, err = 0;
   for(const dupId of duplicados){
     try {
-      // Reasignar pos_orders del duplicado al principal
-      const r1 = await api(`pos_orders?client_id=eq.${dupId}`, {
+      await api(`pos_orders?client_id=eq.${dupId}`, {
         method:'PATCH',
-        body: JSON.stringify({client_id: principal})
+        body: JSON.stringify({client_id: principal}),
+        headers:{'Content-Type':'application/json','Prefer':'return=minimal'}
       });
-      // Borrar cliente duplicado
-      const r2 = await api(`clients?id=eq.${dupId}`, {method:'DELETE'});
-      r2.ok ? ok++ : err++;
+      const r = await api(`clients?id=eq.${dupId}`, {method:'DELETE'});
+      r.ok ? ok++ : err++;
     } catch(e){ err++; }
   }
-  
+
   showToast(`✅ Unificados: ${ok}${err?' | ❌ Errores: '+err:''}`);
   limpiezaLoadClientes();
 }
