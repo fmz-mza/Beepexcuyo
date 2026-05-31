@@ -347,6 +347,21 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
           <div id="limpieza-catalogo-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
         </div>
 
+        <!-- CLIENTES -->
+        <div class="card" style="padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:14px;font-weight:700;">👥 Clientes</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="setting-btn" onclick="limpiezaLoadClientes()">🔄 Cargar</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaBuscarDuplicados('clientes')">🔍 Duplicados</button>
+              <button class="setting-btn" style="background:rgba(58,108,240,.1);color:#3a6cf0;border-color:rgba(58,108,240,.3);" onclick="limpiezaUnificarClientes()">🔀 Unificar seleccionados</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaEliminarSeleccionados('clientes')">🗑️ Eliminar seleccionados</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">💡 Para unificar: seleccioná los duplicados, el <b>primero marcado</b> será el cliente principal que conserva todas las ventas.</div>
+          <div id="limpieza-clientes-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+        </div>
+
         <!-- VENTAS POS -->
         <div class="card" style="padding:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
@@ -2473,7 +2488,7 @@ restoreSession();
 // ═══════════════════════════════════════════════════════
 // LIMPIEZA DE PRUEBAS
 // ═══════════════════════════════════════════════════════
-const _limpiezaData = { usuarios: [], catalogo: [], pos: [] };
+const _limpiezaData = { usuarios: [], catalogo: [], pos: [], clientes: [] };
 
 function _limpiezaRow(id, cols, section){
   return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;">
@@ -2539,6 +2554,7 @@ function limpiezaBuscarDuplicados(section){
   if(section === 'usuarios') keyFn = u => (u.email||'').toLowerCase().trim();
   if(section === 'catalogo') keyFn = o => `${o.nombre_cliente||''}_${o.total||0}_${(o.created_at||'').slice(0,10)}`;
   if(section === 'pos')      keyFn = o => `${o.client_id||''}_${o.total||0}_${(o.fecha||'').slice(0,10)}`;
+  if(section === 'clientes') keyFn = c => (c.nombre||'').toLowerCase().trim();
 
   const seen = {}, dupeIds = new Set();
   data.forEach(item => {
@@ -2555,6 +2571,55 @@ function limpiezaBuscarDuplicados(section){
     if(dupeIds.has(cb.dataset.id)) cb.checked = true;
   });
   showToast(`⚠️ ${dupeIds.size} duplicado(s) marcados`);
+}
+
+async function limpiezaLoadClientes(){
+  const el = document.getElementById('limpieza-clientes-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
+  const data = await api('clients?select=id,nombre,telefono,email,created_at&order=nombre.asc');
+  _limpiezaData.clientes = Array.isArray(data) ? data : [];
+  if(!_limpiezaData.clientes.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin clientes</div>'; return; }
+  
+  // Traer conteo de ventas por cliente
+  const ventas = await api('pos_orders?select=client_id&estado=eq.cerrada');
+  const ventaCount = {};
+  if(Array.isArray(ventas)) ventas.forEach(v => { ventaCount[v.client_id] = (ventaCount[v.client_id]||0)+1; });
+  
+  el.innerHTML = _limpiezaData.clientes.map(c =>
+    _limpiezaRow(c.id,
+      `<b>${c.nombre||'Sin nombre'}</b> · ${c.telefono||'sin tel'} · ${c.email||''} <span style="color:var(--muted);">${ventaCount[c.id]?'📦 '+ventaCount[c.id]+' ventas':''}</span>`,
+      'clientes')
+  ).join('');
+}
+
+async function limpiezaUnificarClientes(){
+  const checks = [...document.querySelectorAll('#limpieza-clientes-list input[type=checkbox]:checked')];
+  if(checks.length < 2){ showToast('Seleccioná al menos 2 clientes para unificar'); return; }
+  
+  const ids = checks.map(c => c.dataset.id);
+  const principal = ids[0];
+  const duplicados = ids.slice(1);
+  const nombrePrincipal = _limpiezaData.clientes.find(c=>c.id===principal)?.nombre || principal;
+  
+  if(!confirm(`¿Unificar ${duplicados.length} cliente(s) hacia "${nombrePrincipal}"?
+Todas sus ventas serán reasignadas al cliente principal.`)) return;
+  
+  let ok = 0, err = 0;
+  for(const dupId of duplicados){
+    try {
+      // Reasignar pos_orders del duplicado al principal
+      const r1 = await api(`pos_orders?client_id=eq.${dupId}`, {
+        method:'PATCH',
+        body: JSON.stringify({client_id: principal})
+      });
+      // Borrar cliente duplicado
+      const r2 = await api(`clients?id=eq.${dupId}`, {method:'DELETE'});
+      r2.ok ? ok++ : err++;
+    } catch(e){ err++; }
+  }
+  
+  showToast(`✅ Unificados: ${ok}${err?' | ❌ Errores: '+err:''}`);
+  limpiezaLoadClientes();
 }
 
 async function limpiezaEliminarSeleccionados(section){
@@ -2577,10 +2642,13 @@ async function limpiezaEliminarSeleccionados(section){
         r.ok ? ok++ : err++;
       }
       if(section === 'pos'){
-        // Borrar en orden por FK: payment_allocations → order_items → pos_orders
         await api(`payment_allocations?order_id=eq.${id}`, {method:'DELETE'});
         await api(`order_items?order_id=eq.${id}`, {method:'DELETE'});
         const r = await api(`pos_orders?id=eq.${id}`, {method:'DELETE'});
+        r.ok ? ok++ : err++;
+      }
+      if(section === 'clientes'){
+        const r = await api(`clients?id=eq.${id}`, {method:'DELETE'});
         r.ok ? ok++ : err++;
       }
     } catch(e){ err++; }
@@ -2590,6 +2658,7 @@ async function limpiezaEliminarSeleccionados(section){
   if(section === 'usuarios') limpiezaLoadUsuarios();
   if(section === 'catalogo') limpiezaLoadCatalogo();
   if(section === 'pos')      limpiezaLoadPOS();
+  if(section === 'clientes') limpiezaLoadClientes();
 }
 
 </script>
