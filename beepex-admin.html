@@ -1482,9 +1482,12 @@ function renderStats(){
   const totalRev=filtOrders.reduce((a,o)=>a+(o.total||0),0);
   const uniqueUsers=new Set(filtOrders.map(o=>o.user_id)).size;
   const convRate=filtViews.length>0?Math.round((filtOrders.length/filtViews.length)*100):0;
+  const posOrds=(allOrdersData.posOrders||[]).filter(o=>periodFilter(o.fecha||o.created_at));
+  const posOrdsCerradas=posOrds.filter(o=>o.estado==='cerrada');
+  const posRev=posOrdsCerradas.reduce((a,o)=>a+(o.total||0),0);
   document.getElementById('statsCards').innerHTML=`
-    <div class="stat-card"><div class="stat-value" style="color:var(--accent2)">${fmt(totalRev)}</div><div class="stat-label">Facturado</div></div>
-    <div class="stat-card"><div class="stat-value">${filtOrders.length}</div><div class="stat-label">Pedidos</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--green)">${fmt(posRev)}</div><div class="stat-label">Ventas POS</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">${posOrdsCerradas.length} ventas cerradas</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--accent2)">${fmt(totalRev)}</div><div class="stat-label">Pedidos Catálogo</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">${filtOrders.length} pedidos</div></div>
     <div class="stat-card"><div class="stat-value">${filtViews.length}</div><div class="stat-label">Vistas de producto</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--green)">${convRate}%</div><div class="stat-label">Conversión</div></div>
   `;
@@ -1601,7 +1604,7 @@ function renderPosKPIs(posOrders, posClients){
   const ultEl = document.getElementById('posUltimasVentas');
   if(ultEl){
     if(!posOrders.length){ ultEl.innerHTML='<div class="empty">Sin ventas en este período</div>'; return; }
-    ultEl.innerHTML = posOrders.slice(0,8).map(o => {
+    ultEl.innerHTML = posOrders.map(o => {
       const nombre = clientMap[o.client_id] || '—';
       const fecha  = o.fecha ? new Date(o.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}) : '—';
       const hora   = o.fecha ? new Date(o.fecha).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : '';
