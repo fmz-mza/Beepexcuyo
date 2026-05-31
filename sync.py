@@ -278,30 +278,20 @@ def run_sync():
                 regla_trigger = True
                 motivo_regla = "Base+21% (Iden)"
 
-        # REGLA PROTECCIÓN GENÉRICOS (REFINADA 08/05 y ACTUALIZADA 29/05):
+        # REGLA PROTECCIÓN GENÉRICOS (REFINADA 08/05 y ACTUALIZADA 31/05):
         # Si es Genérico >= 11432 y no hay PVP:
-        # 1. Si hay Liquidación: Anclamos a 20/30 + 21% (BASE está inflada temporalmente).
-        # 2. Si Lista Base es mayor que Lista 14/20 y Lista 20/30: Usamos LISTA BASE directo (sin multiplicar por 1.21).
-        # 3. Si Lista Base es igual a las otras listas: Usamos Lista 20/30 * 1.21.
+        # Siempre utilizamos la LISTA 20/30 * 1.21 para conservar el volumen de ventas logrado con el 21% de markup sobre costo de reposición.
         try:
             val_sku = int(sku)
             if val_sku >= 11432 and "GENERICOS" in marca.upper() and precio_pvp <= 0:
-                if precio_liqui > 0 and precio_20_30 > 0:
+                if precio_20_30 > 0:
                     precio_pesos = int(precio_20_30 * 1.21)
                     regla_trigger = True
-                    motivo_regla = "Gen_20/30+21%(Liq)"
-                elif precio_lista_base > precio_14_20 and precio_lista_base > precio_20_30:
-                    precio_pesos = precio_lista_base
-                    regla_trigger = True
-                    motivo_regla = "Gen_Base_Directo"
-                elif precio_lista_base == precio_14_20 == precio_20_30:
-                    precio_pesos = int(precio_20_30 * 1.21)
-                    regla_trigger = True
-                    motivo_regla = "Gen_20/30+21%(Iden)"
-                elif not regla_trigger:
+                    motivo_regla = "Gen_20/30+21%"
+                elif precio_lista_base > 0:
                     precio_pesos = int(precio_lista_base * 1.21)
                     regla_trigger = True
-                    motivo_regla = "Gen_Base+21%"
+                    motivo_regla = "Gen_Base+21%(Fallback)"
         except:
             pass
         
