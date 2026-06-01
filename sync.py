@@ -219,6 +219,16 @@ def process_image(drive_id, sku):
         print(f"⚠️ Error procesando {sku}: {e}")
         return None
 
+def get_variant_key(name):
+    if not name or pd.isna(name):
+        return ""
+    # Reemplazar guiones bajos por espacios, colapsar espacios múltiples y dividir por /
+    clean = str(name).replace('_', ' ')
+    clean = re.sub(r'\s+', ' ', clean)
+    if '/' in clean:
+        clean = clean.split('/')[0]
+    return clean.strip().upper()
+
 def run_sync():
     print(f"Iniciando sincronización: {datetime.now()}")
     
@@ -229,6 +239,34 @@ def run_sync():
     except Exception as e:
         print(f"Error obteniendo datos: {e}")
         return
+
+    # Primer paso: Construir mapeo de precios base normales de variantes hermanas (SKU >= 11432)
+    regular_prices_by_key = {}
+    for _, row in df.iterrows():
+        sku_raw = row.get("CODIGO", "")
+        if pd.isna(sku_raw) or sku_raw == "":
+            continue
+        sku_str = str(sku_raw).strip()
+        if sku_str.endswith(".0"):
+            sku_str = sku_str[:-2]
+        
+        nombre = str(row.get("NOMBRE", "")).strip()
+        marca = str(row.get("MARCA", "")).strip()
+        
+        try:
+            val_sku = int(sku_str)
+            if val_sku >= 11432 and "GENERICOS" in marca.upper():
+                precio_liqui = limpiar_precio(row.get("LISTA LIQUIDACION"))
+                precio_lista_base = limpiar_precio(row.get("LISTA BASE"))
+                # Si NO está en liquidación y tiene precio base válido
+                if precio_liqui <= 0 and precio_lista_base > 0:
+                    key = get_variant_key(nombre)
+                    if key:
+                        existing = regular_prices_by_key.get(key, 0)
+                        if precio_lista_base > existing:
+                            regular_prices_by_key[key] = precio_lista_base
+        except Exception:
+            pass
 
     stats = {"nuevos": 0, "actualizados": 0, "precios_cambiados": 0, "fotos_procesadas": 0}
     logs = []
@@ -278,20 +316,31 @@ def run_sync():
                 regla_trigger = True
                 motivo_regla = "Base+21% (Iden)"
 
-        # REGLA PROTECCIÓN GENÉRICOS (REFINADA 08/05 y ACTUALIZADA 31/05):
+        # REGLA PROTECCIÓN GENÉRICOS (REFINADA 08/05, ACTUALIZADA 31/05, AJUSTADA 01/06 y MEJORADA 01/06 DETECCION VARIANTES):
         # Si es Genérico >= 11432 y no hay PVP:
-        # Siempre utilizamos la LISTA 20/30 * 1.21 para conservar el volumen de ventas logrado con el 21% de markup sobre costo de reposición.
+        # 1. Caso con Liquidación: Al estar rebajados en costo, si usáramos LISTA BASE directa o una liquidación menor perderíamos cohesión de precios o rentabilidad porcentual.
+        #    - Lógica Inteligente de Coincidencia de Variantes: Si un producto hermano del mismo nombre raíz + talle (ej. CAMA DONA TERCIOPELO LARGO _ L) no comercializado en liquidación tiene precio base regular,
+        #      adoptamos su precio base a fin de evitar precios distintos para variantes de color.
+        #    - Caso de no existir variante regular activa: Aplicamos protección dinámica usando la fórmula comercial clásica LISTA 20/30 * 1.21.
+        # 2. Caso Estándar: Usamos LISTA BASE directo como precio para el catálogo.
         try:
             val_sku = int(sku)
             if val_sku >= 11432 and "GENERICOS" in marca.upper() and precio_pvp <= 0:
-                if precio_20_30 > 0:
-                    precio_pesos = int(precio_20_30 * 1.21)
+                if precio_liqui > 0 and precio_20_30 > 0:
+                    key = get_variant_key(row.get("NOMBRE", ""))
+                    matched_regular = regular_prices_by_key.get(key, 0)
+                    if matched_regular > 0:
+                        precio_pesos = matched_regular
+                        regla_trigger = True
+                        motivo_regla = "Gen_Liq_SmartMatched"
+                    else:
+                        precio_pesos = int(precio_20_30 * 1.21)
+                        regla_trigger = True
+                        motivo_regla = "Gen_Liq_Proteccion"
+                else:
+                    precio_pesos = precio_lista_base
                     regla_trigger = True
-                    motivo_regla = "Gen_20/30+21%"
-                elif precio_lista_base > 0:
-                    precio_pesos = int(precio_lista_base * 1.21)
-                    regla_trigger = True
-                    motivo_regla = "Gen_Base+21%(Fallback)"
+                    motivo_regla = "Gen_Base_Directo"
         except:
             pass
         
