@@ -2177,7 +2177,8 @@ async function saveOrderSupabase(via){
         nombre_cliente:nombre,
         items:orderItems,
         total,
-        via
+        via,
+        observaciones: obs || null
       })
     });
     if(!res.ok){
