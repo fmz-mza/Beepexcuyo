@@ -2162,7 +2162,14 @@ async function saveOrderSupabase(via, obs){
       brand:c.product.brand,
       qty:c.qty,
       price:mayorista(c.product),
-      subtotal:mayorista(c.product)*c.qty
+      subtotal:mayorista(c.product)*c.qty,
+      iva_percent:c.product.iva,
+      stock:c.product.stock,
+      stock_type:stockType(c.product.stock),
+      include_iva:includeIVA,
+      precio_sin_iva:c.product.price,
+      subtotal_sin_iva:c.product.price*c.qty,
+      iva_monto:Math.round(c.product.price*c.qty*c.product.iva/100)
     }));
     const token=localStorage.getItem('sb_access_token');
     const res=await fetch(`${SUPABASE_URL}/rest/v1/orders`,{

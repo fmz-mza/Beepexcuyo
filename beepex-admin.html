@@ -1628,7 +1628,7 @@ function renderPosKPIs(posOrders, posClients){
 // ── Tickets PDF Admin ────────────────────────────────────────────────────────
 const IMG_BASE_ADMIN = 'https://fmz-mza.github.io/Beepexcuyo/images/SKU_';
 
-function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMonto, total){
+function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMonto, total, options = {}){
   const {jsPDF} = window.jspdf;
   const ANCHO = 72; // ancho útil en mm (80 - 4 margen cada lado)
 
@@ -1639,6 +1639,7 @@ function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMont
   if(numero) yCalc += 4;
   yCalc += 4; // fecha
   if(cliente) yCalc += 4;
+  if(options.isCatalogOrder) yCalc += 4; // precios include IVA
   yCalc += 4; // separador
 
   // Pre-calcular líneas de cada item para altura exacta
@@ -1649,16 +1650,51 @@ function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMont
     const lines = tmpDoc.splitTextToSize(nombre, ANCHO);
     return lines;
   });
+
+  let currentBrandCalc = null;
   itemLines.forEach((lines, idx) => {
+    if (options.isCatalogOrder) {
+      const brand = items[idx].brand || 'Sin marca';
+      if (brand !== currentBrandCalc) {
+        currentBrandCalc = brand;
+        yCalc += 5.5; // space for brand header
+      }
+    }
     yCalc += lines.length * 3.8; // líneas de nombre
-    if(items[idx].sku) yCalc += 3.5; // SKU
+    
+    // SKU + stock if preventa
+    const isPrev = items[idx].stock_type === 'PREVENTA' || (items[idx].stock && items[idx].stock.toUpperCase().includes('PREVENTA'));
+    if(items[idx].sku || (isPrev && options.isCatalogOrder)) {
+      yCalc += 3.5;
+    }
     yCalc += 4.5; // qty x precio
   });
 
   yCalc += 4; // separador items
   yCalc += 4; // cant productos
   if(descMonto > 0) yCalc += 8;
-  yCalc += 5 + 4 + 6; // total + separador + pie
+
+  if (options.isCatalogOrder) {
+    if (options.includeIVA) {
+      yCalc += 8; // Subtotal s/IVA + IVA
+    } else {
+      yCalc += 4; // Subtotal s/IVA
+    }
+  }
+
+  yCalc += 5 + 4; // total + separador
+
+  if (options.hasPrev && options.isCatalogOrder) {
+    yCalc += 4; // preventa warning text
+  }
+
+  if (options.observaciones && options.isCatalogOrder) {
+    yCalc += 2 + 4; // header space
+    const obsLines = tmpDoc.splitTextToSize(options.observaciones, ANCHO);
+    yCalc += obsLines.length * 3.8;
+  }
+
+  yCalc += 6; // pie
 
   const pageH = Math.ceil(yCalc) + 6; // margen inferior
 
@@ -1679,10 +1715,25 @@ function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMont
   doc.setFont('helvetica','normal');
   if(fecha){ doc.text(new Date(fecha).toLocaleString('es-AR'), 4, y); y+=4; }
   if(cliente){ doc.text('Cliente: '+cliente, 4, y); y+=4; }
+  if(options.isCatalogOrder) {
+    doc.text('Precios: ' + (options.includeIVA ? 'Con IVA' : 'Sin IVA'), 4, y); y+=4;
+  }
   doc.line(4,y,76,y); y+=4;
 
   // Items — nombres completos con wrap automático
+  let currentBrand = null;
   items.forEach((i, idx) => {
+    if (options.isCatalogOrder) {
+      const brand = i.brand || 'Sin marca';
+      if (brand !== currentBrand) {
+        currentBrand = brand;
+        doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+        y += 1.5;
+        doc.text('📦 ' + brand.toUpperCase(), 4, y);
+        y += 4;
+      }
+    }
+
     const p   = i.precio_modificado ?? i.precio_unitario ?? i.price ?? 0;
     const qty = i.cantidad ?? i.qty ?? 1;
     const sku = i.sku || '';
@@ -1690,9 +1741,16 @@ function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMont
 
     doc.setFont('helvetica','normal'); doc.setFontSize(8);
     nombreLines.forEach(line => { doc.text(line, 4, y); y+=3.8; });
-    if(sku){
+
+    const isPrev = i.stock_type === 'PREVENTA' || (i.stock && i.stock.toUpperCase().includes('PREVENTA'));
+    if(sku || (isPrev && options.isCatalogOrder)){
       doc.setFontSize(7); doc.setTextColor(120,120,140);
-      doc.text('SKU: '+sku, 4, y);
+      let textStr = '';
+      if(sku) textStr += 'SKU: ' + sku;
+      if(isPrev && options.isCatalogOrder) {
+        textStr += (sku ? '  |  ' : '') + '⏳ ' + i.stock;
+      }
+      doc.text(textStr, 4, y);
       doc.setTextColor(0,0,0); doc.setFontSize(8); y+=3.5;
     }
     doc.text('  '+qty+' x '+fmtN(p)+' = '+fmtN(p*qty), 4, y); y+=4.5;
@@ -1710,8 +1768,31 @@ function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMont
     doc.text('Subtotal: '+fmtN(subtotal), 4, y); y+=4;
     doc.text('Descuento: -'+fmtN(descMonto), 4, y); y+=4;
   }
+
+  if (options.isCatalogOrder) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    doc.text('Subtotal s/IVA: '+fmtN(options.subtotalSinIva), 4, y); y+=4;
+    if (options.includeIVA) {
+      doc.text('IVA: + '+fmtN(options.ivaTotal), 4, y); y+=4;
+    }
+  }
+
   doc.setFont('helvetica','bold'); doc.setFontSize(11);
   doc.text('TOTAL: '+fmtN(total), 4, y); y+=5;
+
+  if (options.hasPrev && options.isCatalogOrder) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    doc.text('⏳ Incluye productos en preventa', 4, y); y+=4;
+  }
+
+  if (options.observaciones && options.isCatalogOrder) {
+    y += 2;
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+    doc.text('Observaciones:', 4, y); y+=4;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    const obsLines = doc.splitTextToSize(options.observaciones, ANCHO);
+    obsLines.forEach(line => { doc.text(line, 4, y); y+=3.8; });
+  }
 
   doc.setFont('helvetica','normal'); doc.setFontSize(8);
   doc.line(4,y,76,y); y+=4;
@@ -1767,11 +1848,56 @@ async function descargarPedidoCatalogo(order){
     const mappedItems = items.map(i=>({
       nombre: i.name || i.nombre || '',
       sku: i.sku || '',
+      brand: i.brand || 'Sin marca',
       cantidad: i.qty || i.cantidad || 1,
       precio_unitario: i.price || i.precio_unitario || 0,
-      precio_modificado: null
+      precio_modificado: null,
+      iva_percent: i.iva_percent,
+      stock: i.stock,
+      stock_type: i.stock_type,
+      include_iva: i.include_iva,
+      precio_sin_iva: i.precio_sin_iva,
+      subtotal_sin_iva: i.subtotal_sin_iva,
+      iva_monto: i.iva_monto
     }));
-    const doc = buildAdminPDF('Pedido Catálogo', order.id?.slice(0,8), order.created_at, order.nombre_cliente, mappedItems, order.total, 0, order.total);
+
+    // Ordenar por marca para mantener consistencia
+    mappedItems.sort((a, b) => a.brand.localeCompare(b.brand));
+
+    // Determinar si incluye IVA
+    const hasIncludeIva = items.some(i => i.include_iva !== undefined);
+    const includeIVA = hasIncludeIva ? items[0].include_iva : false;
+
+    // Calcular subtotal sin IVA e IVA Total
+    let subtotalSinIva = 0;
+    let ivaTotal = 0;
+    let hasPrev = false;
+
+    mappedItems.forEach(i => {
+      if (i.subtotal_sin_iva !== undefined) {
+        subtotalSinIva += i.subtotal_sin_iva;
+      } else {
+        subtotalSinIva += i.precio_unitario * i.cantidad;
+      }
+      if (i.iva_monto !== undefined) {
+        ivaTotal += i.iva_monto;
+      }
+      const isPrev = i.stock_type === 'PREVENTA' || (i.stock && i.stock.toUpperCase().includes('PREVENTA'));
+      if (isPrev) {
+        hasPrev = true;
+      }
+    });
+
+    const options = {
+      isCatalogOrder: true,
+      observaciones: order.observaciones,
+      includeIVA,
+      subtotalSinIva,
+      ivaTotal,
+      hasPrev
+    };
+
+    const doc = buildAdminPDF('Pedido Catálogo', order.id?.slice(0,8), order.created_at, order.nombre_cliente, mappedItems, subtotalSinIva, 0, order.total, options);
     doc.save('pedido-'+(order.nombre_cliente||'cliente').replace(/\s+/g,'-')+'-'+new Date(order.created_at).toISOString().slice(0,10)+'.pdf');
     showToast('📄 Pedido descargado');
   }catch(e){ showToast('Error: '+e.message); }
