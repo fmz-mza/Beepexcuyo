@@ -310,10 +310,72 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <button class="admin-tab" onclick="switchTab('catalogo',this)">📦 Catálogo</button>
     <button class="admin-tab" onclick="switchTab('productos',this)">🗂️ Productos</button>
     <button class="admin-tab" onclick="switchTab('estadisticas',this)">📊 Estadísticas</button>
+    <button class="admin-tab" onclick="switchTab('limpieza',this)">🧹 Limpieza</button>
     <button class="admin-tab" id="tab-btn-ctacte" onclick="switchTab('ctacte',this)">💰 Cta Cte<span class="tab-mora-badge" id="moraBadgeTab" style="display:none"></span></button>
   </div>
 
   <div class="admin-content">
+
+    <!-- TAB LIMPIEZA -->
+    <div class="tab-panel" id="tab-limpieza" style="display:none">
+      <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:40px;">
+
+        <!-- USUARIOS -->
+        <div class="card" style="padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:14px;font-weight:700;">👤 Usuarios</div>
+            <div style="display:flex;gap:8px;">
+              <button class="setting-btn" onclick="limpiezaLoadUsuarios()">🔄 Cargar</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaBuscarDuplicados('usuarios')">🔍 Duplicados</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaEliminarSeleccionados('usuarios')">🗑️ Eliminar seleccionados</button>
+            </div>
+          </div>
+          <div id="limpieza-usuarios-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- PEDIDOS CATÁLOGO -->
+        <div class="card" style="padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:14px;font-weight:700;">📦 Pedidos Catálogo</div>
+            <div style="display:flex;gap:8px;">
+              <button class="setting-btn" onclick="limpiezaLoadCatalogo()">🔄 Cargar</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaBuscarDuplicados('catalogo')">🔍 Duplicados</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaEliminarSeleccionados('catalogo')">🗑️ Eliminar seleccionados</button>
+            </div>
+          </div>
+          <div id="limpieza-catalogo-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- CLIENTES -->
+        <div class="card" style="padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:14px;font-weight:700;">👥 Clientes</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="setting-btn" onclick="limpiezaLoadClientes()">🔄 Cargar</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaBuscarDuplicados('clientes')">🔍 Duplicados</button>
+              <button class="setting-btn" style="background:rgba(58,108,240,.1);color:#3a6cf0;border-color:rgba(58,108,240,.3);" onclick="limpiezaUnificarClientes()">🔀 Unificar seleccionados</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaEliminarSeleccionados('clientes')">🗑️ Eliminar seleccionados</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">💡 Para unificar: seleccioná los duplicados, el <b>primero marcado</b> será el cliente principal que conserva todas las ventas.</div>
+          <div id="limpieza-clientes-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- VENTAS POS -->
+        <div class="card" style="padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:14px;font-weight:700;">🏪 Ventas POS</div>
+            <div style="display:flex;gap:8px;">
+              <button class="setting-btn" onclick="limpiezaLoadPOS()">🔄 Cargar</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaBuscarDuplicados('pos')">🔍 Duplicados</button>
+              <button class="setting-btn" style="background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3);" onclick="limpiezaEliminarSeleccionados('pos')">🗑️ Eliminar seleccionados</button>
+            </div>
+          </div>
+          <div id="limpieza-pos-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+        </div>
+
+      </div>
+    </div>
 
     <!-- TAB USUARIOS -->
     <div class="tab-panel active" id="tab-usuarios" style="display:block">
@@ -2618,6 +2680,223 @@ async function registrarDeuda(){
     btn.disabled=false; btn.textContent='Registrar';
   }
 }
+
+// ═══════════════════════════════════════════════════════
+// LIMPIEZA DE PRUEBAS
+// ═══════════════════════════════════════════════════════
+const _limpiezaData = { usuarios: [], catalogo: [], pos: [], clientes: [] };
+
+function _limpiezaRow(id, cols, section){
+  return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+    <input type="checkbox" data-id="${id}" data-section="${section}" style="width:16px;height:16px;accent-color:var(--red);flex-shrink:0;">
+    <span style="font-size:12px;color:var(--text);flex:1;">${cols}</span>
+  </label>`;
+}
+
+async function limpiezaLoadUsuarios(){
+  const token = localStorage.getItem('admin_token');
+  const el = document.getElementById('limpieza-usuarios-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,nombre,approved,is_admin,created_at&order=created_at.desc`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+  const data = await res.json();
+  _limpiezaData.usuarios = data;
+  if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin usuarios</div>'; return; }
+  el.innerHTML = data.map(u =>
+    _limpiezaRow(u.id,
+      `<b>${u.nombre||'Sin nombre'}</b> <span style="color:var(--muted);">${u.approved?'✅ Aprobado':'⏳ Pendiente'} · ${new Date(u.created_at).toLocaleDateString('es-AR')}</span>`,
+      'usuarios')
+  ).join('');
+}
+
+async function limpiezaLoadCatalogo(){
+  const token = localStorage.getItem('admin_token');
+  const el = document.getElementById('limpieza-catalogo-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=id,nombre_cliente,total,via,created_at&order=created_at.desc&limit=100`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+  const data = await res.json();
+  _limpiezaData.catalogo = data;
+  if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin pedidos</div>'; return; }
+  el.innerHTML = data.map(o =>
+    _limpiezaRow(o.id,
+      `<b>${o.nombre_cliente||'Sin nombre'}</b> · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.created_at).toLocaleDateString('es-AR')} · ${o.via||''}</span>`,
+      'catalogo')
+  ).join('');
+}
+
+async function limpiezaLoadPOS(){
+  const token = localStorage.getItem('admin_token');
+  const el = document.getElementById('limpieza-pos-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/pos_orders?select=id,ticket_display,fecha,total,client_id,clients(nombre)&order=fecha.desc&limit=100`,
+    {headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}});
+  const data = await res.json();
+  _limpiezaData.pos = data;
+  if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin ventas</div>'; return; }
+  el.innerHTML = data.map(o => {
+    const cliente = o.clients?.nombre || 'Sin cliente';
+    return _limpiezaRow(o.id,
+      `<b>${o.ticket_display||o.id.slice(0,8)}</b> · ${cliente} · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.fecha).toLocaleDateString('es-AR')}</span>`,
+      'pos');
+  }).join('');
+}
+
+async function limpiezaLoadClientes(){
+  const el = document.getElementById('limpieza-clientes-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando...</div>';
+  const data = await api('clients?select=id,nombre,telefono,email,created_at&order=nombre.asc');
+  _limpiezaData.clientes = Array.isArray(data) ? data : [];
+  if(!_limpiezaData.clientes.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin clientes</div>'; return; }
+  
+  // Traer conteo de ventas por cliente
+  const ventas = await api('pos_orders?select=client_id&estado=eq.cerrada');
+  const ventaCount = {};
+  if(Array.isArray(ventas)) ventas.forEach(v => { ventaCount[v.client_id] = (ventaCount[v.client_id]||0)+1; });
+  
+  el.innerHTML = _limpiezaData.clientes.map(c =>
+    _limpiezaRow(c.id,
+      `<b>${c.nombre||'Sin nombre'}</b> · ${c.telefono||'sin tel'} · ${c.email||''} <span style="color:var(--muted);">${ventaCount[c.id]?'📦 '+ventaCount[c.id]+' ventas':''}</span>`,
+      'clientes')
+  ).join('');
+}
+
+function limpiezaBuscarDuplicados(section){
+  const data = _limpiezaData[section];
+  if(!data.length){ showToast('Cargá los datos primero'); return; }
+
+  let keyFn;
+  if(section === 'usuarios') keyFn = u => (u.nombre||'').toLowerCase().trim();
+  if(section === 'catalogo') keyFn = o => `${o.nombre_cliente||''}_${o.total||0}_${(o.created_at||'').slice(0,10)}`;
+  if(section === 'pos')      keyFn = o => `${o.client_id||''}_${o.total||0}_${(o.fecha||'').slice(0,10)}`;
+  if(section === 'clientes') keyFn = c => (c.nombre||'').toLowerCase().trim();
+
+  const seen = {}, dupeIds = new Set();
+  data.forEach(item => {
+    const k = keyFn(item);
+    if(seen[k]) dupeIds.add(item.id);
+    else seen[k] = true;
+  });
+
+  if(!dupeIds.size){ showToast('✅ Sin duplicados encontrados'); return; }
+
+  // Marcar checkboxes de duplicados
+  const listEl = document.getElementById(`limpieza-${section}-list`);
+  listEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    if(dupeIds.has(cb.dataset.id)) cb.checked = true;
+  });
+  showToast(`⚠️ ${dupeIds.size} duplicado(s) marcados`);
+}
+
+function limpiezaUnificarClientes(){
+  const checks = [...document.querySelectorAll('#limpieza-clientes-list input[type=checkbox]:checked')];
+  if(checks.length < 2){ showToast('Seleccioná al menos 2 clientes para unificar'); return; }
+
+  const ids = checks.map(c => c.dataset.id);
+  const clientesSeleccionados = ids.map(id => _limpiezaData.clientes.find(c=>c.id===id)).filter(Boolean);
+
+  // Mostrar modal para elegir el principal
+  const modalHtml = `
+    <div id="unificarModal" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;width:100%;max-width:420px;">
+        <h3 style="margin:0 0 8px;font-size:16px;">🔀 Unificar clientes</h3>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 16px;">Elegí cuál será el cliente <b>principal</b> que conservará todas las ventas. Los demás serán eliminados.</p>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+          ${clientesSeleccionados.map((c,i) => `
+            <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+              <input type="radio" name="clientePrincipal" value="${c.id}" ${i===0?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;">
+              <div>
+                <div style="font-size:13px;font-weight:600;">${c.nombre||'Sin nombre'}</div>
+                <div style="font-size:11px;color:var(--muted);">${c.telefono||'sin tel'} ${c.email?'· '+c.email:''}</div>
+              </div>
+            </label>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('unificarModal').remove()" style="flex:1;padding:10px;border:1px solid var(--border);background:none;color:var(--text);border-radius:8px;cursor:pointer;">Cancelar</button>
+          <button onclick="limpiezaConfirmarUnificacion()" style="flex:1;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">✅ Confirmar</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  // Guardar ids para usar en confirmar
+  window._unificarIds = ids;
+}
+
+async function limpiezaConfirmarUnificacion(){
+  const principal = document.querySelector('input[name="clientePrincipal"]:checked')?.value;
+  document.getElementById('unificarModal')?.remove();
+  if(!principal) return;
+
+  const duplicados = window._unificarIds.filter(id => id !== principal);
+  const nombrePrincipal = _limpiezaData.clientes.find(c=>c.id===principal)?.nombre || principal;
+
+  if(!confirm(`¿Unificar ${duplicados.length} cliente(s) en "${nombrePrincipal}"?\nEsta acción no se puede deshacer.`)) return;
+
+  let ok = 0, err = 0;
+  for(const dupId of duplicados){
+    try {
+      // Reasignar pos_orders al principal
+      await api(`pos_orders?client_id=eq.${dupId}`, {
+        method:'PATCH',
+        body: JSON.stringify({client_id: principal}),
+        headers:{'Content-Type':'application/json','Prefer':'return=minimal'}
+      });
+      // Reasignar payments al principal
+      await api(`payments?client_id=eq.${dupId}`, {
+        method:'PATCH',
+        body: JSON.stringify({client_id: principal}),
+        headers:{'Content-Type':'application/json','Prefer':'return=minimal'}
+      });
+      // Ahora borrar el cliente duplicado (ya sin FK dependencies)
+      const r = await api(`clients?id=eq.${dupId}`, {method:'DELETE'});
+      r.ok ? ok++ : err++;
+    } catch(e){ err++; }
+  }
+
+  showToast(`✅ Unificados: ${ok}${err?' | ❌ Errores: '+err:''}`);
+  limpiezaLoadClientes();
+}
+
+async function limpiezaEliminarSeleccionados(section){
+  const checks = document.querySelectorAll(`#limpieza-${section}-list input[type=checkbox]:checked`);
+  if(!checks.length){ showToast('Seleccioná al menos un item'); return; }
+  if(!confirm(`¿Eliminar ${checks.length} item(s)? Esta acción no se puede deshacer.`)) return;
+
+  const ids = [...checks].map(c => c.dataset.id);
+  let ok = 0, err = 0;
+
+  for(const id of ids){
+    try {
+      if(section === 'usuarios'){
+        // Borrar profile (auth.users debe borrarse desde Supabase Dashboard o SQL)
+        const r = await api(`profiles?id=eq.${id}`, {method:'DELETE'});
+        r.ok ? ok++ : err++;
+      }
+      if(section === 'catalogo'){
+        const r = await api(`orders?id=eq.${id}`, {method:'DELETE'});
+        r.ok ? ok++ : err++;
+      }
+      if(section === 'pos'){
+        await api(`payment_allocations?order_id=eq.${id}`, {method:'DELETE'});
+        await api(`order_items?order_id=eq.${id}`, {method:'DELETE'});
+        const r = await api(`pos_orders?id=eq.${id}`, {method:'DELETE'});
+        r.ok ? ok++ : err++;
+      }
+      if(section === 'clientes'){
+        const r = await api(`clients?id=eq.${id}`, {method:'DELETE'});
+        r.ok ? ok++ : err++;
+      }
+    } catch(e){ err++; }
+  }
+
+  showToast(`✅ Eliminados: ${ok}${err ? ' | ❌ Errores: '+err : ''}`);
+  if(section === 'usuarios') limpiezaLoadUsuarios();
+  if(section === 'catalogo') limpiezaLoadCatalogo();
+  if(section === 'pos')      limpiezaLoadPOS();
+  if(section === 'clientes') limpiezaLoadClientes();
+}
+
 
 </script>
 </body>
