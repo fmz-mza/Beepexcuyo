@@ -2033,7 +2033,7 @@ function getOrderedCartGroups(){
 }
 
 // ── WhatsApp ──────────────────────────────────────────────────────────────────
-function sendWhatsApp(){
+async function sendWhatsApp(){
   if(!userApproved) return;
   const nameRaw=document.getElementById('clientName').value.trim();
   if(!nameRaw){
@@ -2084,13 +2084,14 @@ function sendWhatsApp(){
   // Guardar en historial de pedidos
   saveOrderHistory(name, total, totalU);
   // Deshabilitar botón para evitar doble envío
-  const waBtn = document.querySelector('[onclick*="sendWA"], [onclick*="openCart"]');
   document.querySelectorAll('.cart-send-btn, .wa-btn, [onclick*="whatsapp"]').forEach(b=>{ b.disabled=true; b.style.opacity='.5'; });
-  saveOrderSupabase('whatsapp');
+  // IMPORTANTE: esperar el guardado en Supabase ANTES de redirigir a WhatsApp.
+  // Si no se espera, window.location.href cancela el fetch pendiente y el pedido no se registra.
+  await saveOrderSupabase('whatsapp', obs);
+  window.location.href = 'https://api.whatsapp.com/send/?phone=' + WA_NUMBER + '&text=' + encodeURIComponent(msg);
   setTimeout(()=>{
     document.querySelectorAll('.cart-send-btn, .wa-btn, [onclick*="whatsapp"]').forEach(b=>{ b.disabled=false; b.style.opacity=''; });
-  }, 5000);
-  window.location.href = 'https://api.whatsapp.com/send/?phone=' + WA_NUMBER + '&text=' + encodeURIComponent(msg);
+  }, 3000);
 }
 
 
@@ -2144,7 +2145,7 @@ async function trackEvent(table, data){
   } catch(e){}
 }
 let _orderSending = false;
-async function saveOrderSupabase(via){
+async function saveOrderSupabase(via, obs){
   if(!currentUser) return;
   if(_orderSending){ console.warn('saveOrderSupabase: bloqueado por doble envío'); return; }
   _orderSending = true;
@@ -2166,6 +2167,7 @@ async function saveOrderSupabase(via){
     const token=localStorage.getItem('sb_access_token');
     const res=await fetch(`${SUPABASE_URL}/rest/v1/orders`,{
       method:'POST',
+      keepalive: true, // Garantiza que el request se complete incluso si el browser navega a otra URL
       headers:{
         'apikey':SUPABASE_ANON,
         'Authorization':`Bearer ${token}`,
@@ -2365,7 +2367,7 @@ async function exportPDF(){
   doc.text('Beepex Cuyo', 40, y, {align:'center'});
 
   // Guardar pedido en Supabase
-  saveOrderSupabase('pdf');
+  saveOrderSupabase('pdf', obs);
 
   // Compartir o descargar
   const pdfBlob = doc.output('blob');
