@@ -1729,7 +1729,7 @@ function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMont
         currentBrand = brand;
         doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
         y += 1.5;
-        doc.text('📦 ' + brand.toUpperCase(), 4, y);
+        doc.text(brand.toUpperCase(), 4, y);
         y += 4;
       }
     }
@@ -1748,7 +1748,7 @@ function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMont
       let textStr = '';
       if(sku) textStr += 'SKU: ' + sku;
       if(isPrev && options.isCatalogOrder) {
-        textStr += (sku ? '  |  ' : '') + '⏳ ' + i.stock;
+        textStr += (sku ? '  |  ' : '') + i.stock;
       }
       doc.text(textStr, 4, y);
       doc.setTextColor(0,0,0); doc.setFontSize(8); y+=3.5;
@@ -1782,7 +1782,7 @@ function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMont
 
   if (options.hasPrev && options.isCatalogOrder) {
     doc.setFont('helvetica','normal'); doc.setFontSize(8);
-    doc.text('⏳ Incluye productos en preventa', 4, y); y+=4;
+    doc.text('Incluye productos en preventa', 4, y); y+=4;
   }
 
   if (options.observaciones && options.isCatalogOrder) {
