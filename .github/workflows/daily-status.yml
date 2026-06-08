@@ -2,7 +2,7 @@ name: Daily WhatsApp Status
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # 9am Argentina (UTC-3)
+    - cron: '15 12 * * *'  # 9:15am Argentina (UTC-3). Evita congestión del minuto 0 en GitHub Actions.
   workflow_dispatch:        # permite correr manualmente desde GitHub
 
 permissions:
