@@ -93,13 +93,28 @@ def limpiar_precio(val):
         return 0
 
 def get_drive_ids_from_netlify():
-    """Extrae el mapeo de IDs de Drive desde el HTML de Netlify"""
+    """Extrae el mapeo de IDs de Drive desde la API dinámica de beepex.dev y el HTML de Netlify"""
+    mapping = {}
+    
+    # 1. Obtener de la API dinámica (método moderno y completo)
+    try:
+        res = requests.get("https://beepex.dev/api/landings/products", timeout=15)
+        if res.status_code == 200:
+            data = res.json()
+            drive_map = data.get("driveMap", {})
+            for sku, drive_id in drive_map.items():
+                if sku and drive_id:
+                    mapping[str(sku).strip()] = str(drive_id).strip()
+            print(f"✅ Cargados {len(drive_map)} IDs de Drive desde la API de beepex.dev")
+    except Exception as e:
+        print(f"⚠️ Error cargando IDs desde la API dinámica: {e}")
+
+    # 2. Mapeo complementario desde el HTML de Netlify (como fallback)
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(NETLIFY_SRC_URL, headers=headers, timeout=10)
         html = res.text
         
-        mapping = {}
         start_marker = 'DRIVE_IDS='
         start_idx = html.find(start_marker)
         if start_idx != -1:
@@ -110,11 +125,14 @@ def get_drive_ids_from_netlify():
                 obj_str = html[open_brace:close_brace+1]
                 pairs = re.findall(r'["\']?(\w+)["\']?\s*:\s*["\']([\w\-]+)["\']', obj_str)
                 for sku, drive_id in pairs:
-                    mapping[sku] = drive_id
-        return mapping
+                    sku_str = str(sku).strip()
+                    if sku_str not in mapping:
+                        mapping[sku_str] = str(drive_id).strip()
     except Exception as e:
         print(f"Error scraping Netlify: {e}")
-        return {}
+        
+    return mapping
+
 
 def limpiar_stock(val):
     if pd.isna(val) or val is None: return 0
@@ -229,6 +247,31 @@ def get_variant_key(name):
         clean = clean.split('/')[0]
     return clean.strip().upper()
 
+def subir_stock_beepex(items: list[dict]) -> dict:
+    """Sube el stock obtenido de Beepex al ERP vía RPC de Supabase"""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        print("Error: SUPABASE_URL o SUPABASE_KEY no definidos.")
+        return {"actualizados": 0, "sin_match": [], "invalidos": []}
+    
+    resp = requests.post(
+        f"{SUPABASE_URL}/rest/v1/rpc/actualizar_stock_beepex",
+        headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={"p_items": items},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    resultado = resp.json()
+    if resultado.get("sin_match"):
+        print(f"AVISO: {len(resultado['sin_match'])} SKUs sin match en ERP: {resultado['sin_match']}")
+    if resultado.get("invalidos"):
+        print(f"AVISO: {len(resultado['invalidos'])} SKUs con valores inválidos: {resultado['invalidos']}")
+    print(f"Stock Beepex actualizado en ERP: {resultado.get('actualizados', 0)} productos")
+    return resultado
+
 def run_sync():
     print(f"Iniciando sincronización: {datetime.now()}")
     
@@ -270,6 +313,7 @@ def run_sync():
 
     stats = {"nuevos": 0, "actualizados": 0, "precios_cambiados": 0, "fotos_procesadas": 0}
     logs = []
+    beepex_stock_items = []
 
     for _, row in df.iterrows():
         sku_raw = row.get("CODIGO", "")
@@ -364,6 +408,7 @@ def run_sync():
         # Stock
         stock_raw = str(row.get("STOCK/INGRESO", "0")).upper()
         stock_fisico = limpiar_stock(stock_raw)
+        beepex_stock_items.append({"sku": sku, "stock": int(stock_fisico)})
         
         stock_ingresos = limpiar_stock(row.get("STOCK INGRESOS", "0"))
 
@@ -442,12 +487,33 @@ def run_sync():
             print(f"❌ Error guardando {sku}: {e}")
             # Si hay error, no incrementamos stats de éxito
 
+    # Sincronizar stock con el ERP
+    erp_summary_line = ""
+    if beepex_stock_items:
+        try:
+            print(f"Enviando {len(beepex_stock_items)} items de stock al ERP...")
+            res_erp = subir_stock_beepex(beepex_stock_items)
+            actualizados_erp = res_erp.get('actualizados', 0)
+            sin_match_erp = len(res_erp.get('sin_match', []))
+            invalidos_erp = len(res_erp.get('invalidos', []))
+            
+            erp_summary_line = f"- Stock ERP: {actualizados_erp} actualizados"
+            if sin_match_erp > 0:
+                erp_summary_line += f" ({sin_match_erp} sin match)"
+            if invalidos_erp > 0:
+                erp_summary_line += f" ({invalidos_erp} inválidos)"
+        except Exception as e:
+            print(f"❌ Error subiendo stock al ERP: {e}")
+            erp_summary_line = f"- Stock ERP: ❌ ERROR ({e})"
+    
     # Alerta Discord
     summary = f"🔄 **Sincronización Completada**\n"
     summary += f"- Nuevos: {stats['nuevos']}\n"
     summary += f"- Actualizados: {stats['actualizados']}\n"
     summary += f"- Cambios precio: {stats['precios_cambiados']}\n"
     summary += f"- Fotos procesadas: {stats['fotos_procesadas']}\n"
+    if erp_summary_line:
+        summary += erp_summary_line + "\n"
     
     if logs:
         log_text = "\n".join(logs[:15]) # Top 15 cambios
