@@ -429,9 +429,11 @@ def run_sync():
             estado_stock = "NOSTOCK"
 
         # Foto
-        foto_id = str(row.get("FOTO", "")).strip()
-        if not foto_id or foto_id.lower() == "prueba":
+        foto_val = row.get("FOTO")
+        if pd.isna(foto_val) or str(foto_val).strip() == "" or str(foto_val).strip().lower() in ["prueba", "nan"]:
             foto_id = netlify_mapping.get(sku, "")
+        else:
+            foto_id = str(foto_val).strip()
         
         # 2. Verificar existencia y datos previos para evitar re-procesamiento innecesario
         existing = {}
