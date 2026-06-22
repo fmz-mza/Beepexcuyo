@@ -428,6 +428,14 @@ def run_sync():
         else:
             estado_stock = "NOSTOCK"
 
+        # Ocultar del catálogo si el stock físico es <= 1 y no está en preventa
+        if stock_fisico <= 1 and not estado_stock.startswith("PREVENTA"):
+            try:
+                supabase.table(PRODUCT_TABLE).delete().eq("codigo", sku).execute()
+            except:
+                pass
+            continue
+
         # Foto
         foto_val = row.get("FOTO")
         if pd.isna(foto_val) or str(foto_val).strip() == "" or str(foto_val).strip().lower() in ["prueba", "nan"]:
