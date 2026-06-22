@@ -1,6 +1,7 @@
-const CACHE = 'beepex-v4';
+const CACHE = 'beepex-v5';
 const ASSETS = [
   'beepex-cuyo.html',
+  'beepex-pos.html',
 ];
 
 self.addEventListener('install', e => {
@@ -19,7 +20,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   // Solo cachear el HTML principal — imágenes y fonts siempre de red
-  if (e.request.method === 'GET' && e.request.url.includes('beepex-cuyo.html')) {
+  if (e.request.method === 'GET' && (e.request.url.includes('beepex-cuyo.html') || e.request.url.includes('beepex-pos.html'))) {
     e.respondWith(
       fetch(e.request)
         .then(res => {
