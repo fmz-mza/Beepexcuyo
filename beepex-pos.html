@@ -462,12 +462,14 @@ input,select,textarea{font-family:inherit;}
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js">
-// ── Descargar carrito en Excel ────────────────────────────────────────────────
-async function downloadCartExcel(){
-  if(!cart || cart.length === 0){ showToast('El pedido está vacío'); return; }
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script>
+// ── Descargar carrito en Excel ────────────────────────────────────────────
+async function downloadCartExcel(orderData){
+  // orderData: objeto con items (desde admin) o null (desde tab Pagar)
+  const srcItems = orderData ? orderData.items : (window.cart || []);
+  if(!srcItems || srcItems.length === 0){ if(window.showToast) showToast('El pedido está vacío'); return; }
   try {
-    // Cargar SheetJS dinámicamente
     if(!window.XLSX){
       await new Promise((res,rej)=>{
         const s=document.createElement('script');
@@ -476,38 +478,35 @@ async function downloadCartExcel(){
         document.head.appendChild(s);
       });
     }
-    
-    // Mapear items del carrito con datos completos
-    const mapped = cart.map(item => {
-      const p = item.product;
-      const precio = item.precio_modificado ?? item.precio_unitario ?? p.precio_pesos;
-      const iva = p.iva || 0;
+    const mapped = srcItems.map(item => {
+      // Soporta tanto formato cart (POS) como formato items (admin/order_items)
+      const name   = item.name  || (item.product && item.product.producto) || '';
+      const sku    = item.sku   || (item.product && item.product.codigo)   || '';
+      const precio = item.precio_unitario ?? item.precioFinal ?? (item.product && item.product.precio_pesos) ?? 0;
+      const qty    = item.cantidad ?? item.qty ?? 1;
+      const iva    = item.iva   || (item.product && item.product.iva)      || 0;
+      const marca  = item.marca || (item.product && item.product.marca)   || '';
       return {
-        'SKU': p.codigo,
-        'NOMBRE': p.producto,
-        'DESCRIPCIÓN': p.descripcion || '',
+        'SKU': sku,
+        'NOMBRE': name,
         'PRECIO PESOS': precio,
-        'PVP': p.precio_pvp || '',
         'IVA (%)': iva,
-        'CANTIDAD': item.cantidad,
-        'SUBTOTAL': precio * item.cantidad,
-        'MARCA': p.marca || ''
+        'CANTIDAD': qty,
+        'SUBTOTAL': precio * qty,
+        'MARCA': marca
       };
     });
-    
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(mapped);
-    
-    // Auto-ajustar ancho de columnas
-    const colWidths = { A: 12, B: 25, C: 20, D: 15, E: 12, F: 10, G: 10, H: 15, I: 15 };
-    ws['!cols'] = Object.values(colWidths).map(w => ({ wch: w }));
-    
-    XLSX.utils.book_append_sheet(wb, ws, 'PEDIDO');
-    const filename = `Pedido_${new Date().toISOString().slice(0,10)}.xlsx`;
+    ws['!cols'] = [12,30,15,10,10,15,15].map(w=>({wch:w}));
+    const ticket = orderData ? (orderData.ticket_display||orderData.id||'') : '';
+    XLSX.utils.book_append_sheet(wb, ws, 'VENTA');
+    const filename = `Venta${ticket?'_'+ticket:''}_${new Date().toISOString().slice(0,10)}.xlsx`;
     XLSX.writeFile(wb, filename);
-    showToast('✅ Excel descargado: ' + filename);
+    if(window.showToast) showToast('✅ Excel descargado');
   } catch(e) {
-    showToast('❌ Error: ' + e.message);
+    if(window.showToast) showToast('❌ Error: '+e.message);
+    else alert('Error: '+e.message);
   }
 }
 

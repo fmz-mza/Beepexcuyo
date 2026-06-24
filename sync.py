@@ -428,12 +428,9 @@ def run_sync():
         else:
             estado_stock = "NOSTOCK"
 
-        # Ocultar del catálogo si el stock físico es <= 1 y no está en preventa
+        # Si stock físico es <= 1 y no es preventa: no upsert al catálogo (el frontend catalogo los filtra)
+        # NO borrar de Supabase para que el POS pueda verlos y seleccionarlos
         if stock_fisico <= 1 and not estado_stock.startswith("PREVENTA"):
-            try:
-                supabase.table(PRODUCT_TABLE).delete().eq("codigo", sku).execute()
-            except:
-                pass
             continue
 
         # Foto

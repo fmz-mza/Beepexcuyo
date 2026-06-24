@@ -1902,6 +1902,40 @@ async function descargarTicketPOS(orderId, ticket, fecha, total){
   }catch(e){ showToast('Error: '+e.message); }
 }
 
+async function descargarOrderExcel(order){
+  try{
+    const items = Array.isArray(order.items) ? order.items : [];
+    if(!items.length){ showToast('Sin items en este pedido'); return; }
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res; s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+    const mapped = items.map(i=>({
+      'SKU':             i.sku   || '',
+      'NOMBRE':          i.name  || '',
+      'PRECIO PESOS':    i.precio_unitario ?? i.price ?? 0,
+      'IVA (%)':         i.iva   || 0,
+      'CANTIDAD':        i.cantidad ?? i.qty ?? 1,
+      'SUBTOTAL':        (i.precio_unitario ?? i.price ?? 0) * (i.cantidad ?? i.qty ?? 1),
+      'MARCA':           i.marca || ''
+    }));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(mapped);
+    ws['!cols'] = [12,30,15,10,10,15,15].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, ws, 'VENTA');
+    const ticket = order.ticket_display || order.id || '';
+    const filename = `Venta${ticket?'_'+ticket:''}_${new Date().toISOString().slice(0,10)}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    showToast('✅ Excel descargado');
+  } catch(e){
+    showToast('❌ Error: '+e.message);
+  }
+}
+
 async function descargarPedidoCatalogo(order){
   try{
     const items = Array.isArray(order.items) ? order.items : [];
@@ -2058,6 +2092,7 @@ function renderAllOrders(orders){
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="order-total">${fmt(o.total)}</span>
           <button onclick="descargarPedidoCatalogo(${JSON.stringify(o).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar PDF">📄</button>
+          <button onclick="descargarOrderExcel(${JSON.stringify(o).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar Excel">📊</button>
         </div>
       </div>
       <div class="order-meta">${fmtDateTime(o.created_at)} · ${items.length} producto${items.length!==1?'s':''}</div>

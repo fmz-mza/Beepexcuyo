@@ -4439,7 +4439,7 @@
         }
         const rows = await res.json();
         console.log('loadProducts rows:', rows.length);
-        products = rows.map(r => {
+        const allRows = rows.map(r => {
           const sku = String(r.sku);
           let price = r.price;
           if (sku === '11573') price = 59999;
@@ -4456,6 +4456,11 @@
             rubro: r.rubro || null,
             ean: r.ean || ''
           };
+        });
+        // Ocultar del catálogo los productos con stock físico <= 1 que no sean preventa
+        products = allRows.filter(p => {
+          if ((p.stock || '').startsWith('PREVENTA')) return true;
+          return p.stock_fisico > 1;
         });
         productMeta = {};
         rows.forEach(r => {
