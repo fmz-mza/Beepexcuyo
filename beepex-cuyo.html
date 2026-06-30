@@ -6369,7 +6369,17 @@
       const type = hashParams.get('type') || queryParams.get('type');
       if (type === 'recovery' || window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery')) {
         _isRecovering = true;
-        const token = hashParams.get('access_token') || queryParams.get('access_token');
+        let token = hashParams.get('access_token') || queryParams.get('access_token');
+        
+        // Si Supabase SDK ya procesó el hash y lo limpió, el token estará en la sesión
+        if (!token) {
+          const { data } = await _supabase.auth.getSession();
+          if (data && data.session) {
+            token = data.session.access_token;
+            localStorage.setItem('sb_access_token', token);
+          }
+        }
+        
         const tokenHash = hashParams.get('token_hash') || queryParams.get('token_hash') || hashParams.get('refresh_token') || queryParams.get('refresh_token') || token;
 
         history.replaceState(null, '', window.location.pathname);
