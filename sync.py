@@ -93,28 +93,13 @@ def limpiar_precio(val):
         return 0
 
 def get_drive_ids_from_netlify():
-    """Extrae el mapeo de IDs de Drive desde la API dinámica de beepex.dev y el HTML de Netlify"""
-    mapping = {}
-    
-    # 1. Obtener de la API dinámica (método moderno y completo)
-    try:
-        res = requests.get("https://beepex.dev/api/landings/products", timeout=15)
-        if res.status_code == 200:
-            data = res.json()
-            drive_map = data.get("driveMap", {})
-            for sku, drive_id in drive_map.items():
-                if sku and drive_id:
-                    mapping[str(sku).strip()] = str(drive_id).strip()
-            print(f"✅ Cargados {len(drive_map)} IDs de Drive desde la API de beepex.dev")
-    except Exception as e:
-        print(f"⚠️ Error cargando IDs desde la API dinámica: {e}")
-
-    # 2. Mapeo complementario desde el HTML de Netlify (como fallback)
+    """Extrae el mapeo de IDs de Drive desde el HTML de Netlify"""
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(NETLIFY_SRC_URL, headers=headers, timeout=10)
         html = res.text
         
+        mapping = {}
         start_marker = 'DRIVE_IDS='
         start_idx = html.find(start_marker)
         if start_idx != -1:
@@ -125,14 +110,11 @@ def get_drive_ids_from_netlify():
                 obj_str = html[open_brace:close_brace+1]
                 pairs = re.findall(r'["\']?(\w+)["\']?\s*:\s*["\']([\w\-]+)["\']', obj_str)
                 for sku, drive_id in pairs:
-                    sku_str = str(sku).strip()
-                    if sku_str not in mapping:
-                        mapping[sku_str] = str(drive_id).strip()
+                    mapping[sku] = drive_id
+        return mapping
     except Exception as e:
         print(f"Error scraping Netlify: {e}")
-        
-    return mapping
-
+        return {}
 
 def limpiar_stock(val):
     if pd.isna(val) or val is None: return 0
@@ -247,31 +229,6 @@ def get_variant_key(name):
         clean = clean.split('/')[0]
     return clean.strip().upper()
 
-def subir_stock_beepex(items: list[dict]) -> dict:
-    """Sube el stock obtenido de Beepex al ERP vía RPC de Supabase"""
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        print("Error: SUPABASE_URL o SUPABASE_KEY no definidos.")
-        return {"actualizados": 0, "sin_match": [], "invalidos": []}
-    
-    resp = requests.post(
-        f"{SUPABASE_URL}/rest/v1/rpc/actualizar_stock_beepex",
-        headers={
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={"p_items": items},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    resultado = resp.json()
-    if resultado.get("sin_match"):
-        print(f"AVISO: {len(resultado['sin_match'])} SKUs sin match en ERP: {resultado['sin_match']}")
-    if resultado.get("invalidos"):
-        print(f"AVISO: {len(resultado['invalidos'])} SKUs con valores inválidos: {resultado['invalidos']}")
-    print(f"Stock Beepex actualizado en ERP: {resultado.get('actualizados', 0)} productos")
-    return resultado
-
 def run_sync():
     print(f"Iniciando sincronización: {datetime.now()}")
     
@@ -313,7 +270,6 @@ def run_sync():
 
     stats = {"nuevos": 0, "actualizados": 0, "precios_cambiados": 0, "fotos_procesadas": 0}
     logs = []
-    beepex_stock_items = []
 
     for _, row in df.iterrows():
         sku_raw = row.get("CODIGO", "")
@@ -347,57 +303,47 @@ def run_sync():
         regla_trigger = False
         motivo_regla = "Identidad"
         
-        if precio_lista_base > 0 and precio_lista_base == precio_14_20 == precio_20_30:
-            if precio_pvp > 0:
-                calculado = int(precio_pvp / 2)
-                if precio_lista_base == precio_pvp or calculado > precio_lista_base:
-                    precio_pesos = calculado
-                    regla_trigger = True
-                    motivo_regla = "PVP/2"
-            else:
-                # NUEVA REGLA (04/05): Si no hay PVP y los precios de lista son idénticos, sumamos 21%
-                precio_pesos = int(precio_lista_base * 1.21)
-                regla_trigger = True
-                motivo_regla = "Base+21% (Iden)"
-
-        # REGLA PROTECCIÓN GENÉRICOS (REFINADA 08/05, ACTUALIZADA 31/05, AJUSTADA 01/06 y MEJORADA 01/06 DETECCION VARIANTES):
-        # Si es Genérico >= 11432 y no hay PVP:
-        # 1. Caso con Liquidación: Al estar rebajados en costo, si usáramos LISTA BASE directa o una liquidación menor perderíamos cohesión de precios o rentabilidad porcentual.
-        #    - Lógica Inteligente de Coincidencia de Variantes: Si un producto hermano del mismo nombre raíz + talle (ej. CAMA DONA TERCIOPELO LARGO _ L) no comercializado en liquidación tiene precio base regular,
-        #      adoptamos su precio base a fin de evitar precios distintos para variantes de color.
-        #    - Caso de no existir variante regular activa: Aplicamos protección dinámica usando la fórmula comercial clásica LISTA 20/30 * 1.21.
-        # 2. Caso Estándar: Usamos LISTA BASE directo como precio para el catálogo.
-        try:
-            val_sku = int(sku)
-            if val_sku >= 11432 and "GENERICOS" in marca.upper() and precio_pvp <= 0:
-                if precio_liqui > 0 and precio_20_30 > 0:
-                    key = get_variant_key(row.get("NOMBRE", ""))
-                    matched_regular = regular_prices_by_key.get(key, 0)
-                    if matched_regular > 0:
-                        precio_pesos = matched_regular
+        if precio_liqui > 0:
+            # REGLA LIQUIDACIÓN: Sincronizar productos en liquidación calculando LISTA LIQUIDACION * 1.23
+            # Aplica para todos los SKUs (incluyendo marca Beepaw < 11432) de manera puntual.
+            precio_pesos = int(precio_liqui * 1.23)
+            regla_trigger = True
+            motivo_regla = "Liqui_1.23"
+        else:
+            if precio_lista_base > 0 and precio_lista_base == precio_14_20 == precio_20_30:
+                if precio_pvp > 0:
+                    calculado = int(precio_pvp / 2)
+                    if precio_lista_base == precio_pvp or calculado > precio_lista_base:
+                        precio_pesos = calculado
                         regla_trigger = True
-                        motivo_regla = "Gen_Liq_SmartMatched"
-                    else:
-                        precio_pesos = int(precio_20_30 * 1.21)
-                        regla_trigger = True
-                        motivo_regla = "Gen_Liq_Proteccion"
+                        motivo_regla = "PVP/2"
                 else:
+                    # NUEVA REGLA (04/05): Si no hay PVP y los precios de lista son idénticos, sumamos 21%
+                    precio_pesos = int(precio_lista_base * 1.21)
+                    regla_trigger = True
+                    motivo_regla = "Base+21% (Iden)"
+
+            # REGLA PROTECCIÓN GENÉRICOS (para productos NO en liquidación):
+            # Si es Genérico >= 11432 y no hay PVP:
+            try:
+                val_sku = int(sku)
+                if val_sku >= 11432 and "GENERICOS" in marca.upper() and precio_pvp <= 0:
                     precio_pesos = precio_lista_base
                     regla_trigger = True
                     motivo_regla = "Gen_Base_Directo"
-        except:
-            pass
-        
-        # Fallback histórico para SKUs nuevos sin lista base (>= 11432)
-        if precio_pesos <= 0:
-            try:
-                val_sku = int(sku)
-                if val_sku >= 11432 and precio_pvp > 0:
-                    precio_pesos = int(precio_pvp / 2)
-                    regla_trigger = True
-                    motivo_regla = "PVP/2 (Fallback)"
             except:
                 pass
+            
+            # Fallback histórico para SKUs nuevos sin lista base (>= 11432)
+            if precio_pesos <= 0:
+                try:
+                    val_sku = int(sku)
+                    if val_sku >= 11432 and precio_pvp > 0:
+                        precio_pesos = int(precio_pvp / 2)
+                        regla_trigger = True
+                        motivo_regla = "PVP/2 (Fallback)"
+                except:
+                    pass
  
         # Mostrar en log si se aplicó alguna regla especial
         if regla_trigger:
@@ -408,7 +354,6 @@ def run_sync():
         # Stock
         stock_raw = str(row.get("STOCK/INGRESO", "0")).upper()
         stock_fisico = limpiar_stock(stock_raw)
-        beepex_stock_items.append({"sku": sku, "stock": int(stock_fisico)})
         
         stock_ingresos = limpiar_stock(row.get("STOCK INGRESOS", "0"))
 
@@ -428,17 +373,10 @@ def run_sync():
         else:
             estado_stock = "NOSTOCK"
 
-        # Si stock físico es <= 1 y no es preventa: no upsert al catálogo (el frontend catalogo los filtra)
-        # NO borrar de Supabase para que el POS pueda verlos y seleccionarlos
-        if stock_fisico <= 1 and not estado_stock.startswith("PREVENTA"):
-            continue
-
         # Foto
-        foto_val = row.get("FOTO")
-        if pd.isna(foto_val) or str(foto_val).strip() == "" or str(foto_val).strip().lower() in ["prueba", "nan"]:
+        foto_id = str(row.get("FOTO", "")).strip()
+        if not foto_id or foto_id.lower() == "prueba":
             foto_id = netlify_mapping.get(sku, "")
-        else:
-            foto_id = str(foto_val).strip()
         
         # 2. Verificar existencia y datos previos para evitar re-procesamiento innecesario
         existing = {}
@@ -494,33 +432,12 @@ def run_sync():
             print(f"❌ Error guardando {sku}: {e}")
             # Si hay error, no incrementamos stats de éxito
 
-    # Sincronizar stock con el ERP
-    erp_summary_line = ""
-    if beepex_stock_items:
-        try:
-            print(f"Enviando {len(beepex_stock_items)} items de stock al ERP...")
-            res_erp = subir_stock_beepex(beepex_stock_items)
-            actualizados_erp = res_erp.get('actualizados', 0)
-            sin_match_erp = len(res_erp.get('sin_match', []))
-            invalidos_erp = len(res_erp.get('invalidos', []))
-            
-            erp_summary_line = f"- Stock ERP: {actualizados_erp} actualizados"
-            if sin_match_erp > 0:
-                erp_summary_line += f" ({sin_match_erp} sin match)"
-            if invalidos_erp > 0:
-                erp_summary_line += f" ({invalidos_erp} inválidos)"
-        except Exception as e:
-            print(f"❌ Error subiendo stock al ERP: {e}")
-            erp_summary_line = f"- Stock ERP: ❌ ERROR ({e})"
-    
     # Alerta Discord
     summary = f"🔄 **Sincronización Completada**\n"
     summary += f"- Nuevos: {stats['nuevos']}\n"
     summary += f"- Actualizados: {stats['actualizados']}\n"
     summary += f"- Cambios precio: {stats['precios_cambiados']}\n"
     summary += f"- Fotos procesadas: {stats['fotos_procesadas']}\n"
-    if erp_summary_line:
-        summary += erp_summary_line + "\n"
     
     if logs:
         log_text = "\n".join(logs[:15]) # Top 15 cambios
