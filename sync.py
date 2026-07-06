@@ -364,7 +364,11 @@ def run_sync():
             fecha_ingreso = str(fecha_val).strip()
 
         if stock_fisico > 0 or "STOCK" in stock_raw or "DISPONIBLE" in stock_raw:
-            estado_stock = "STOCK"
+            # Si tiene precio de liquidación, marcarlo como LIQUIDACION
+            if precio_liqui > 0:
+                estado_stock = "LIQUIDACION"
+            else:
+                estado_stock = "STOCK"
         elif stock_ingresos > 0 or "PREVENTA" in stock_raw:
             if fecha_ingreso:
                 estado_stock = f"PREVENTA ({fecha_ingreso})"

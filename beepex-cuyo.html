@@ -763,6 +763,21 @@
       color: var(--green);
     }
 
+    .liqui-fire {
+      display: inline-flex;
+      align-items: center;
+      font-size: 1em;
+      line-height: 1;
+      margin-left: 4px;
+      vertical-align: middle;
+      animation: fire-pulse 1.8s ease-in-out infinite;
+      filter: drop-shadow(0 0 4px rgba(255,120,0,0.5));
+    }
+    @keyframes fire-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.2); opacity: 0.85; }
+    }
+
     .tag.t-nostock {
       color: var(--red);
     }
@@ -4405,12 +4420,12 @@
       return 'NOSTOCK';
     }
     function stockLabel(s) {
-      if (s === 'LIQUIDACION') return 'EN STOCK 🔥';
       const t = stockType(s);
       if (t === 'STOCK') return 'EN STOCK';
       if (t === 'PREVENTA') return s;
       return 'SIN STOCK';
     }
+    function isLiquidacion(s) { return s === 'LIQUIDACION'; }
 
     // ── Productos — cargados desde Supabase ─────────────────────────────────────
     let products = [];
@@ -4915,7 +4930,7 @@
     <div class="card-body">
       <div class="tags">
         <span class="tag ${brandClass}">${p.brand}</span>
-        <span class="tag ${tagClass}">${stockLabel(p.stock)}</span>
+        <span class="tag ${tagClass}">${stockLabel(p.stock)}</span>${isLiquidacion(p.stock) ? '<span class="liqui-fire" aria-label="Liquidación">🔥</span>' : ''}
       </div>
       <div class="iva-label">IVA ${p.iva}%</div>
       <div class="prod-name">${p.name}</div>
