@@ -4400,11 +4400,12 @@
     // ── Helpers de stock ─────────────────────────────────────────────────────────
     function stockType(s) {
       if (!s || s === 'NOSTOCK') return 'NOSTOCK';
-      if (s === 'STOCK') return 'STOCK';
+      if (s === 'STOCK' || s === 'LIQUIDACION') return 'STOCK';
       if (s.toUpperCase().includes('PREVENTA')) return 'PREVENTA';
       return 'NOSTOCK';
     }
     function stockLabel(s) {
+      if (s === 'LIQUIDACION') return 'EN STOCK 🔥';
       const t = stockType(s);
       if (t === 'STOCK') return 'EN STOCK';
       if (t === 'PREVENTA') return s;
