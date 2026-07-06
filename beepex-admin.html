@@ -453,6 +453,22 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
             </div>
           </div>
           <div class="setting-row">
+            <div><div class="setting-label">Banner movimiento</div><div class="setting-sub">Texto desplazante en carrusel horizontal</div></div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="toggle-wrap">
+                <button class="toggle" id="bannerScrollToggle" onclick="toggleBannerScroll()"></button>
+                <span id="bannerScrollLabel" style="font-size:12px;color:var(--muted);">Inactivo</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:12px;color:var(--muted);">Velocidad</span>
+                <input type="number" id="bannerScrollSpeed" min="0" max="100" value="50"
+                  style="width:56px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 6px;font-size:12px;"
+                  oninput="saveBannerScrollSpeed()">
+                <span style="font-size:12px;color:var(--muted);">%</span>
+              </div>
+            </div>
+          </div>
+          <div class="setting-row">
             <div><div class="setting-label">Margen de ganancia</div><div class="setting-sub">Mostrar u ocultar el margen en el modal +info</div></div>
             <div class="toggle-wrap">
               <button class="toggle" id="margenToggle" onclick="toggleMargen()"></button>
@@ -1314,6 +1330,12 @@ async function loadSettings(){
   const toggle=document.getElementById('bannerToggle');
   if(bannerOn) toggle.classList.add('on'); else toggle.classList.remove('on');
   document.getElementById('bannerToggleLabel').textContent=bannerOn?'Activo':'Inactivo';
+  // Banner movimiento
+  const scrollOn=s.banner_scroll==='true';
+  const scrollToggle=document.getElementById('bannerScrollToggle');
+  if(scrollOn) scrollToggle.classList.add('on'); else scrollToggle.classList.remove('on');
+  document.getElementById('bannerScrollLabel').textContent=scrollOn?'Activo':'Inactivo';
+  if(s.banner_scroll_speed) document.getElementById('bannerScrollSpeed').value=s.banner_scroll_speed;
   const margenOn=s.margen_active==='true';
   const margenToggle=document.getElementById('margenToggle');
   if(margenOn) margenToggle.classList.add('on'); else margenToggle.classList.remove('on');
@@ -1453,6 +1475,45 @@ async function toggleBanner(){
     showToast(newVal==='true'?'📢 Banner activado':'Banner desactivado');
   }
 }
+
+async function toggleBannerScroll(){
+  const toggle=document.getElementById('bannerScrollToggle');
+  const isOn=toggle.classList.contains('on');
+  const newVal=isOn?'false':'true';
+  const res=await api('settings?key=eq.banner_scroll',{
+    method:'PATCH',
+    body:JSON.stringify({value:newVal}),
+    headers:{'Prefer':'return=minimal'}
+  });
+  if(res.ok||res.status===204){
+    if(newVal==='true'){ toggle.classList.add('on'); document.getElementById('bannerScrollLabel').textContent='Activo'; }
+    else { toggle.classList.remove('on'); document.getElementById('bannerScrollLabel').textContent='Inactivo'; }
+    showToast(newVal==='true'?'🔄 Banner en movimiento':'Banner estático');
+  } else {
+    // Si la fila no existe, insertarla
+    await api('settings',{ method:'POST', body:JSON.stringify({key:'banner_scroll',value:newVal}), headers:{'Prefer':'return=minimal'} });
+    if(newVal==='true'){ toggle.classList.add('on'); document.getElementById('bannerScrollLabel').textContent='Activo'; }
+    else { toggle.classList.remove('on'); document.getElementById('bannerScrollLabel').textContent='Inactivo'; }
+  }
+}
+
+let _scrollSpeedTimer=null;
+async function saveBannerScrollSpeed(){
+  clearTimeout(_scrollSpeedTimer);
+  _scrollSpeedTimer=setTimeout(async()=>{
+    const speed=document.getElementById('bannerScrollSpeed').value||'50';
+    const res=await api('settings?key=eq.banner_scroll_speed',{
+      method:'PATCH',
+      body:JSON.stringify({value:speed}),
+      headers:{'Prefer':'return=minimal'}
+    });
+    if(!res.ok && res.status!==204){
+      await api('settings',{ method:'POST', body:JSON.stringify({key:'banner_scroll_speed',value:speed}), headers:{'Prefer':'return=minimal'} });
+    }
+  },600);
+}
+
+
 
 // ── ESTADÍSTICAS ──
 function periodFilter(created_at){

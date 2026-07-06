@@ -432,6 +432,13 @@
       color: #fff;
     }
 
+    .filter-btn.f-liqui.active,
+    .filter-btn.f-liqui:hover {
+      background: linear-gradient(135deg, #ff6a00, #ee0979);
+      border-color: #ff6a00;
+      color: #fff;
+    }
+
     .filter-sep {
       width: 1px;
       background: var(--border);
@@ -1016,6 +1023,29 @@
 
     .site-banner-close:hover {
       opacity: 1;
+    }
+
+    .site-banner-track {
+      display: flex;
+      justify-content: center;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .site-banner-track.scrolling {
+      --scroll-dur: 20s;
+      justify-content: flex-start;
+    }
+
+    .site-banner-track.scrolling span {
+      display: inline-block;
+      animation: banner-scroll var(--scroll-dur) linear infinite;
+      padding-right: 80px;
+    }
+
+    @keyframes banner-scroll {
+      0%   { transform: translateX(100vw); }
+      100% { transform: translateX(-100%); }
     }
 
     .pwd-overlay {
@@ -3968,7 +3998,9 @@
   <header class="header">
     <div class="sale-banner" id="saleBanner">🏪 MODO VENTA — Precios venta público</div>
     <div id="siteBanner" class="site-banner">
-      <span id="siteBannerText"></span>
+      <div class="site-banner-track" id="siteBannerTrack">
+        <span id="siteBannerText"></span>
+      </div>
       <button class="site-banner-close"
         onclick="document.getElementById('siteBanner').classList.remove('visible')">✕</button>
     </div>
@@ -4620,6 +4652,9 @@
         // Preventa: solo si hay productos en preventa
         const hayPreventa = products.some(p => p.stock && p.stock.toUpperCase().startsWith('PREVENTA'));
         if (hayPreventa) html += `<button class="filter-btn f-preventa ${activeStock === 'PREVENTA' ? 'active' : ''}" onclick="setStock('PREVENTA')">🕐 Preventa</button>`;
+        // Liquidación: solo si hay productos con estado LIQUIDACION
+        const hayLiqui = products.some(p => p.stock === 'LIQUIDACION');
+        if (hayLiqui) html += `<button class="filter-btn f-liqui ${activeStock === 'LIQUIDACION' ? 'active' : ''}" onclick="setStock('LIQUIDACION')">🔥 Liquidación</button>`;
       }
       document.getElementById('brandFilters').innerHTML = html;
       renderRubros();
@@ -4715,7 +4750,7 @@
         const meta = productMeta[p.sku];
         const searchStr = normalize(`${p.name} ${p.sku} ${p.brand || ''} ${meta ? meta.tags : ''}`);
         const okQ = !q || matchQuery(searchStr, q);
-        const okStock = activeStock === 'ALL' || stockType(p.stock) === activeStock;
+        const okStock = activeStock === 'ALL' || (activeStock === 'LIQUIDACION' ? p.stock === 'LIQUIDACION' : stockType(p.stock) === activeStock);
         // Ocultar productos desactivados para usuarios normales
         const okDisabled = !disabledSkus.has(p.sku) || isAdmin;
         return okBrand && okRubro && okQ && okStock && okDisabled && okNoStock;
@@ -7648,6 +7683,16 @@ _${text}_`;
         // Banner temporal
         if (s.banner_active === 'true' && s.banner_text) {
           document.getElementById('siteBannerText').textContent = s.banner_text;
+          const track = document.getElementById('siteBannerTrack');
+          if (s.banner_scroll === 'true') {
+            // velocidad: 100% = 8s (rápido), 0% = 40s (lento)
+            const pct = parseFloat(s.banner_scroll_speed || '50') / 100;
+            const dur = 40 - pct * 32; // 40s → 8s
+            track.style.setProperty('--scroll-dur', dur + 's');
+            track.classList.add('scrolling');
+          } else {
+            track.classList.remove('scrolling');
+          }
           document.getElementById('siteBanner').classList.add('visible');
         }
         // Productos desactivados
