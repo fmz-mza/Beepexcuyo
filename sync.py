@@ -22,8 +22,16 @@ PRODUCT_TABLE = "productos"
 FOTOS_BUCKET = "fotos"
 
 # URLs de origen
-BEEPAW_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=1686576198"
+BEEPAW_API_URL = "https://beepex.dev/api/landings/products?fresh=1"
 NETLIFY_SRC_URL = "https://beepawmayorista.netlify.app/ailen-l2.html"
+
+def safe_int(val):
+    if val is None or str(val).strip() == "":
+        return 0
+    try:
+        return int(round(float(val)))
+    except:
+        return 0
 
 # Inicializar Supabase
 if not SUPABASE_URL or not SUPABASE_KEY:
@@ -220,7 +228,7 @@ def process_image(drive_id, sku):
         return None
 
 def get_variant_key(name):
-    if not name or pd.isna(name):
+    if not name:
         return ""
     # Reemplazar guiones bajos por espacios, colapsar espacios múltiples y dividir por /
     clean = str(name).replace('_', ' ')
@@ -232,32 +240,35 @@ def get_variant_key(name):
 def run_sync():
     print(f"Iniciando sincronización: {datetime.now()}")
     
-    # 1. Obtener datos
+    # 1. Obtener datos de la nueva API
     try:
-        df = pd.read_csv(BEEPAW_CSV_URL)
-        netlify_mapping = get_drive_ids_from_netlify()
+        res = requests.get(BEEPAW_API_URL, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
+        if res.status_code != 200:
+            print(f"Error HTTP obteniendo datos de la API: {res.status_code}")
+            return
+        payload = res.json()
+        products = payload.get("products", [])
+        api_drive_map = payload.get("driveMap", {})
+        print(f"Se obtuvieron {len(products)} productos de la API y {len(api_drive_map)} mapeos de imágenes.")
+        
+        # Unificar mapeo de imágenes: preferir API, fallback a Netlify
+        netlify_mapping = api_drive_map if api_drive_map else get_drive_ids_from_netlify()
     except Exception as e:
-        print(f"Error obteniendo datos: {e}")
+        print(f"Error obteniendo datos de la API: {e}")
         return
 
     # Primer paso: Construir mapeo de precios base normales de variantes hermanas (SKU >= 11432)
     regular_prices_by_key = {}
-    for _, row in df.iterrows():
-        sku_raw = row.get("CODIGO", "")
-        if pd.isna(sku_raw) or sku_raw == "":
-            continue
-        sku_str = str(sku_raw).strip()
-        if sku_str.endswith(".0"):
-            sku_str = sku_str[:-2]
-        
-        nombre = str(row.get("NOMBRE", "")).strip()
-        marca = str(row.get("MARCA", "")).strip()
+    for row in products:
+        sku_str = str(row.get("codigo", "")).strip()
+        nombre = str(row.get("nombre", "")).strip()
+        marca = str(row.get("marcaRaw", "")).strip()
         
         try:
             val_sku = int(sku_str)
             if val_sku >= 11432 and "GENERICOS" in marca.upper():
-                precio_liqui = limpiar_precio(row.get("LISTA LIQUIDACION"))
-                precio_lista_base = limpiar_precio(row.get("LISTA BASE"))
+                precio_liqui = safe_int(row.get("liquidacion"))
+                precio_lista_base = safe_int(row.get("precioBase"))
                 # Si NO está en liquidación y tiene precio base válido
                 if precio_liqui <= 0 and precio_lista_base > 0:
                     key = get_variant_key(nombre)
@@ -271,33 +282,29 @@ def run_sync():
     stats = {"nuevos": 0, "actualizados": 0, "precios_cambiados": 0, "fotos_procesadas": 0}
     logs = []
 
-    for _, row in df.iterrows():
-        sku_raw = row.get("CODIGO", "")
-        if pd.isna(sku_raw) or sku_raw == "":
-            continue
-            
-        # Limpieza de SKU para evitar decimales .0 (problema de float en Pandas)
-        sku = str(sku_raw).strip()
-        if sku.endswith(".0"):
-            sku = sku[:-2]
-        
-        nombre = str(row.get("NOMBRE", "")).replace('_', ' ').strip()
+    for row in products:
+        sku = str(row.get("codigo", "")).strip()
+        nombre = str(row.get("nombre", "")).replace('_', ' ').strip()
         
         # Saltar si no hay SKU o es de prueba
         if not sku or sku == "0" or "PRUEBA" in nombre.upper() or "TEST" in nombre.upper():
             continue
         
-        descripcion = str(row.get("DESCRIPCION", "")).strip()
-        iva = normalizar_iva(row.get("IVA"))
-        marca = str(row.get("MARCA", "")).strip()
-        rubro = str(row.get("RUBRO", "")).strip()
+        descripcion = str(row.get("desc", "")).strip()
         
-        # PRECIOS: Lógica de Identidad entre listas
-        precio_pvp = limpiar_precio(row.get("PVP"))
-        precio_lista_base = limpiar_precio(row.get("LISTA BASE"))
-        precio_14_20 = limpiar_precio(row.get("LISTA 14/20"))
-        precio_20_30 = limpiar_precio(row.get("LISTA 20/30"))
-        precio_liqui = limpiar_precio(row.get("LISTA LIQUIDACION"))
+        # IVA
+        iva_val = row.get("ivaPct")
+        iva = str(iva_val) if iva_val is not None else ""
+        
+        marca = str(row.get("marcaRaw", "")).strip()
+        rubro = str(row.get("rubro", "")).strip()
+        
+        # PRECIOS: Lógica de Identidad entre listas (convertidos de forma segura a int)
+        precio_pvp = safe_int(row.get("pvp"))
+        precio_lista_base = safe_int(row.get("precioBase"))
+        precio_14_20 = safe_int(row.get("lista14"))
+        precio_20_30 = safe_int(row.get("lista20"))
+        precio_liqui = safe_int(row.get("liquidacion"))
         
         precio_pesos = precio_lista_base
         regla_trigger = False
@@ -306,20 +313,20 @@ def run_sync():
         if precio_liqui > 0:
             # REGLA LIQUIDACIÓN: Sincronizar productos en liquidación calculando LISTA LIQUIDACION * 1.23
             # Aplica para todos los SKUs (incluyendo marca Beepaw < 11432) de manera puntual.
-            precio_pesos = int(precio_liqui * 1.23)
+            precio_pesos = int(round(precio_liqui * 1.23))
             regla_trigger = True
             motivo_regla = "Liqui_1.23"
         else:
             if precio_lista_base > 0 and precio_lista_base == precio_14_20 == precio_20_30:
                 if precio_pvp > 0:
-                    calculado = int(precio_pvp / 2)
+                    calculado = int(round(precio_pvp / 2))
                     if precio_lista_base == precio_pvp or calculado > precio_lista_base:
                         precio_pesos = calculado
                         regla_trigger = True
                         motivo_regla = "PVP/2"
                 else:
                     # NUEVA REGLA (04/05): Si no hay PVP y los precios de lista son idénticos, sumamos 21%
-                    precio_pesos = int(precio_lista_base * 1.21)
+                    precio_pesos = int(round(precio_lista_base * 1.21))
                     regla_trigger = True
                     motivo_regla = "Base+21% (Iden)"
 
@@ -339,7 +346,7 @@ def run_sync():
                 try:
                     val_sku = int(sku)
                     if val_sku >= 11432 and precio_pvp > 0:
-                        precio_pesos = int(precio_pvp / 2)
+                        precio_pesos = int(round(precio_pvp / 2))
                         regla_trigger = True
                         motivo_regla = "PVP/2 (Fallback)"
                 except:
@@ -351,25 +358,15 @@ def run_sync():
             if precio_pesos != precio_lista_base:
                 print(f"ℹ️ REGLA {motivo_regla}: SKU {sku} ({nombre}) -> Aplicado: ${precio_pesos} (Base era ${precio_lista_base})")
 
-        # Stock
-        stock_raw = str(row.get("STOCK/INGRESO", "0")).upper()
-        stock_fisico = limpiar_stock(stock_raw)
-        
-        stock_ingresos = limpiar_stock(row.get("STOCK INGRESOS", "0"))
+        # Stock directo desde la API
+        stock_fisico = safe_int(row.get("stockNum"))
+        stock_ingresos = safe_int(row.get("cantidadTransito"))
+        fecha_ingreso = str(row.get("etaRaw") or "").strip()
 
-        fecha_val = row.get("INGRESOS")
-        if pd.isna(fecha_val) or str(fecha_val).lower() in ["none", "0", "nan"]:
-            fecha_ingreso = ""
-        else:
-            fecha_ingreso = str(fecha_val).strip()
-
-        if stock_fisico > 0 or "STOCK" in stock_raw or "DISPONIBLE" in stock_raw:
-            # Si tiene precio de liquidación, marcarlo como LIQUIDACION
-            if precio_liqui > 0:
-                estado_stock = "LIQUIDACION"
-            else:
-                estado_stock = "STOCK"
-        elif stock_ingresos > 0 or "PREVENTA" in stock_raw:
+        # Determinar estado de stock de manera precisa
+        if stock_fisico > 0:
+            estado_stock = "STOCK"
+        elif stock_ingresos > 0:
             if fecha_ingreso:
                 estado_stock = f"PREVENTA ({fecha_ingreso})"
             else:
@@ -378,9 +375,7 @@ def run_sync():
             estado_stock = "NOSTOCK"
 
         # Foto
-        foto_id = str(row.get("FOTO", "")).strip()
-        if not foto_id or foto_id.lower() == "prueba":
-            foto_id = netlify_mapping.get(sku, "")
+        foto_id = netlify_mapping.get(sku, "")
         
         # 2. Verificar existencia y datos previos para evitar re-procesamiento innecesario
         existing = {}
@@ -401,9 +396,9 @@ def run_sync():
             "precio_pvp": precio_pvp,
             "stock_estado": estado_stock,
             "stock_fisico": stock_fisico,
-            "ean": str(row.get("EAN", "")).replace('/', '').strip(),
-            "rubro": str(row.get("RUBRO", "")).strip(),
-            "marca": str(row.get("MARCA", "")).strip(),
+            "ean": str(row.get("ean", "")).replace('/', '').strip(),
+            "rubro": rubro,
+            "marca": marca,
             "ingresos": fecha_ingreso,
             "stock_ingresos": stock_ingresos,
             "updated_at": datetime.now().isoformat()
