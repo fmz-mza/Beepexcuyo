@@ -4447,7 +4447,7 @@
     // ── Helpers de stock ─────────────────────────────────────────────────────────
     function stockType(s) {
       if (!s || s === 'NOSTOCK') return 'NOSTOCK';
-      if (s === 'STOCK' || s === 'LIQUIDACION') return 'STOCK';
+      if (s && (s === 'STOCK' || String(s).toUpperCase().includes('LIQUIDACION'))) return 'STOCK';
       if (s.toUpperCase().includes('PREVENTA')) return 'PREVENTA';
       return 'NOSTOCK';
     }
@@ -4457,7 +4457,7 @@
       if (t === 'PREVENTA') return s;
       return 'SIN STOCK';
     }
-    function isLiquidacion(s) { return s === 'LIQUIDACION'; }
+    function isLiquidacion(s) { return Boolean(s && String(s).toUpperCase().includes('LIQUIDACION')); }
 
     // ── Productos — cargados desde Supabase ─────────────────────────────────────
     let products = [];
@@ -4653,7 +4653,7 @@
         const hayPreventa = products.some(p => p.stock && p.stock.toUpperCase().startsWith('PREVENTA'));
         if (hayPreventa) html += `<button class="filter-btn f-preventa ${activeStock === 'PREVENTA' ? 'active' : ''}" onclick="setStock('PREVENTA')">🕐 Preventa</button>`;
         // Liquidación: solo si hay productos con estado LIQUIDACION
-        const hayLiqui = products.some(p => p.stock === 'LIQUIDACION');
+        const hayLiqui = products.some(p => isLiquidacion(p.stock));
         if (hayLiqui) html += `<button class="filter-btn f-liqui ${activeStock === 'LIQUIDACION' ? 'active' : ''}" onclick="setStock('LIQUIDACION')">🔥 Liquidación</button>`;
       }
       document.getElementById('brandFilters').innerHTML = html;
