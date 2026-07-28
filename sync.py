@@ -365,7 +365,10 @@ def run_sync():
 
         # Determinar estado de stock de manera precisa
         if stock_fisico > 0:
-            estado_stock = "STOCK"
+            if precio_liqui > 0:
+                estado_stock = "LIQUIDACION"
+            else:
+                estado_stock = "STOCK"
         elif stock_ingresos > 0:
             if fecha_ingreso:
                 estado_stock = f"PREVENTA ({fecha_ingreso})"
