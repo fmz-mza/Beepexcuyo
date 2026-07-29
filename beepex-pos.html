@@ -463,12 +463,34 @@ input,select,textarea{font-family:inherit;}
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
+'use strict';
+const SUPABASE_URL  = 'https://mmerrzniuxbrjryhcsda.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_oJzr70DjfOZsK4mjFX5rRw_5hc03thM';
+const WA_NUMBER     = '5492616531533';
+const GITHUB_USER='fmz-mza', GITHUB_REPO='Beepexcuyo', GITHUB_BRANCH='main';
+const EXTENSIONS=['webp','jpg','jpeg','png','JPG','PNG'];
+const BUCKET_URL='https://mmerrzniuxbrjryhcsda.supabase.co/storage/v1/object/public/fotos';
+
+const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth:{ autoRefreshToken:true, persistSession:true, detectSessionInUrl:false }
+});
+
+let currentUser = null, products = [], clients = [], cart = [];
+let payMethod = 'efectivo', lastTicket = null;
+let isOnline = navigator.onLine, includeIVA = false;
+let pendingSync = JSON.parse(localStorage.getItem('pos_pending_sync')||'[]');
+let _lastScanCode = '', _lastScanTime = 0;
+let clienteSaldoPendiente = 0;   // saldo deuda del cliente seleccionado
+let cobrarSaldoJunto = false;    // toggle: cobrar deuda junto con la venta
+
 // ── Descargar carrito en Excel ────────────────────────────────────────────
 async function downloadCartExcel(orderData){
-  // orderData: objeto con items (desde admin) o null (desde tab Pagar)
-  const srcItems = orderData ? orderData.items : (window.cart || []);
-  if(!srcItems || srcItems.length === 0){ if(window.showToast) showToast('El pedido está vacío'); return; }
+  const srcItems = orderData ? orderData.items : cart;
+  if(!srcItems || srcItems.length === 0){ showToast('El pedido está vacío'); return; }
   try {
     if(!window.XLSX){
       await new Promise((res,rej)=>{
@@ -479,7 +501,6 @@ async function downloadCartExcel(orderData){
       });
     }
     const mapped = srcItems.map(item => {
-      // Soporta tanto formato cart (POS) como formato items (admin/order_items)
       const name   = item.name  || (item.product && item.product.producto) || '';
       const sku    = item.sku   || (item.product && item.product.codigo)   || '';
       const precio = item.precio_unitario ?? item.precioFinal ?? (item.product && item.product.precio_pesos) ?? 0;
@@ -503,35 +524,11 @@ async function downloadCartExcel(orderData){
     XLSX.utils.book_append_sheet(wb, ws, 'VENTA');
     const filename = `Venta${ticket?'_'+ticket:''}_${new Date().toISOString().slice(0,10)}.xlsx`;
     XLSX.writeFile(wb, filename);
-    if(window.showToast) showToast('✅ Excel descargado');
+    showToast('✅ Excel descargado');
   } catch(e) {
-    if(window.showToast) showToast('❌ Error: '+e.message);
-    else alert('Error: '+e.message);
+    showToast('❌ Error: '+e.message);
   }
 }
-
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script>
-'use strict';
-const SUPABASE_URL  = 'https://mmerrzniuxbrjryhcsda.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_oJzr70DjfOZsK4mjFX5rRw_5hc03thM';
-const WA_NUMBER     = '5492616531533';
-const GITHUB_USER='fmz-mza', GITHUB_REPO='Beepexcuyo', GITHUB_BRANCH='main';
-const EXTENSIONS=['webp','jpg','jpeg','png','JPG','PNG'];
-const BUCKET_URL='https://mmerrzniuxbrjryhcsda.supabase.co/storage/v1/object/public/fotos';
-
-const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
-  auth:{ autoRefreshToken:true, persistSession:true, detectSessionInUrl:false }
-});
-
-let currentUser = null, products = [], clients = [], cart = [];
-let payMethod = 'efectivo', lastTicket = null;
-let isOnline = navigator.onLine, includeIVA = false;
-let pendingSync = JSON.parse(localStorage.getItem('pos_pending_sync')||'[]');
-let _lastScanCode = '', _lastScanTime = 0;
-let clienteSaldoPendiente = 0;   // saldo deuda del cliente seleccionado
-let cobrarSaldoJunto = false;    // toggle: cobrar deuda junto con la venta
 
 const fmt = n => '$'+Math.round(n||0).toLocaleString('es-AR').replace(/,/g,'.');
 const mayorista = p => includeIVA ? Math.round(p.precio_pesos*(1+(p.iva||21)/100)) : p.precio_pesos;

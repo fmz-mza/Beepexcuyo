@@ -71,9 +71,19 @@ def generate_client_excel():
         sku = p.get('codigo')
         stock_fisico = float(p.get('stock_fisico') or 0)
         stock_ingresos = float(p.get('stock_ingresos') or 0)
+        stock_estado = str(p.get('stock_estado') or '').upper()
+        precio = float(p.get('precio_pesos') or 0)
         
-        # Filtro de STOCK: Si no hay stock físico ni ingresos, saltar
-        if stock_fisico <= 0 and stock_ingresos <= 0:
+        # Filtro de STOCK: Mismas reglas que el catálogo web
+        # - Solo productos con stock físico > 1 (o preventa/liquidación)
+        # - Debe tener precio > 0
+        is_preventa = 'PREVENTA' in stock_estado
+        is_liquidacion = 'LIQUIDACION' in stock_estado
+        if not is_preventa and not is_liquidacion and stock_fisico <= 1:
+            continue
+        if stock_estado == 'NOSTOCK':
+            continue
+        if precio <= 0:
             continue
 
         # Intentar cargar la foto PRIMERO
