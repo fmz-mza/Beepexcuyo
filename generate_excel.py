@@ -29,11 +29,18 @@ def generate_client_excel():
     try:
         response = supabase.table("productos").select("*").execute()
         all_products = response.data
-        # ORDENAR por SKU de menor a mayor
-        all_products.sort(key=lambda x: int(x.get('codigo') or 0))
+        
+        # ORDENAR por SKU de menor a mayor de forma segura
+        def safe_sku(val):
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return 999999999
+        all_products.sort(key=lambda x: safe_sku(x.get('codigo')))
     except Exception as e:
         print(f"Error al consultar Supabase: {e}")
-        return
+        import sys
+        sys.exit(1)
 
     # 2. Libro de Excel
     wb = Workbook()
