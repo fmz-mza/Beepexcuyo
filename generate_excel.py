@@ -144,6 +144,12 @@ def generate_client_excel():
     print(f"Excel listo con {added_count} productos.")
 
     try:
+        # Intentamos borrar el archivo anterior por si el upsert falla
+        try:
+            supabase.storage.from_("reportes").remove(["Beepex.xlsx"])
+        except Exception:
+            pass
+
         with open(output_file, "rb") as f:
             supabase.storage.from_("reportes").upload(
                 path="Beepex.xlsx", 
