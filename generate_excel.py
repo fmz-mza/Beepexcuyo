@@ -144,21 +144,27 @@ def generate_client_excel():
     print(f"Excel listo con {added_count} productos.")
 
     try:
-        # Intentamos borrar el archivo anterior por si el upsert falla
-        try:
-            supabase.storage.from_("reportes").remove(["Beepex.xlsx"])
-        except Exception:
-            pass
-
         with open(output_file, "rb") as f:
-            supabase.storage.from_("reportes").upload(
-                path="Beepex.xlsx", 
-                file=f, 
-                file_options={"x-upsert": "true", "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
-            )
+            try:
+                # Intentamos actualizar el archivo existente
+                supabase.storage.from_("reportes").update(
+                    path="Beepex.xlsx", 
+                    file=f, 
+                    file_options={"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+                )
+            except Exception as e_update:
+                # Si falla (ej. el archivo no existe), intentamos subirlo desde cero
+                f.seek(0)
+                supabase.storage.from_("reportes").upload(
+                    path="Beepex.xlsx", 
+                    file=f, 
+                    file_options={"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+                )
         print("Subido a Supabase Storage.")
     except Exception as e:
-        print(f"Error subida: {e}")
+        print(f"Error Crítico en Subida: {e}")
+        import sys
+        sys.exit(1)
 
 if __name__ == "__main__":
     generate_client_excel()
