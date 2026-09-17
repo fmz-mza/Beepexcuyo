@@ -32,7 +32,8 @@ def safe_int(val):
     if val is None or str(val).strip() == "":
         return 0
     try:
-        return int(round(float(val)))
+        s = str(val).replace(',', '.').strip()
+        return int(round(float(s)))
     except:
         return 0
 
