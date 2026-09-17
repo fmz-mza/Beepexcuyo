@@ -4759,7 +4759,7 @@
         const meta = productMeta[p.sku];
         const searchStr = normalize(`${p.name} ${p.sku} ${p.brand || ''} ${meta ? meta.tags : ''}`);
         const okQ = !q || matchQuery(searchStr, q);
-        const okStock = activeStock === 'ALL' || (activeStock === 'LIQUIDACION' ? p.stock === 'LIQUIDACION' : stockType(p.stock) === activeStock);
+        const okStock = activeStock === 'ALL' || (activeStock === 'LIQUIDACION' ? isLiquidacion(p.stock) : stockType(p.stock) === activeStock);
         // Ocultar productos desactivados para usuarios normales
         const okDisabled = !disabledSkus.has(p.sku) || isAdmin;
         return okBrand && okRubro && okQ && okStock && okDisabled && okNoStock;
