@@ -22,8 +22,11 @@ PRODUCT_TABLE = "productos"
 FOTOS_BUCKET = "fotos"
 
 # URLs de origen
-BEEPAW_API_URL = "https://beepex.dev/api/landings/products?fresh=1"
+BEEPAW_API_URL = "https://beepex.dev/api/landings/products"
 NETLIFY_SRC_URL = "https://beepawmayorista.netlify.app/ailen-l2.html"
+
+# SKUs sin reposición confirmados por el proveedor (no tienen tránsito ni preventa)
+SKUS_SIN_REPOSICION = {"11026", "11027", "11028", "11156"}
 
 def safe_int(val):
     if val is None or str(val).strip() == "":
@@ -242,7 +245,7 @@ def run_sync():
     
     # 1. Obtener datos de la nueva API
     try:
-        res = requests.get(BEEPAW_API_URL, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
+        res = requests.get(BEEPAW_API_URL, headers={'User-Agent': 'Mozilla/5.0'}, timeout=30)
         if res.status_code != 200:
             print(f"Error HTTP obteniendo datos de la API: {res.status_code}")
             return
@@ -359,16 +362,29 @@ def run_sync():
                 print(f"ℹ️ REGLA {motivo_regla}: SKU {sku} ({nombre}) -> Aplicado: ${precio_pesos} (Base era ${precio_lista_base})")
 
         # Stock directo desde la API
-        stock_fisico = safe_int(row.get("stockNum"))
-        stock_ingresos = safe_int(row.get("cantidadTransito"))
-        fecha_ingreso = str(row.get("etaRaw") or "").strip()
+        stock_fisico_raw = safe_int(row.get("stockNum"))
+        # Regla: si stockNum es menor a 10 unidades, se trata como stock 0 / NOSTOCK
+        stock_fisico = stock_fisico_raw if stock_fisico_raw >= 10 else 0
+
+        # Tránsito (enBarco, zonaFranca, enCamino, cantidadTransito)
+        en_barco = safe_int(row.get("enBarco"))
+        zona_franca = safe_int(row.get("zonaFranca"))
+        en_camino = safe_int(row.get("enCamino"))
+        transito_total = safe_int(row.get("cantidadTransito"))
+        if transito_total == 0:
+            transito_total = en_barco + zona_franca + en_camino
+
+        # Regla: si no hay reposición o el tránsito es menor a 10 unidades, se anula
+        if sku in SKUS_SIN_REPOSICION or transito_total < 10:
+            stock_ingresos = 0
+            fecha_ingreso = ""
+        else:
+            stock_ingresos = transito_total
+            fecha_ingreso = str(row.get("etaRaw") or "").strip()
 
         # Determinar estado de stock de manera precisa
         if stock_fisico > 0:
-            if precio_liqui > 0:
-                estado_stock = "LIQUIDACION"
-            else:
-                estado_stock = "STOCK"
+            estado_stock = "STOCK"
         elif stock_ingresos > 0:
             if fecha_ingreso:
                 estado_stock = f"PREVENTA ({fecha_ingreso})"

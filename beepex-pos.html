@@ -392,10 +392,7 @@ input,select,textarea{font-family:inherit;}
           <div class="resumen-box" id="resumenBox"></div>
         </div>
         <button class="confirm-btn" id="confirmBtn" onclick="confirmSale()" disabled>✓ Confirmar venta</button>
-        <div style="display:flex;gap:8px;">
-          <button class="cancel-btn" onclick="cancelOrder()" style="flex:1;">Cancelar pedido</button>
-          <button style="flex:1;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;padding:12px;cursor:pointer;" onclick="downloadCartExcel()" title="Descargar carrito en Excel">📊 Excel Venta</button>
-        </div>
+        <button class="cancel-btn" onclick="cancelOrder()">Cancelar pedido</button>
       </div>
     </div>
 
@@ -463,8 +460,6 @@ input,select,textarea{font-family:inherit;}
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
-
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 'use strict';
@@ -486,49 +481,6 @@ let pendingSync = JSON.parse(localStorage.getItem('pos_pending_sync')||'[]');
 let _lastScanCode = '', _lastScanTime = 0;
 let clienteSaldoPendiente = 0;   // saldo deuda del cliente seleccionado
 let cobrarSaldoJunto = false;    // toggle: cobrar deuda junto con la venta
-
-// ── Descargar carrito en Excel ────────────────────────────────────────────
-async function downloadCartExcel(orderData){
-  const srcItems = orderData ? orderData.items : cart;
-  if(!srcItems || srcItems.length === 0){ showToast('El pedido está vacío'); return; }
-  try {
-    if(!window.XLSX){
-      await new Promise((res,rej)=>{
-        const s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        s.onload=res; s.onerror=rej;
-        document.head.appendChild(s);
-      });
-    }
-    const mapped = srcItems.map(item => {
-      const name   = item.name  || (item.product && item.product.producto) || '';
-      const sku    = item.sku   || (item.product && item.product.codigo)   || '';
-      const precio = item.precio_unitario ?? item.precioFinal ?? (item.product && item.product.precio_pesos) ?? 0;
-      const qty    = item.cantidad ?? item.qty ?? 1;
-      const iva    = item.iva   || (item.product && item.product.iva)      || 0;
-      const marca  = item.marca || (item.product && item.product.marca)   || '';
-      return {
-        'SKU': sku,
-        'NOMBRE': name,
-        'PRECIO PESOS': precio,
-        'IVA (%)': iva,
-        'CANTIDAD': qty,
-        'SUBTOTAL': precio * qty,
-        'MARCA': marca
-      };
-    });
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(mapped);
-    ws['!cols'] = [12,30,15,10,10,15,15].map(w=>({wch:w}));
-    const ticket = orderData ? (orderData.ticket_display||orderData.id||'') : '';
-    XLSX.utils.book_append_sheet(wb, ws, 'VENTA');
-    const filename = `Venta${ticket?'_'+ticket:''}_${new Date().toISOString().slice(0,10)}.xlsx`;
-    XLSX.writeFile(wb, filename);
-    showToast('✅ Excel descargado');
-  } catch(e) {
-    showToast('❌ Error: '+e.message);
-  }
-}
 
 const fmt = n => '$'+Math.round(n||0).toLocaleString('es-AR').replace(/,/g,'.');
 const mayorista = p => includeIVA ? Math.round(p.precio_pesos*(1+(p.iva||21)/100)) : p.precio_pesos;
@@ -560,13 +512,6 @@ function toggleIVA(){
   lbl.textContent = includeIVA ? 'Con IVA' : 'Sin IVA';
   btn.style.color = includeIVA ? 'var(--accent2)' : 'var(--text)';
   btn.style.borderColor = includeIVA ? 'var(--accent2)' : 'var(--border)';
-  
-  cart.forEach(item => {
-    if(!item.precioModificado) {
-      item.precioFinal = mayorista(item.product);
-    }
-  });
-
   renderProds(products);
   renderCart();
 }
@@ -646,6 +591,11 @@ async function loadProducts(){
     products = rows.map(p => {
       const code = String(p.codigo);
       if(code === '11573') p.precio_pesos = 59999;
+      const sFisico = parseFloat(p.stock_fisico) || 0;
+      const sIngresos = parseFloat(p.stock_ingresos) || 0;
+      if (sFisico < 10 && sIngresos < 10) {
+        p.stock_estado = 'NOSTOCK';
+      }
       return p;
     });
     renderProds(products);
@@ -696,7 +646,7 @@ function addToCart(sku){
   const ex=cart.find(c=>c.product.codigo===sku);
   if(ex) ex.qty++;
   else{
-    cart.push({product:p,qty:1,precioFinal:mayorista(p),precioModificado:null,motivoPrecio:''});
+    cart.push({product:p,qty:1,precioFinal:p.precio_pesos,precioModificado:null,motivoPrecio:''});
     if(!p.stock_estado||p.stock_estado==='NOSTOCK') showToast('⚠️ '+p.producto+' sin stock — se agrega igual','err');
   }
   const pc=document.getElementById('pc-'+sku);
@@ -735,10 +685,9 @@ function clearCart(){
 }
 function onPriceChange(sku,val){
   const item=cart.find(c=>c.product.codigo===sku); if(!item) return;
-  const basePrice=mayorista(item.product);
-  const np=parseFloat(val)||basePrice;
+  const np=parseFloat(val)||item.product.precio_pesos;
   item.precioFinal=np;
-  item.precioModificado=np!==basePrice?np:null;
+  item.precioModificado=np!==item.product.precio_pesos?np:null;
   const inp=document.getElementById('cpi-'+sku);
   if(inp) inp.classList.toggle('modified',!!item.precioModificado);
   const mot=document.getElementById('cmot-'+sku);
@@ -1385,15 +1334,15 @@ function shareWA(){
   const {t, client, ml} = buildTicketLines();
   const {order, items, totalVenta, total, pagado, saldoAnterior, saldoRestante} = t;
 
-  let msg = '\uD83D\uDC3E *BEEPEX CUYO*\n';
+  let msg = '🐾 *BEEPEX CUYO*\n';
   msg += 'Ticket #'+order.ticket_display+'\n';
-  msg += '\uD83D\uDCC5 '+new Date(order.fecha).toLocaleDateString('es-AR')+'\n';
-  if(client) msg += '\uD83D\uDC64 '+client.nombre+'\n';
+  msg += '📅 '+new Date(order.fecha).toLocaleDateString('es-AR')+'\n';
+  if(client) msg += '👤 '+client.nombre+'\n';
   msg += '━━━━━━━━━━━━━━\n';
 
   items.forEach(i=>{
     const p = i.precio_modificado ?? i.precio_unitario;
-    msg += '\u2022 '+i.nombre+'\n  '+i.cantidad+' × '+fmt(p)+' = '+fmt(p*i.cantidad)+'\n';
+    msg += '• '+i.nombre+'\n  '+i.cantidad+' × '+fmt(p)+' = '+fmt(p*i.cantidad)+'\n';
   });
 
   msg += '━━━━━━━━━━━━━━\n';
@@ -1414,9 +1363,9 @@ function shareWA(){
     msg += 'Recibido: '+fmt(pagado)+'\n';
     if(saldoAnterior > 0){
       if(saldoRestante > 0)
-        msg += '\u26A0 Saldo restante cta cte: '+fmt(saldoRestante)+'\n';
+        msg += '⚠️ Saldo restante cta cte: '+fmt(saldoRestante)+'\n';
       else
-        msg += '\u2705 Cuenta cancelada\n';
+        msg += '✅ Cuenta cancelada\n';
     } else {
       const diff = total - pagado;
       if(diff > 0) msg += 'Queda a cta cte: '+fmt(diff)+'\n';
@@ -1428,7 +1377,7 @@ function shareWA(){
 
   const wa = client?.telefono_wa || WA_NUMBER;
   // location.href — no abre ventana nueva, WhatsApp app en mobile
-  window.location.href = 'https://api.whatsapp.com/send/?phone='+wa+'&text='+encodeURIComponent(msg);
+  window.location.href = 'https://wa.me/'+wa+'?text='+encodeURIComponent(msg);
 }
 
 function shareWASoloPago(){
@@ -1436,10 +1385,10 @@ function shareWASoloPago(){
   const client = clients.find(x=>x.id===t.clientId);
   const ml = {efectivo:'Efectivo', transferencia:'Transferencia', cta_cte:'Cuenta Corriente'};
 
-  let msg = '\uD83D\uDC3E *BEEPEX CUYO*\n';
+  let msg = '🐾 *BEEPEX CUYO*\n';
   msg += 'Comprobante de Pago\n';
-  msg += '\uD83D\uDCC5 '+new Date(t.fecha).toLocaleDateString('es-AR')+'\n';
-  if(client) msg += '\uD83D\uDC64 '+client.nombre+'\n';
+  msg += '📅 '+new Date(t.fecha).toLocaleDateString('es-AR')+'\n';
+  if(client) msg += '👤 '+client.nombre+'\n';
   msg += '━━━━━━━━━━━━━━\n';
   msg += 'Saldo anterior: '+fmt(t.saldoAnterior)+'\n';
   msg += 'Abono recibido: '+fmt(t.saldoCobrado)+'\n';
@@ -1447,12 +1396,12 @@ function shareWASoloPago(){
   if(t.pagado > t.saldoCobrado) msg += 'Vuelto: '+fmt(t.pagado - t.saldoCobrado)+'\n';
   msg += '━━━━━━━━━━━━━━\n';
   if(t.saldoRestante > 0)
-    msg += '\u26A0 Saldo restante: '+fmt(t.saldoRestante)+'\n';
+    msg += '⚠️ Saldo restante: '+fmt(t.saldoRestante)+'\n';
   else
-    msg += '\u2705 *Cuenta cancelada*\n';
+    msg += '✅ *Cuenta cancelada*\n';
 
   const wa = client?.telefono_wa || client?.telefono || WA_NUMBER;
-  window.location.href = 'https://api.whatsapp.com/send/?phone='+wa+'&text='+encodeURIComponent(msg);
+  window.location.href = 'https://wa.me/'+wa+'?text='+encodeURIComponent(msg);
 }
 
 /* SCANNER */
