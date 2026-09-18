@@ -4760,8 +4760,8 @@
         const searchStr = normalize(`${p.name} ${p.sku} ${p.brand || ''} ${meta ? meta.tags : ''}`);
         const okQ = !q || matchQuery(searchStr, q);
         const okStock = activeStock === 'ALL' || (activeStock === 'LIQUIDACION' ? isLiquidacion(p.stock) : stockType(p.stock) === activeStock);
-        // Ocultar productos desactivados para usuarios normales
-        const okDisabled = !disabledSkus.has(p.sku) || isAdmin;
+        // Ocultar productos desactivados
+        const okDisabled = !disabledSkus.has(String(p.sku));
         return okBrand && okRubro && okQ && okStock && okDisabled && okNoStock;
       });
 
@@ -7705,7 +7705,7 @@ _${text}_`;
           document.getElementById('siteBanner').classList.add('visible');
         }
         // Productos desactivados
-        try { disabledSkus = new Set(JSON.parse(s.disabled_skus || '[]')); } catch (e) { disabledSkus = new Set(); }
+        try { disabledSkus = new Set(JSON.parse(s.disabled_skus || '[]').map(String)); } catch (e) { disabledSkus = new Set(); }
         if (disabledSkus.size > 0) renderGrid();
         // Margen de ganancia
         margenActive = s.margen_active === 'true';
