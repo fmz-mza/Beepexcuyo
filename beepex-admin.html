@@ -581,12 +581,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;" class="two-col">
         <div class="section">
-          <div class="section-header"><span class="section-title">👤 Usuarios activos</span></div>
+          <div class="section-header"><span class="section-title">👤 Top Pedidos por Cliente</span></div>
           <div class="section-body"><div class="rank-list" id="topUsers"></div></div>
         </div>
         <div class="section">
-          <div class="section-header"><span class="section-title">🛒 En carrito, sin pedir</span></div>
-          <div class="section-body"><div class="rank-list" id="cartAbandoned"></div></div>
+          <div class="section-header"><span class="section-title">👁 Más Vistos en Catálogo</span></div>
+          <div class="section-body"><div class="rank-list" id="topViewed2"></div></div>
+        </div>
+      </div>
+
+      <div class="section" style="margin-bottom:16px;">
+        <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <span class="section-title">👥 Conexión de Clientes, Tiempo & Carritos</span>
+          <span id="activeClientsBadge" style="font-size:12px;color:var(--green);font-weight:700;"></span>
+        </div>
+        <div class="section-body" style="padding:12px 14px;">
+          <div id="clientActivityList" style="display:flex;flex-direction:column;gap:8px;">
+            <div class="loading">Cargando actividad de clientes...</div>
+          </div>
         </div>
       </div>
 
@@ -1579,13 +1591,14 @@ async function loadStats(){
     document.getElementById('statsCards').innerHTML='<div class="loading">Cargando estadísticas...</div>';
   }
   try {
-    const [orders, views, cartEvts, profiles, posOrders, posClients]=await Promise.all([
+    const [orders, views, cartEvts, profiles, posOrders, posClients, presence]=await Promise.all([
       api('orders?select=*&order=created_at.desc'),
-      api('product_views?select=sku,viewed_at'),
+      api('product_views?select=sku,viewed_at,user_id'),
       api('cart_events?select=sku,action,user_id,created_at'),
       api('profiles?select=id,nombre,approved'),
       api('pos_orders?select=id,ticket_display,fecha,total,estado,client_id&order=fecha.desc&limit=200'),
-      api('clients?select=id,nombre')
+      api('clients?select=id,nombre'),
+      api('presence?select=*&order=last_seen.desc')
     ]);
     allOrdersData={
       orders:    Array.isArray(orders)     ? orders     : [],
@@ -1593,7 +1606,8 @@ async function loadStats(){
       cartEvts:  Array.isArray(cartEvts)   ? cartEvts   : [],
       profiles:  Array.isArray(profiles)   ? profiles   : [],
       posOrders: Array.isArray(posOrders)  ? posOrders  : [],
-      posClients:Array.isArray(posClients) ? posClients : []
+      posClients:Array.isArray(posClients) ? posClients : [],
+      presence:  Array.isArray(presence)   ? presence   : []
     };
     // Diagnóstico visible en pantalla
     const diag = document.getElementById('statsDiag');
@@ -1602,6 +1616,7 @@ async function loadStats(){
       diag.textContent = 'Datos: orders='+allOrdersData.orders.length+
         ' | views='+allOrdersData.views.length+
         ' | cartEvts='+allOrdersData.cartEvts.length+
+        ' | presence='+allOrdersData.presence.length+
         ' | profiles='+allOrdersData.profiles.length;
     }
     renderStats();
@@ -1619,7 +1634,7 @@ function renderStats(){
     if(sc) sc.innerHTML='<div class="loading">Cargando estadísticas...</div>';
     return;
   }
-  const { orders, views, cartEvts, profiles }=allOrdersData;
+  const { orders, views, cartEvts, profiles, presence }=allOrdersData;
   if(!orders) return;
   const filtOrders=orders.filter(o=>periodFilter(o.created_at));
   const filtViews=views.filter(v=>periodFilter(v.viewed_at));
@@ -1644,40 +1659,20 @@ function renderStats(){
   renderRanking('topOrdered', skuCount, 5, 'unidades');
 
   // Top vistos
-  // Construir mapa sku→nombre desde allProducts si está disponible
   const skuNames={};
   (window.allProducts||allProducts||[]).forEach(p=>{ skuNames[p.sku]=p.name; });
   const viewCount={};
   filtViews.forEach(v=>{ const key=skuNames[v.sku]||(v.sku?`SKU ${v.sku}`:'Desconocido'); viewCount[key]=(viewCount[key]||0)+1; });
   renderRanking('topViewed', viewCount, 5, 'vistas');
+  if(document.getElementById('topViewed2')) renderRanking('topViewed2', viewCount, 5, 'vistas');
 
-  // Top usuarios
+  // Top usuarios por pedidos
   const userCount={};
   filtOrders.forEach(o=>{ userCount[o.nombre_cliente||o.user_id]=(userCount[o.nombre_cliente||o.user_id]||0)+1; });
   renderRanking('topUsers', userCount, 5, 'pedidos');
 
-  // Carrito abandonado — por producto: quién lo tiene y hace cuánto
-  const userOrderedSkus={};
-  orders.forEach(o=>{ (o.items||[]).forEach(i=>{ if(!userOrderedSkus[o.user_id]) userOrderedSkus[o.user_id]=new Set(); userOrderedSkus[o.user_id].add(i.sku); }); });
-  // Mapa userId → nombre
-  const userNames={};
-  profiles.forEach(p=>{ userNames[p.id]=p.nombre||p.id.slice(0,8); });
-  // Por SKU: lista de {userId, nombre, fecha} que lo tienen sin pedir
-  const abandonedBySku={};
-  // Solo el último add por usuario+sku
-  const lastAdd={};
-  cartEvts.filter(e=>e.action==='add').forEach(e=>{
-    const key=`${e.user_id}_${e.sku}`;
-    if(!lastAdd[key]||new Date(e.created_at)>new Date(lastAdd[key].created_at)) lastAdd[key]=e;
-  });
-  Object.values(lastAdd).forEach(e=>{
-    const userOrdered=userOrderedSkus[e.user_id]||new Set();
-    if(!userOrdered.has(e.sku)){
-      if(!abandonedBySku[e.sku]) abandonedBySku[e.sku]=[];
-      abandonedBySku[e.sku].push({userId:e.user_id, nombre:userNames[e.user_id]||e.user_id.slice(0,8), created_at:e.created_at});
-    }
-  });
-  renderAbandoned('cartAbandoned', abandonedBySku);
+  // Nueva Sección: Actividad de Clientes, Tiempo en Catálogo & Carrito Pendiente
+  renderClientActivity(profiles, presence, cartEvts, orders, views);
 
   // Evolución mensual (últimos 6 meses)
   renderMonthlyChart(orders);
@@ -1693,6 +1688,201 @@ function renderStats(){
   const posClients = allOrdersData.posClients || [];
   const filtPosOrders = posOrders.filter(o => periodFilter(o.fecha || o.created_at));
   renderPosKPIs(filtPosOrders, posClients);
+}
+
+// ── ACTIVIDAD DE CLIENTES, TIEMPO Y CARRITOS PENDIENTES ─────────────────────
+let _clientActivityMap = {};
+
+function renderClientActivity(profiles, presence, cartEvts, orders, views) {
+  const container = document.getElementById('clientActivityList');
+  if(!container) return;
+
+  const now = new Date();
+  const presenceMap = {};
+  (presence || []).forEach(p => { presenceMap[p.user_id] = p.last_seen; });
+
+  // Agrupar eventos de carrito por usuario y determinar carrito pendiente actual
+  const cartByUser = {};
+  (cartEvts || []).forEach(e => {
+    if(!cartByUser[e.user_id]) cartByUser[e.user_id] = {};
+    if(e.action === 'add') {
+      cartByUser[e.user_id][e.sku] = e.created_at;
+    } else if(e.action === 'remove') {
+      delete cartByUser[e.user_id][e.sku];
+    }
+  });
+
+  // Ocultar SKUs que ya fueron comprados en algún pedido
+  (orders || []).forEach(o => {
+    const uid = o.user_id;
+    if(cartByUser[uid]) {
+      (o.items || []).forEach(item => {
+        delete cartByUser[uid][item.sku];
+      });
+    }
+  });
+
+  _clientActivityMap = {};
+  
+  (profiles || []).forEach(prof => {
+    const uid = prof.id;
+    const name = prof.nombre || 'Usuario sin nombre';
+    
+    // Conexiones e interacciones en el período
+    const userCartEvts = (cartEvts || []).filter(e => e.user_id === uid && periodFilter(e.created_at));
+    const userViews = (views || []).filter(v => v.user_id === uid && periodFilter(v.viewed_at));
+    const userOrders = (orders || []).filter(o => o.user_id === uid && periodFilter(o.created_at));
+    
+    const lastSeenRaw = presenceMap[uid] || (userCartEvts[0]?.created_at) || (userOrders[0]?.created_at);
+    const lastSeenDate = lastSeenRaw ? new Date(lastSeenRaw) : null;
+    const isOnline = lastSeenDate && (now - lastSeenDate) < 10 * 60 * 1000;
+
+    const interactionCount = userCartEvts.length + userViews.length + (lastSeenDate && periodFilter(lastSeenRaw) ? 1 : 0);
+    // Estimación tiempo en catálogo (cada interacción/heartbeat representa ~2 min activos)
+    const estimatedMinutes = Math.max(interactionCount * 2, lastSeenDate ? 2 : 0);
+
+    // Items en carrito pendiente
+    const pendingSkus = Object.keys(cartByUser[uid] || {});
+
+    _clientActivityMap[uid] = {
+      profile: prof,
+      name,
+      lastSeenDate,
+      isOnline,
+      interactionCount,
+      estimatedMinutes,
+      pendingSkus,
+      ordersCount: userOrders.length,
+      viewsCount: userViews.length
+    };
+  });
+
+  // Convertir a lista y ordenar: primero online, luego los con carrito, luego los con más minutos
+  const activeList = Object.values(_clientActivityMap).sort((a, b) => {
+    if (a.isOnline !== b.isOnline) return b.isOnline ? 1 : -1;
+    if (a.pendingSkus.length !== b.pendingSkus.length) return b.pendingSkus.length - a.pendingSkus.length;
+    return b.estimatedMinutes - a.estimatedMinutes;
+  });
+
+  const onlineCount = activeList.filter(c => c.isOnline).length;
+  const badgeEl = document.getElementById('activeClientsBadge');
+  if(badgeEl) badgeEl.textContent = onlineCount > 0 ? `🟢 ${onlineCount} en línea` : `${activeList.length} clientes`;
+
+  if (!activeList.length) {
+    container.innerHTML = '<div class="empty">Sin actividad registrada en este período</div>';
+    return;
+  }
+
+  container.innerHTML = activeList.map(c => {
+    const uid = c.profile.id;
+    const cartCount = c.pendingSkus.length;
+    const timeStr = c.estimatedMinutes >= 60 
+      ? `${Math.floor(c.estimatedMinutes/60)}h ${c.estimatedMinutes%60}m` 
+      : `${c.estimatedMinutes} min`;
+
+    const lastSeenStr = c.isOnline 
+      ? '<span style="color:var(--green);font-weight:700;">🟢 En línea ahora</span>' 
+      : (c.lastSeenDate ? `Últ. vez: ${fmtDateTime(c.lastSeenDate)}` : 'Sin registros rec.');
+
+    return `
+      <div onclick="openClientDetailModal('${uid}')" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
+          <div style="width:36px;height:36px;border-radius:50%;background:${c.isOnline?'rgba(34,197,94,.15)':'var(--surface)'};border:1.5px solid ${c.isOnline?'var(--green)':'var(--border)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:${c.isOnline?'var(--green)':'var(--muted)'};flex-shrink:0;">
+            ${c.name.charAt(0).toUpperCase()}
+          </div>
+          <div style="min-width:0;flex:1;">
+            <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${lastSeenStr}</div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+          <div style="text-align:right;">
+            <div style="font-size:12px;font-weight:700;color:var(--text);">${c.interactionCount} conex.</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:1px;">⏱ ${timeStr}</div>
+          </div>
+          ${cartCount > 0 
+            ? `<div style="background:rgba(245,166,35,.15);color:var(--accent2);border:1px solid rgba(245,166,35,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;">🛒 ${cartCount} ítems</div>`
+            : `<div style="font-size:11px;color:var(--muted);opacity:.5;">Sin carrito</div>`}
+          <div style="font-size:16px;color:var(--muted);">&rsaquo;</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function openClientDetailModal(uid) {
+  const info = _clientActivityMap[uid];
+  if(!info) return;
+
+  document.getElementById('modalClientName').textContent = info.name;
+  document.getElementById('modalClientMeta').textContent = info.isOnline 
+    ? '🟢 Cliente en línea en este momento' 
+    : (info.lastSeenDate ? `Última sesión: ${fmtDateTime(info.lastSeenDate)}` : 'Sin sesión reciente');
+
+  const timeStr = info.estimatedMinutes >= 60 
+    ? `${Math.floor(info.estimatedMinutes/60)}h ${info.estimatedMinutes%60}m` 
+    : `${info.estimatedMinutes} min`;
+
+  document.getElementById('modalClientKPIs').innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-size:16px;font-weight:800;color:var(--accent);">${info.interactionCount}</div>
+      <div style="font-size:10px;color:var(--muted);">Conexiones</div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-size:16px;font-weight:800;color:var(--green);">${timeStr}</div>
+      <div style="font-size:10px;color:var(--muted);">Tiempo Catálogo</div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-size:16px;font-weight:800;color:var(--accent2);">${info.ordersCount}</div>
+      <div style="font-size:10px;color:var(--muted);">Pedidos Hechos</div>
+    </div>
+  `;
+
+  const cartListEl = document.getElementById('modalCartList');
+  const cartTotalEl = document.getElementById('modalCartTotal');
+  cartListEl.innerHTML = '<div class="loading">Cargando ítems del carrito...</div>';
+  cartTotalEl.textContent = '';
+
+  document.getElementById('clientDetailModal').style.display = 'block';
+
+  if (!info.pendingSkus || !info.pendingSkus.length) {
+    cartListEl.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:14px;">Este cliente no tiene productos pendientes en el carrito</div>';
+    return;
+  }
+
+  // Buscar detalles de los productos en memoria o en Supabase
+  const productMap = {};
+  (window.allProducts || allProducts || []).forEach(p => { productMap[p.sku || p.codigo] = p; });
+
+  const missingSkus = info.pendingSkus.filter(sku => !productMap[sku]);
+  if (missingSkus.length > 0) {
+    try {
+      const res = await api(`productos?codigo=in.(${missingSkus.join(',')})&select=sku:codigo,name:producto,brand:marca,price:precio_pesos`);
+      if (Array.isArray(res)) {
+        res.forEach(p => { productMap[p.sku || p.codigo] = p; });
+      }
+    } catch(e){}
+  }
+
+  let totalMonto = 0;
+  cartListEl.innerHTML = info.pendingSkus.map(sku => {
+    const prod = productMap[sku] || { name: `Producto SKU ${sku}`, price: 0, brand: '' };
+    totalMonto += (prod.price || 0);
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--surface);border-radius:8px;">
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${prod.name || prod.producto}</div>
+          <div style="font-size:10px;color:var(--muted);">SKU: ${sku} ${prod.brand ? '· '+prod.brand : ''}</div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);flex-shrink:0;">
+          ${prod.price ? fmt(prod.price) : '-'}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (totalMonto > 0) cartTotalEl.textContent = `Monto est: ${fmt(totalMonto)}`;
 }
 
 function renderPosKPIs(posOrders, posClients){
@@ -3013,9 +3203,37 @@ async function limpiezaEliminarSeleccionados(section){
   if(section === 'usuarios') limpiezaLoadUsuarios();
   if(section === 'catalogo') limpiezaLoadCatalogo();
   if(section === 'pos')      limpiezaLoadPOS();
-  if(section === 'clientes') limpiezaLoadClientes();
 }
 
+<!-- Modal Detalle Cliente y Carrito -->
+<div id="clientDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;overflow-y:auto;padding:16px;backdrop-filter:blur(4px);">
+  <div style="max-width:520px;margin:30px auto;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:0 12px 32px rgba(0,0,0,.5);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:14px;">
+      <div>
+        <div id="modalClientName" style="font-size:17px;font-weight:800;font-family:'Syne',sans-serif;">Cliente</div>
+        <div id="modalClientMeta" style="font-size:12px;color:var(--muted);margin-top:2px;"></div>
+      </div>
+      <button onclick="document.getElementById('clientDetailModal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;padding:4px 8px;line-height:1;">&times;</button>
+    </div>
+
+    <!-- KPIs del cliente -->
+    <div id="modalClientKPIs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px;"></div>
+
+    <!-- Carrito del cliente -->
+    <div style="margin-bottom:18px;">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
+        <span>🛒 Carrito Pendiente (Sin pedir)</span>
+        <span id="modalCartTotal" style="color:var(--accent2);font-weight:800;"></span>
+      </div>
+      <div id="modalCartList" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;"></div>
+    </div>
+
+    <!-- Acciones -->
+    <div style="display:flex;gap:10px;justify-content:flex-end;" id="modalClientActions">
+      <button class="btn-sm" onclick="document.getElementById('clientDetailModal').style.display='none'">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 </script>
 </body>
