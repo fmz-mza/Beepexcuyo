@@ -1402,26 +1402,39 @@ async function toggleProduct(sku){
   if(disabled.has(sku)) disabled.delete(sku); else disabled.add(sku);
   window._disabledSkus=disabled;
   const arr=Array.from(disabled);
-  const res=await api('settings?key=eq.disabled_skus',{
-    method:'PATCH',
-    body:JSON.stringify({value:JSON.stringify(arr)}),
-    headers:{'Prefer':'return=minimal'}
-  });
-  if(res.ok||res.status===204){
-    showToast(disabled.has(sku)?'⚫ Producto desactivado':'🟢 Producto activado');
-    filterProducts();
-  } else { showToast('❌ Error al guardar'); }
+  const token=localStorage.getItem('admin_token');
+  const headers={'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};
+  try {
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/settings`,{
+      method:'POST', headers, body:JSON.stringify({key:'disabled_skus',value:JSON.stringify(arr)})
+    });
+    if(res.ok||res.status===201||res.status===204){
+      showToast(disabled.has(sku)?'⚫ Producto desactivado':'🟢 Producto activado');
+      filterProducts();
+    } else {
+      const err=await res.text();
+      console.error('toggleProduct error:', err);
+      showToast('❌ Error al guardar');
+    }
+  } catch(e){
+    console.error('toggleProduct catch:', e);
+    showToast('❌ Error: '+e.message);
+  }
 }
 
 async function saveSetting(key, inputId){
   const val=document.getElementById(inputId).value.trim();
-  const res=await api(`settings?key=eq.${key}`,{
-    method:'PATCH',
-    body:JSON.stringify({value:val}),
-    headers:{'Prefer':'return=minimal'}
-  });
-  if(res.ok||res.status===204) showToast('✅ Guardado');
-  else showToast('❌ Error al guardar');
+  const token=localStorage.getItem('admin_token');
+  const headers={'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};
+  try {
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/settings`,{
+      method:'POST', headers, body:JSON.stringify({key,value:val})
+    });
+    if(res.ok||res.status===201||res.status===204) showToast('✅ Guardado');
+    else showToast('❌ Error al guardar');
+  } catch(e){
+    showToast('❌ Error: '+e.message);
+  }
 }
 
 async function toggleNostock(){
