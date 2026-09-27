@@ -20,6 +20,46 @@ jobs:
     timeout-minutes: 20
 
     steps:
+      # Diagnóstico de SUPABASE_DB_URL sin exponer la contraseña: imprime esquema,
+      # usuario, host, puerto y base, y el LARGO de la contraseña (nunca su valor),
+      # para descartar espacios de más, el placeholder [YOUR-PASSWORD] sin
+      # reemplazar, o un usuario/host distinto al esperado del pooler.
+      - name: Diagnosticar cadena de conexión (sin exponer la contraseña)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_DB_URL" || { echo "::error::Falta el secreto SUPABASE_DB_URL"; exit 1; }
+
+          RAW_LEN=${#SUPABASE_DB_URL}
+          TRIMMED=$(printf '%s' "$SUPABASE_DB_URL" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          TRIM_LEN=${#TRIMMED}
+          if [ "$RAW_LEN" != "$TRIM_LEN" ]; then
+            echo "::warning::El secreto tiene espacios o saltos de línea de más ($RAW_LEN vs $TRIM_LEN caracteres tras recortar). Volvé a pegarlo sin espacios extra al principio o al final."
+          fi
+
+          if [[ "$TRIMMED" =~ ^([a-zA-Z]+)://([^:@/]+):([^@]*)@([^:@/]+):([0-9]+)/(.+)$ ]]; then
+            ESQUEMA="${BASH_REMATCH[1]}"; USUARIO="${BASH_REMATCH[2]}"; CLAVE="${BASH_REMATCH[3]}"
+            HOST="${BASH_REMATCH[4]}"; PUERTO="${BASH_REMATCH[5]}"; BASE="${BASH_REMATCH[6]}"
+            echo "esquema: $ESQUEMA"
+            echo "usuario: $USUARIO"
+            echo "host: $HOST"
+            echo "puerto: $PUERTO"
+            echo "base: $BASE"
+            echo "largo de la contraseña: ${#CLAVE} caracteres (el valor nunca se imprime)"
+
+            [ "$USUARIO" = "postgres.mmerrzniuxbrjryhcsda" ] || echo "::error::Usuario inesperado. Debería ser 'postgres.mmerrzniuxbrjryhcsda' y es '$USUARIO'."
+            [ "$HOST" = "aws-1-sa-east-1.pooler.supabase.com" ] || echo "::warning::Host distinto al esperado del Session pooler ('aws-1-sa-east-1.pooler.supabase.com'). Es '$HOST'."
+            [ "$PUERTO" = "5432" ] || echo "::warning::Puerto distinto al esperado (5432). Es '$PUERTO'."
+            [ "$BASE" = "postgres" ] || echo "::warning::Base distinta a 'postgres'. Es '$BASE'."
+            case "$CLAVE" in
+              *'[YOUR-PASSWORD]'*|'YOUR-PASSWORD') echo "::error::La contraseña sigue siendo el placeholder [YOUR-PASSWORD] sin reemplazar." ;;
+            esac
+            [ "${#CLAVE}" -ge 8 ] || echo "::warning::La contraseña parece muy corta (${#CLAVE} caracteres)."
+          else
+            echo "::error::No se pudo interpretar SUPABASE_DB_URL como postgresql://usuario:clave@host:puerto/base. Revisá que se haya copiado la cadena completa del Session pooler."
+          fi
+
       # Supabase usa PostgreSQL 17: pg_dump debe ser de versión igual o mayor que el servidor.
       - name: Instalar cliente PostgreSQL 17
         run: |
