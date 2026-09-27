@@ -54,8 +54,19 @@ jobs:
             [ "$BASE" = "postgres" ] || echo "::warning::Base distinta a 'postgres'. Es '$BASE'."
             case "$CLAVE" in
               *'[YOUR-PASSWORD]'*|'YOUR-PASSWORD') echo "::error::La contraseña sigue siendo el placeholder [YOUR-PASSWORD] sin reemplazar." ;;
+              *' '*) echo "::warning::La contraseña contiene un espacio. Si no lo pusiste a propósito, puede ser un espacio pegado por error." ;;
             esac
             [ "${#CLAVE}" -ge 8 ] || echo "::warning::La contraseña parece muy corta (${#CLAVE} caracteres)."
+            if printf '%s' "$CLAVE" | LC_ALL=C grep -q '[^ -~]'; then
+              echo "::warning::La contraseña tiene un carácter no imprimible o no-ASCII (posible carácter invisible pegado por el portapapeles)."
+            fi
+
+            # Huella (no reversible) para comparar con la contraseña real sin exponerla en el log.
+            # En PowerShell, con tu contraseña real, calculá la misma huella así (no la compartas
+            # acá, solo el resultado de 12 caracteres):
+            #   $b=[Text.Encoding]::UTF8.GetBytes('TU_CONTRASEÑA'); ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($b)) -replace '-','').ToLower().Substring(0,12)
+            HUELLA=$(printf '%s' "$CLAVE" | sha256sum | cut -c1-12)
+            echo "huella de la contraseña (12 caracteres, no reversible): $HUELLA"
           else
             echo "::error::No se pudo interpretar SUPABASE_DB_URL como postgresql://usuario:clave@host:puerto/base. Revisá que se haya copiado la cadena completa del Session pooler."
           fi
