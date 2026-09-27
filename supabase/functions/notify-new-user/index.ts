@@ -1,28 +1,39 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const RESEND_API_KEY = "re_DQmiqBMZ_KEPhiKyrvvtyV6uM19CDXeDa";
-const ADMIN_EMAIL = "fzabos@gmail.com";
-const FROM_EMAIL = "onboarding@resend.dev";
-const SUPABASE_URL = "https://mmerrzniuxbrjryhcsda.supabase.co";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
+const ADMIN_EMAIL = Deno.env.get("ADMIN_EMAIL") ?? "fzabos@gmail.com";
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "onboarding@resend.dev";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://mmerrzniuxbrjryhcsda.supabase.co";
+const APPROVAL_TOKEN_SECRET = Deno.env.get("APPROVAL_TOKEN_SECRET") ?? "";
+const SERVICE_ROLE_KEY = Deno.env.get("SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+function requireServerConfig() {
+  if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY no configurada");
+  if (!APPROVAL_TOKEN_SECRET) throw new Error("APPROVAL_TOKEN_SECRET no configurada");
+  if (!SERVICE_ROLE_KEY) throw new Error("SERVICE_ROLE_KEY no configurada");
+}
+
+function approvalToken(userId: string) {
+  return btoa(userId + APPROVAL_TOKEN_SECRET).replace(/=/g, "");
+}
 
 serve(async (req) => {
   try {
+    requireServerConfig();
+
     const url = new URL(req.url);
     const approveId = url.searchParams.get("approve");
 
     // ── Aprobación via link (GET) ─────────────────────────────────────────────
     if (approveId) {
       const token = url.searchParams.get("token");
-      const expectedToken = btoa(approveId + "beepex_secret_2026").replace(/=/g, "");
+      const expectedToken = approvalToken(approveId);
       if (token !== expectedToken) {
         return new Response("Token inválido", { status: 403 });
       }
 
-      const supabase = createClient(
-        SUPABASE_URL,
-        Deno.env.get("SERVICE_ROLE_KEY") ?? ""
-      );
+      const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
       const { error } = await supabase
         .from("profiles")
@@ -71,10 +82,7 @@ serve(async (req) => {
     const nombre = record.nombre || "Sin nombre";
     const userId = record.id;
 
-    const supabase = createClient(
-      SUPABASE_URL,
-      Deno.env.get("SERVICE_ROLE_KEY") ?? ""
-    );
+    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     const { data: authUser } = await supabase.auth.admin.getUserById(userId);
     const userEmail = authUser?.user?.email || "email no disponible";
@@ -82,7 +90,7 @@ serve(async (req) => {
       timeZone: "America/Argentina/Mendoza",
     });
 
-    const token = btoa(userId + "beepex_secret_2026").replace(/=/g, "");
+    const token = approvalToken(userId);
     const approveUrl = `${SUPABASE_URL}/functions/v1/notify-new-user?approve=${userId}&token=${token}`;
 
     const emailRes = await fetch("https://api.resend.com/emails", {
