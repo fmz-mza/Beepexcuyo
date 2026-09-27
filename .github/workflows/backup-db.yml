@@ -1,0 +1,111 @@
+name: Backup Supabase (cifrado)
+
+on:
+  workflow_dispatch:
+  # Programación DESACTIVADA hasta validar la primera corrida manual y un restore de prueba
+  # (ver supabase/BACKUP.md). Para activarla, descomentar. Domingos 06:00 UTC = 03:00 Argentina:
+  # schedule:
+  #   - cron: '0 6 * * 0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-db
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # Supabase usa PostgreSQL 17: pg_dump debe ser de versión igual o mayor que el servidor.
+      - name: Instalar cliente PostgreSQL 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Volcar base de datos
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_DB_URL" || { echo "::error::Falta el secreto SUPABASE_DB_URL"; exit 1; }
+          PGBIN=/usr/lib/postgresql/17/bin
+          mkdir -p work out
+          echo "FECHA=$(date -u +%Y-%m-%d_%H%M)" >> "$GITHUB_ENV"
+
+          # Esquema + datos de public: tablas, vistas, funciones, triggers y políticas RLS.
+          "$PGBIN/pg_dump" "$SUPABASE_DB_URL" --format=custom --no-owner --no-privileges \
+            --schema=public --file=work/public.dump
+
+          # Usuarios de login (necesarios para restaurar cuentas). Solo datos: en un proyecto
+          # nuevo las tablas de auth ya existen.
+          "$PGBIN/pg_dump" "$SUPABASE_DB_URL" --format=custom --no-owner --no-privileges \
+            --data-only -t auth.users -t auth.identities --file=work/auth.dump
+
+      - name: Verificar que los volcados son legibles y completos
+        run: |
+          set -euo pipefail
+          PGBIN=/usr/lib/postgresql/17/bin
+          for f in public auth; do
+            "$PGBIN/pg_restore" --list "work/$f.dump" > "work/$f.list"
+          done
+          for t in clients pos_orders order_items payments payment_allocations profiles user_prices; do
+            grep -q "TABLE DATA public $t " work/public.list || { echo "::error::Falta la tabla public.$t en el volcado"; exit 1; }
+          done
+          grep -q "TABLE DATA auth users " work/auth.list || { echo "::error::Falta auth.users en el volcado"; exit 1; }
+          test "$(stat -c%s work/public.dump)" -gt 10000 || { echo "::error::El volcado public es sospechosamente chico"; exit 1; }
+
+      # El repo es PÚBLICO y sus artefactos los puede descargar cualquiera con cuenta de GitHub:
+      # NUNCA se sube nada sin cifrar.
+      - name: Cifrar (AES-256) y comprobar que se puede descifrar
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          test -n "$BACKUP_PASSPHRASE" || { echo "::error::Falta el secreto BACKUP_PASSPHRASE"; exit 1; }
+          OUT="out/beepex-backup-${FECHA}.tar.gpg"
+          tar -C work -cf work/backup.tar public.dump auth.dump
+          printf '%s' "$BACKUP_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 --symmetric --cipher-algo AES256 --output "$OUT" work/backup.tar
+
+          # Prueba de descifrado: debe listar los dos archivos
+          LISTA=$(printf '%s' "$BACKUP_PASSPHRASE" | gpg --batch --pinentry-mode loopback \
+            --passphrase-fd 0 --decrypt "$OUT" | tar -tf -)
+          echo "$LISTA" | grep -qx "public.dump"
+          echo "$LISTA" | grep -qx "auth.dump"
+
+          rm -rf work   # borra todo lo que quedó sin cifrar
+          {
+            echo "### Backup generado"
+            echo "- Archivo: \`beepex-backup-${FECHA}.tar.gpg\`"
+            echo "- Tamaño: $(du -h "$OUT" | cut -f1)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Subir backup cifrado
+        uses: actions/upload-artifact@v4
+        with:
+          name: beepex-backup-${{ env.FECHA }}
+          path: out/*.tar.gpg
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Notificar a Discord
+        if: always()
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RESULTADO: ${{ job.status }}
+        run: |
+          [ -n "$WEBHOOK" ] || exit 0
+          if [ "$RESULTADO" = "success" ]; then
+            MSG="✅ Backup de Supabase generado y cifrado (${FECHA:-sin fecha})."
+          else
+            MSG="❌ Falló el backup de Supabase. Revisá los logs en GitHub Actions."
+          fi
+          curl -s -H "Content-Type: application/json" -d "{\"username\":\"Beepex Bot\",\"content\":\"$MSG\"}" "$WEBHOOK" > /dev/null || true
