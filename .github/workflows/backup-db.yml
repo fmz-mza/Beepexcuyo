@@ -54,6 +54,7 @@ jobs:
             [ "$BASE" = "postgres" ] || echo "::warning::Base distinta a 'postgres'. Es '$BASE'."
             case "$CLAVE" in
               *'[YOUR-PASSWORD]'*|'YOUR-PASSWORD') echo "::error::La contraseña sigue siendo el placeholder [YOUR-PASSWORD] sin reemplazar." ;;
+              '['*|*']') echo "::error::La contraseña empieza o termina con un corchete. Los corchetes de [YOUR-PASSWORD] son solo una marca de Supabase para indicar dónde va la contraseña — no van en el valor final. Sacalos y dejá solo la contraseña." ;;
               *' '*) echo "::warning::La contraseña contiene un espacio. Si no lo pusiste a propósito, puede ser un espacio pegado por error." ;;
             esac
             [ "${#CLAVE}" -ge 8 ] || echo "::warning::La contraseña parece muy corta (${#CLAVE} caracteres)."
