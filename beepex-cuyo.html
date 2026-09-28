@@ -37,11 +37,19 @@
       padding: 0;
     }
 
+    html {
+      /* Evita que un swipe hacia abajo cerca del tope de la página (ej. al tocar
+         un chip de filtro, que queda pegado arriba de todo) dispare el gesto nativo
+         de "pull to refresh" del navegador en mobile, que recarga toda la página. */
+      overscroll-behavior-y: contain;
+    }
+
     body {
       background: var(--bg);
       color: var(--text);
       font-family: 'DM Sans', sans-serif;
       min-height: 100vh;
+      overscroll-behavior-y: contain;
     }
 
     .header {
