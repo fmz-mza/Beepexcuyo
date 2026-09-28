@@ -33,11 +33,14 @@ En GitHub → Settings → Secrets and variables → Actions:
 
 ## Ejecutar un backup
 
-GitHub → Actions → "Backup Supabase (cifrado)" → Run workflow. Al terminar, el archivo está en
-la sección "Artifacts" de la corrida.
+Corre solo los domingos a las 03:00 (Argentina). También se puede lanzar a mano: GitHub →
+Actions → "Backup Supabase (cifrado)" → Run workflow. Al terminar, el archivo está en la
+sección "Artifacts" de la corrida.
 
-Para programarlo, descomentar el bloque `schedule` del workflow **después** de haber probado un
-restore (ver abajo).
+Estado (2026-09-28): se validó que el backup corre bien y que el archivo se descifra y contiene
+`public.dump` y `auth.dump`. **Todavía falta hacer un restore de prueba** (ver abajo) para
+confirmar que el contenido sirve para recuperar de verdad — se decidió activar igual la
+programación semanal mientras tanto, en vez de esperar a ese restore.
 
 ## Restaurar
 

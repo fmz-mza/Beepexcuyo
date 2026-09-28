@@ -2,10 +2,9 @@ name: Backup Supabase (cifrado)
 
 on:
   workflow_dispatch:
-  # Programación DESACTIVADA hasta validar la primera corrida manual y un restore de prueba
-  # (ver supabase/BACKUP.md). Para activarla, descomentar. Domingos 06:00 UTC = 03:00 Argentina:
-  # schedule:
-  #   - cron: '0 6 * * 0'
+  # Domingos 06:00 UTC = 03:00 Argentina.
+  schedule:
+    - cron: '0 6 * * 0'
 
 permissions:
   contents: read
