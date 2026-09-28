@@ -1597,7 +1597,7 @@ async function loadStats(){
       api('cart_events?select=sku,action,user_id,created_at'),
       api('profiles?select=id,nombre,approved'),
       api('pos_orders?select=id,ticket_display,fecha,total,estado,client_id&order=fecha.desc&limit=200'),
-      api('clients?select=id,nombre'),
+      api('clients?select=id,nombre,email,telefono,telefono_wa,profile_id'),
       api('presence?select=*&order=last_seen.desc')
     ]);
     allOrdersData={
@@ -1672,7 +1672,7 @@ function renderStats(){
   renderRanking('topUsers', userCount, 5, 'pedidos');
 
   // Nueva Sección: Actividad de Clientes, Tiempo en Catálogo & Carrito Pendiente
-  renderClientActivity(profiles, presence, cartEvts, orders, views);
+  renderClientActivity(profiles, presence, cartEvts, orders, views, allOrdersData.posClients);
 
   // Evolución mensual (últimos 6 meses)
   renderMonthlyChart(orders);
@@ -1693,13 +1693,19 @@ function renderStats(){
 // ── ACTIVIDAD DE CLIENTES, TIEMPO Y CARRITOS PENDIENTES ─────────────────────
 let _clientActivityMap = {};
 
-function renderClientActivity(profiles, presence, cartEvts, orders, views) {
+function renderClientActivity(profiles, presence, cartEvts, orders, views, clients) {
   const container = document.getElementById('clientActivityList');
   if(!container) return;
 
   const now = new Date();
   const presenceMap = {};
   (presence || []).forEach(p => { presenceMap[p.user_id] = p.last_seen; });
+
+  // Datos de contacto (email/teléfono) por profile_id, desde la tabla clients
+  const contactByProfileId = {};
+  (clients || []).forEach(c => {
+    if (c.profile_id) contactByProfileId[c.profile_id] = { email: c.email, telefono: c.telefono, telefonoWa: c.telefono_wa };
+  });
 
   // Agrupar eventos de carrito por usuario y determinar carrito pendiente actual
   const cartByUser = {};
@@ -1743,6 +1749,7 @@ function renderClientActivity(profiles, presence, cartEvts, orders, views) {
 
     // Items en carrito pendiente
     const pendingSkus = Object.keys(cartByUser[uid] || {});
+    const contact = contactByProfileId[uid] || {};
 
     _clientActivityMap[uid] = {
       profile: prof,
@@ -1753,7 +1760,10 @@ function renderClientActivity(profiles, presence, cartEvts, orders, views) {
       estimatedMinutes,
       pendingSkus,
       ordersCount: userOrders.length,
-      viewsCount: userViews.length
+      viewsCount: userViews.length,
+      email: contact.email || null,
+      telefono: contact.telefono || null,
+      telefonoWa: contact.telefonoWa || null
     };
   });
 
@@ -1780,9 +1790,24 @@ function renderClientActivity(profiles, presence, cartEvts, orders, views) {
       ? `${Math.floor(c.estimatedMinutes/60)}h ${c.estimatedMinutes%60}m` 
       : `${c.estimatedMinutes} min`;
 
-    const lastSeenStr = c.isOnline 
-      ? '<span style="color:var(--green);font-weight:700;">🟢 En línea ahora</span>' 
+    const lastSeenStr = c.isOnline
+      ? '<span style="color:var(--green);font-weight:700;">🟢 En línea ahora</span>'
       : (c.lastSeenDate ? `Últ. vez: ${fmtDateTime(c.lastSeenDate)}` : 'Sin registros rec.');
+
+    // Contacto: mail y teléfono (no todos los clientes tienen teléfono cargado)
+    const contactoParts = [];
+    if (c.email) contactoParts.push(`✉️ ${c.email}`);
+    if (c.telefono || c.telefonoWa) contactoParts.push(`📱 ${c.telefonoWa || c.telefono}`);
+    const contactoStr = contactoParts.length
+      ? contactoParts.join(' &nbsp;·&nbsp; ')
+      : '<span style="opacity:.5;">Sin datos de contacto</span>';
+
+    const waNumero = (c.telefonoWa || c.telefono || '').replace(/[^0-9]/g, '');
+    const waBtn = waNumero ? `
+          <a href="https://wa.me/${waNumero}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
+             title="Escribir por WhatsApp"
+             style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);flex-shrink:0;font-size:14px;text-decoration:none;">💬</a>
+    ` : '';
 
     return `
       <div onclick="openClientDetailModal('${uid}')" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
@@ -1793,17 +1818,19 @@ function renderClientActivity(profiles, presence, cartEvts, orders, views) {
           <div style="min-width:0;flex:1;">
             <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
             <div style="font-size:11px;color:var(--muted);margin-top:2px;">${lastSeenStr}</div>
+            <div style="font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${contactoStr}</div>
           </div>
         </div>
 
-        <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
           <div style="text-align:right;">
             <div style="font-size:12px;font-weight:700;color:var(--text);">${c.interactionCount} conex.</div>
             <div style="font-size:10px;color:var(--muted);margin-top:1px;">⏱ ${timeStr}</div>
           </div>
-          ${cartCount > 0 
+          ${cartCount > 0
             ? `<div style="background:rgba(245,166,35,.15);color:var(--accent2);border:1px solid rgba(245,166,35,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;">🛒 ${cartCount} ítems</div>`
             : `<div style="font-size:11px;color:var(--muted);opacity:.5;">Sin carrito</div>`}
+          ${waBtn}
           <div style="font-size:16px;color:var(--muted);">&rsaquo;</div>
         </div>
       </div>
@@ -1816,9 +1843,16 @@ async function openClientDetailModal(uid) {
   if(!info) return;
 
   document.getElementById('modalClientName').textContent = info.name;
-  document.getElementById('modalClientMeta').textContent = info.isOnline 
-    ? '🟢 Cliente en línea en este momento' 
+  document.getElementById('modalClientMeta').textContent = info.isOnline
+    ? '🟢 Cliente en línea en este momento'
     : (info.lastSeenDate ? `Última sesión: ${fmtDateTime(info.lastSeenDate)}` : 'Sin sesión reciente');
+
+  const waNumero = (info.telefonoWa || info.telefono || '').replace(/[^0-9]/g, '');
+  const contactBits = [];
+  if (info.email) contactBits.push(`<a href="mailto:${info.email}" style="color:var(--accent);text-decoration:none;">✉️ ${info.email}</a>`);
+  if (waNumero) contactBits.push(`<a href="https://wa.me/${waNumero}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;">💬 ${info.telefonoWa || info.telefono}</a>`);
+  else if (info.telefono) contactBits.push(`📱 ${info.telefono}`);
+  document.getElementById('modalClientContact').innerHTML = contactBits.join('') || '<span style="opacity:.5;">Sin datos de contacto</span>';
 
   const timeStr = info.estimatedMinutes >= 60 
     ? `${Math.floor(info.estimatedMinutes/60)}h ${info.estimatedMinutes%60}m` 
@@ -3214,6 +3248,7 @@ async function limpiezaEliminarSeleccionados(section){
       <div>
         <div id="modalClientName" style="font-size:17px;font-weight:800;font-family:'Syne',sans-serif;">Cliente</div>
         <div id="modalClientMeta" style="font-size:12px;color:var(--muted);margin-top:2px;"></div>
+        <div id="modalClientContact" style="font-size:12px;color:var(--muted);margin-top:6px;display:flex;flex-wrap:wrap;gap:10px;"></div>
       </div>
       <button onclick="document.getElementById('clientDetailModal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;padding:4px 8px;line-height:1;">&times;</button>
     </div>
