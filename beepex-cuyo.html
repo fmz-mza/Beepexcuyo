@@ -6662,7 +6662,7 @@
         const menu = document.getElementById('userMenu');
         if (isAdmin) {
           menu.innerHTML = `
-        <button class="user-menu-item" onclick="closeUserMenu();window.location.href='beepex-admin.html'">👥 Panel admin</button>
+        <button class="user-menu-item" onclick="closeUserMenu();window.location.href='beepex-admin.html?v='+Date.now()">👥 Panel admin</button>
         <div class="user-menu-sep"></div>
         <button class="user-menu-item" onclick="closeUserMenu();openSalePrices()">💰 Mis precios de venta</button>
         <button class="user-menu-item" id="saleModeMenuItem" onclick="closeUserMenu();toggleSaleMode()">${saleMode ? '🛒 Modo Compra' : '🏪 Modo Venta'}</button>
