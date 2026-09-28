@@ -3956,7 +3956,12 @@
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true,
+        // false a propósito: initAuth() recién corre después de cargar el catálogo,
+        // y con esto en true el SDK borra el #access_token=...&type=recovery del link
+        // de "olvidé mi contraseña" apenas carga la página, antes de que initAuth()
+        // llegue a leerlo — el modal de reset nunca aparecía. La app ya maneja el
+        // parseo de este hash a mano (ver initAuth), no depende del SDK para esto.
+        detectSessionInUrl: false,
         flowType: 'implicit'
       },
       global: {
