@@ -596,6 +596,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
           <span id="activeClientsBadge" style="font-size:12px;color:var(--green);font-weight:700;"></span>
         </div>
         <div class="section-body" style="padding:12px 14px;">
+          <input type="text" id="clientActivitySearch" placeholder="🔎 Buscar cliente por nombre..."
+            oninput="_renderClientActivityList()"
+            style="width:100%;padding:8px 12px;margin-bottom:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">
           <div id="clientActivityList" style="display:flex;flex-direction:column;gap:8px;">
             <div class="loading">Cargando actividad de clientes...</div>
           </div>
@@ -1591,15 +1594,20 @@ async function loadStats(){
     document.getElementById('statsCards').innerHTML='<div class="loading">Cargando estadísticas...</div>';
   }
   try {
-    const [orders, views, cartEvts, profiles, posOrders, posClients, presence]=await Promise.all([
+    const [orders, views, cartEvts, profiles, posOrders, posClients, presence, moraRes]=await Promise.all([
       api('orders?select=*&order=created_at.desc'),
       api('product_views?select=sku,viewed_at,user_id'),
       api('cart_events?select=sku,action,user_id,created_at'),
       api('profiles?select=id,nombre,approved'),
       api('pos_orders?select=id,ticket_display,fecha,total,estado,client_id&order=fecha.desc&limit=200'),
-      api('clients?select=id,nombre'),
-      api('presence?select=*&order=last_seen.desc')
+      api('clients?select=id,nombre,email,telefono,telefono_wa,profile_id'),
+      api('presence?select=*&order=last_seen.desc'),
+      api('rpc/clientes_en_mora', {method:'POST', body: JSON.stringify({dias: 30})})
     ]);
+    // clientes_en_mora es un RPC (POST): api() devuelve el Response crudo, hay que parsearlo a mano
+    let clientesEnMora = [];
+    try { clientesEnMora = await moraRes.json(); if(!Array.isArray(clientesEnMora)) clientesEnMora = []; } catch(e) {}
+
     allOrdersData={
       orders:    Array.isArray(orders)     ? orders     : [],
       views:     Array.isArray(views)      ? views      : [],
@@ -1607,7 +1615,8 @@ async function loadStats(){
       profiles:  Array.isArray(profiles)   ? profiles   : [],
       posOrders: Array.isArray(posOrders)  ? posOrders  : [],
       posClients:Array.isArray(posClients) ? posClients : [],
-      presence:  Array.isArray(presence)   ? presence   : []
+      presence:  Array.isArray(presence)   ? presence   : [],
+      clientesEnMora
     };
     // Diagnóstico visible en pantalla
     const diag = document.getElementById('statsDiag');
@@ -1672,7 +1681,7 @@ function renderStats(){
   renderRanking('topUsers', userCount, 5, 'pedidos');
 
   // Nueva Sección: Actividad de Clientes, Tiempo en Catálogo & Carrito Pendiente
-  renderClientActivity(profiles, presence, cartEvts, orders, views);
+  renderClientActivity(profiles, presence, cartEvts, orders, views, allOrdersData.posClients, allOrdersData.posOrders, allOrdersData.clientesEnMora);
 
   // Evolución mensual (últimos 6 meses)
   renderMonthlyChart(orders);
@@ -1693,13 +1702,30 @@ function renderStats(){
 // ── ACTIVIDAD DE CLIENTES, TIEMPO Y CARRITOS PENDIENTES ─────────────────────
 let _clientActivityMap = {};
 
-function renderClientActivity(profiles, presence, cartEvts, orders, views) {
+function renderClientActivity(profiles, presence, cartEvts, orders, views, clients, posOrders, clientesEnMora) {
   const container = document.getElementById('clientActivityList');
   if(!container) return;
 
   const now = new Date();
   const presenceMap = {};
   (presence || []).forEach(p => { presenceMap[p.user_id] = p.last_seen; });
+
+  // Datos de contacto (email/teléfono) y el id de cliente, por profile_id — desde la tabla clients.
+  // No todos los profiles tienen una fila en clients (ej. nunca se aprobaron), así que puede faltar.
+  const contactByProfileId = {};
+  (clients || []).forEach(c => {
+    if (c.profile_id) contactByProfileId[c.profile_id] = { clientId: c.id, email: c.email, telefono: c.telefono, telefonoWa: c.telefono_wa };
+  });
+
+  // Clientes con saldo vencido (RPC clientes_en_mora), indexado por client_id
+  const moraByClientId = {};
+  (clientesEnMora || []).forEach(m => { moraByClientId[m.client_id] = m; });
+
+  // Ventas POS cerradas por client_id (para saber si un cliente ya compró, aunque sea solo por POS)
+  const posComprasByClientId = {};
+  (posOrders || []).forEach(o => {
+    if (o.estado === 'cerrada' && o.client_id) posComprasByClientId[o.client_id] = (posComprasByClientId[o.client_id] || 0) + 1;
+  });
 
   // Agrupar eventos de carrito por usuario y determinar carrito pendiente actual
   const cartByUser = {};
@@ -1723,16 +1749,16 @@ function renderClientActivity(profiles, presence, cartEvts, orders, views) {
   });
 
   _clientActivityMap = {};
-  
+
   (profiles || []).forEach(prof => {
     const uid = prof.id;
     const name = prof.nombre || 'Usuario sin nombre';
-    
+
     // Conexiones e interacciones en el período
     const userCartEvts = (cartEvts || []).filter(e => e.user_id === uid && periodFilter(e.created_at));
     const userViews = (views || []).filter(v => v.user_id === uid && periodFilter(v.viewed_at));
     const userOrders = (orders || []).filter(o => o.user_id === uid && periodFilter(o.created_at));
-    
+
     const lastSeenRaw = presenceMap[uid] || (userCartEvts[0]?.created_at) || (userOrders[0]?.created_at);
     const lastSeenDate = lastSeenRaw ? new Date(lastSeenRaw) : null;
     const isOnline = lastSeenDate && (now - lastSeenDate) < 10 * 60 * 1000;
@@ -1741,8 +1767,23 @@ function renderClientActivity(profiles, presence, cartEvts, orders, views) {
     // Estimación tiempo en catálogo (cada interacción/heartbeat representa ~2 min activos)
     const estimatedMinutes = Math.max(interactionCount * 2, lastSeenDate ? 2 : 0);
 
-    // Items en carrito pendiente
-    const pendingSkus = Object.keys(cartByUser[uid] || {});
+    // Items en carrito pendiente, y hace cuánto está el más viejo de ellos sin comprarse
+    const cartMap = cartByUser[uid] || {};
+    const pendingSkus = Object.keys(cartMap);
+    const cartAgeHours = pendingSkus.length
+      ? (now - new Date(Math.min(...pendingSkus.map(sku => new Date(cartMap[sku]).getTime())))) / 3600000
+      : 0;
+    const isCartFrio = pendingSkus.length > 0 && cartAgeHours >= 24;
+
+    const contact = contactByProfileId[uid] || {};
+    const clientId = contact.clientId || null;
+
+    // Nunca compró: ni por catálogo (histórico completo, no solo el período filtrado) ni por POS
+    const everPurchasedCatalog = (orders || []).some(o => o.user_id === uid);
+    const everPurchasedPos = clientId ? !!posComprasByClientId[clientId] : false;
+    const neverPurchased = !everPurchasedCatalog && !everPurchasedPos;
+
+    const mora = clientId ? moraByClientId[clientId] : null;
 
     _clientActivityMap[uid] = {
       profile: prof,
@@ -1752,63 +1793,142 @@ function renderClientActivity(profiles, presence, cartEvts, orders, views) {
       interactionCount,
       estimatedMinutes,
       pendingSkus,
+      isCartFrio,
       ordersCount: userOrders.length,
-      viewsCount: userViews.length
+      viewsCount: userViews.length,
+      email: contact.email || null,
+      telefono: contact.telefono || null,
+      telefonoWa: contact.telefonoWa || null,
+      clientId,
+      neverPurchased,
+      mora: mora ? { saldo: mora.saldo, diasMora: mora.dias_mora } : null
     };
   });
 
-  // Convertir a lista y ordenar: primero online, luego los con carrito, luego los con más minutos
-  const activeList = Object.values(_clientActivityMap).sort((a, b) => {
+  const onlineCount = Object.values(_clientActivityMap).filter(c => c.isOnline).length;
+  const badgeEl = document.getElementById('activeClientsBadge');
+  if(badgeEl) badgeEl.textContent = onlineCount > 0 ? `🟢 ${onlineCount} en línea` : `${Object.keys(_clientActivityMap).length} clientes`;
+
+  _renderClientActivityList();
+}
+
+// Renderiza la lista a partir de _clientActivityMap, aplicando el filtro de búsqueda por nombre.
+// Separado de renderClientActivity() para que buscar no recalcule toda la actividad de nuevo.
+function _renderClientActivityList() {
+  const container = document.getElementById('clientActivityList');
+  if(!container) return;
+
+  const searchEl = document.getElementById('clientActivitySearch');
+  const search = (searchEl?.value || '').trim().toLowerCase();
+
+  let activeList = Object.values(_clientActivityMap);
+  if (search) activeList = activeList.filter(c => c.name.toLowerCase().includes(search));
+
+  // Ordenar: primero online, luego con carrito (los fríos primero, para que salten a la vista), luego más minutos
+  activeList = activeList.sort((a, b) => {
     if (a.isOnline !== b.isOnline) return b.isOnline ? 1 : -1;
+    if (a.isCartFrio !== b.isCartFrio) return b.isCartFrio ? 1 : -1;
     if (a.pendingSkus.length !== b.pendingSkus.length) return b.pendingSkus.length - a.pendingSkus.length;
     return b.estimatedMinutes - a.estimatedMinutes;
   });
 
-  const onlineCount = activeList.filter(c => c.isOnline).length;
-  const badgeEl = document.getElementById('activeClientsBadge');
-  if(badgeEl) badgeEl.textContent = onlineCount > 0 ? `🟢 ${onlineCount} en línea` : `${activeList.length} clientes`;
-
   if (!activeList.length) {
-    container.innerHTML = '<div class="empty">Sin actividad registrada en este período</div>';
+    container.innerHTML = `<div class="empty">${search ? 'Ningún cliente coincide con la búsqueda' : 'Sin actividad registrada en este período'}</div>`;
     return;
   }
 
-  container.innerHTML = activeList.map(c => {
-    const uid = c.profile.id;
-    const cartCount = c.pendingSkus.length;
-    const timeStr = c.estimatedMinutes >= 60 
-      ? `${Math.floor(c.estimatedMinutes/60)}h ${c.estimatedMinutes%60}m` 
-      : `${c.estimatedMinutes} min`;
+  container.innerHTML = activeList.map(_renderClientActivityCard).join('');
+}
 
-    const lastSeenStr = c.isOnline 
-      ? '<span style="color:var(--green);font-weight:700;">🟢 En línea ahora</span>' 
-      : (c.lastSeenDate ? `Últ. vez: ${fmtDateTime(c.lastSeenDate)}` : 'Sin registros rec.');
+function _renderClientActivityCard(c) {
+  const uid = c.profile.id;
+  const cartCount = c.pendingSkus.length;
+  const timeStr = c.estimatedMinutes >= 60
+    ? `${Math.floor(c.estimatedMinutes/60)}h ${c.estimatedMinutes%60}m`
+    : `${c.estimatedMinutes} min`;
 
-    return `
-      <div onclick="openClientDetailModal('${uid}')" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
-          <div style="width:36px;height:36px;border-radius:50%;background:${c.isOnline?'rgba(34,197,94,.15)':'var(--surface)'};border:1.5px solid ${c.isOnline?'var(--green)':'var(--border)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:${c.isOnline?'var(--green)':'var(--muted)'};flex-shrink:0;">
-            ${c.name.charAt(0).toUpperCase()}
-          </div>
-          <div style="min-width:0;flex:1;">
-            <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${lastSeenStr}</div>
-          </div>
+  const lastSeenStr = c.isOnline
+    ? '<span style="color:var(--green);font-weight:700;">🟢 En línea ahora</span>'
+    : (c.lastSeenDate ? `Últ. vez: ${fmtDateTime(c.lastSeenDate)}` : 'Sin registros rec.');
+
+  // Contacto: mail y teléfono (no todos los clientes tienen teléfono cargado). Si falta el
+  // teléfono pero sí hay una ficha de cliente asociada, se ofrece cargarlo ahí mismo.
+  const contactoParts = [];
+  if (c.email) contactoParts.push(`✉️ ${c.email}`);
+  if (c.telefono || c.telefonoWa) {
+    contactoParts.push(`📱 ${c.telefonoWa || c.telefono}`);
+  } else if (c.clientId) {
+    contactoParts.push(`<a href="#" onclick="event.stopPropagation();event.preventDefault();agregarTelefonoCliente('${c.clientId}','${uid}')" style="color:var(--accent);text-decoration:none;">+ agregar teléfono</a>`);
+  }
+  const contactoStr = contactoParts.length
+    ? contactoParts.join(' &nbsp;·&nbsp; ')
+    : '<span style="opacity:.5;">Sin datos de contacto</span>';
+
+  const waNumero = (c.telefonoWa || c.telefono || '').replace(/[^0-9]/g, '');
+  const waBtn = waNumero ? `
+        <a href="https://wa.me/${waNumero}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
+           title="Escribir por WhatsApp"
+           style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);flex-shrink:0;font-size:14px;text-decoration:none;">💬</a>
+  ` : '';
+
+  const moraBadge = c.mora ? `<span title="Debe ${fmt(c.mora.saldo)}, hace ${c.mora.diasMora} días sin pagar" style="background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;">⚠️ En mora</span>` : '';
+  const nuevoBadge = c.neverPurchased ? `<span style="background:rgba(74,124,255,.15);color:var(--accent);border:1px solid rgba(74,124,255,.3);padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;">🆕 Nunca compró</span>` : '';
+
+  const cartBadge = cartCount > 0
+    ? (c.isCartFrio
+        ? `<div title="Hace más de 24hs que estos productos están en el carrito sin comprarse" style="background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;">🥶 ${cartCount} ítems</div>`
+        : `<div style="background:rgba(245,166,35,.15);color:var(--accent2);border:1px solid rgba(245,166,35,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;">🛒 ${cartCount} ítems</div>`)
+    : `<div style="font-size:11px;color:var(--muted);opacity:.5;">Sin carrito</div>`;
+
+  return `
+    <div onclick="openClientDetailModal('${uid}')" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
+        <div style="width:36px;height:36px;border-radius:50%;background:${c.isOnline?'rgba(34,197,94,.15)':'var(--surface)'};border:1.5px solid ${c.isOnline?'var(--green)':'var(--border)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:${c.isOnline?'var(--green)':'var(--muted)'};flex-shrink:0;">
+          ${c.name.charAt(0).toUpperCase()}
         </div>
-
-        <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
-          <div style="text-align:right;">
-            <div style="font-size:12px;font-weight:700;color:var(--text);">${c.interactionCount} conex.</div>
-            <div style="font-size:10px;color:var(--muted);margin-top:1px;">⏱ ${timeStr}</div>
+        <div style="min-width:0;flex:1;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
+            ${moraBadge}${nuevoBadge}
           </div>
-          ${cartCount > 0 
-            ? `<div style="background:rgba(245,166,35,.15);color:var(--accent2);border:1px solid rgba(245,166,35,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;">🛒 ${cartCount} ítems</div>`
-            : `<div style="font-size:11px;color:var(--muted);opacity:.5;">Sin carrito</div>`}
-          <div style="font-size:16px;color:var(--muted);">&rsaquo;</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${lastSeenStr}</div>
+          <div style="font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${contactoStr}</div>
         </div>
       </div>
-    `;
-  }).join('');
+
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <div style="text-align:right;">
+          <div style="font-size:12px;font-weight:700;color:var(--text);">${c.interactionCount} conex.</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:1px;">⏱ ${timeStr}</div>
+        </div>
+        ${cartBadge}
+        ${waBtn}
+        <div style="font-size:16px;color:var(--muted);">&rsaquo;</div>
+      </div>
+    </div>
+  `;
+}
+
+// Cargar el teléfono de un cliente desde la propia tarjeta, sin ir a otra pantalla.
+// Se guarda el mismo valor en telefono y telefono_wa (lo más común es que sea el mismo número).
+async function agregarTelefonoCliente(clientId, uid) {
+  const val = prompt('Teléfono del cliente (con característica, ej: 2611234567):');
+  if (!val || !val.trim()) return;
+  const limpio = val.trim();
+  try {
+    const res = await api(`clients?id=eq.${clientId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ telefono: limpio, telefono_wa: limpio })
+    });
+    if (!res.ok) { alert('No se pudo guardar el teléfono'); return; }
+    if (_clientActivityMap[uid]) {
+      _clientActivityMap[uid].telefono = limpio;
+      _clientActivityMap[uid].telefonoWa = limpio;
+    }
+    _renderClientActivityList();
+  } catch (e) {
+    alert('Error de conexión al guardar el teléfono');
+  }
 }
 
 async function openClientDetailModal(uid) {
@@ -1816,9 +1936,20 @@ async function openClientDetailModal(uid) {
   if(!info) return;
 
   document.getElementById('modalClientName').textContent = info.name;
-  document.getElementById('modalClientMeta').textContent = info.isOnline 
-    ? '🟢 Cliente en línea en este momento' 
-    : (info.lastSeenDate ? `Última sesión: ${fmtDateTime(info.lastSeenDate)}` : 'Sin sesión reciente');
+  const badges = [];
+  if (info.mora) badges.push(` · ⚠️ En mora: debe ${fmt(info.mora.saldo)} (${info.mora.diasMora} días)`);
+  if (info.neverPurchased) badges.push(' · 🆕 Nunca compró');
+  document.getElementById('modalClientMeta').textContent = (info.isOnline
+    ? '🟢 Cliente en línea en este momento'
+    : (info.lastSeenDate ? `Última sesión: ${fmtDateTime(info.lastSeenDate)}` : 'Sin sesión reciente')) + badges.join('');
+
+  const waNumero = (info.telefonoWa || info.telefono || '').replace(/[^0-9]/g, '');
+  const contactBits = [];
+  if (info.email) contactBits.push(`<a href="mailto:${info.email}" style="color:var(--accent);text-decoration:none;">✉️ ${info.email}</a>`);
+  if (waNumero) contactBits.push(`<a href="https://wa.me/${waNumero}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;">💬 ${info.telefonoWa || info.telefono}</a>`);
+  else if (info.telefono) contactBits.push(`📱 ${info.telefono}`);
+  else if (info.clientId) contactBits.push(`<a href="#" onclick="event.preventDefault();agregarTelefonoCliente('${info.clientId}','${uid}').then(()=>openClientDetailModal('${uid}'))" style="color:var(--accent);text-decoration:none;">+ agregar teléfono</a>`);
+  document.getElementById('modalClientContact').innerHTML = contactBits.join('') || '<span style="opacity:.5;">Sin datos de contacto</span>';
 
   const timeStr = info.estimatedMinutes >= 60 
     ? `${Math.floor(info.estimatedMinutes/60)}h ${info.estimatedMinutes%60}m` 
@@ -3214,6 +3345,7 @@ async function limpiezaEliminarSeleccionados(section){
       <div>
         <div id="modalClientName" style="font-size:17px;font-weight:800;font-family:'Syne',sans-serif;">Cliente</div>
         <div id="modalClientMeta" style="font-size:12px;color:var(--muted);margin-top:2px;"></div>
+        <div id="modalClientContact" style="font-size:12px;color:var(--muted);margin-top:6px;display:flex;flex-wrap:wrap;gap:10px;"></div>
       </div>
       <button onclick="document.getElementById('clientDetailModal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;padding:4px 8px;line-height:1;">&times;</button>
     </div>
