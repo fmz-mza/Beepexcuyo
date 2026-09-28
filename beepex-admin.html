@@ -301,6 +301,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     </div>
     <div class="admin-header-right">
       <a class="admin-back-btn" href="beepex-cuyo.html">← Catálogo</a>
+      <button onclick="forzarActualizacion()" title="Si instalaste esta página como app, a veces queda una copia vieja guardada. Este botón la fuerza a traer la versión más nueva."
+        style="font-size:12px;font-weight:700;color:var(--accent);background:none;border:1px solid rgba(74,124,255,.3);border-radius:8px;padding:6px 10px;cursor:pointer;font-family:inherit;">🔄 Actualizar</button>
       <button class="admin-signout" onclick="doSignOut()">Salir</button>
     </div>
   </header>
@@ -845,6 +847,26 @@ async function restoreSession(){
       }
     }
   } catch(e){ localStorage.removeItem('admin_token'); }
+}
+
+// Fuerza traer la versión más nueva de la página. Pensado para cuando esta
+// página está instalada como app en el celular (PWA/ícono en pantalla de
+// inicio): esas instalaciones a veces guardan una copia vieja que no se
+// entera de las actualizaciones ni cerrando y reabriendo la app. No borra
+// la sesión — solo cachés/registros técnicos y hace una recarga con una URL
+// nueva, para que nada pueda servir una copia guardada de antes.
+async function forzarActualizacion(){
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ('caches' in window) {
+      const names = await caches.keys();
+      await Promise.all(names.map(n => caches.delete(n)));
+    }
+  } catch(e) { /* seguimos igual aunque falle algo de esto */ }
+  location.replace(location.pathname + '?v=' + Date.now());
 }
 
 function doSignOut(){
