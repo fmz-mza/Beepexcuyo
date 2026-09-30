@@ -314,6 +314,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <button class="admin-tab" onclick="switchTab('estadisticas',this)">📊 Estadísticas</button>
     <button class="admin-tab" onclick="switchTab('limpieza',this)">🧹 Limpieza</button>
     <button class="admin-tab" id="tab-btn-ctacte" onclick="switchTab('ctacte',this)">💰 Cta Cte<span class="tab-mora-badge" id="moraBadgeTab" style="display:none"></span></button>
+    <button class="admin-tab" onclick="switchTab('historial',this)">📈 Historial</button>
   </div>
 
   <div class="admin-content">
@@ -680,6 +681,54 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
       </div>
     </div>
 
+    <!-- ── HISTORIAL DE PRECIOS ── -->
+    <div class="tab-panel" id="tab-historial">
+      <!-- Período -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="filter-btn active" onclick="setHistorialPeriod('month',this)">Este mes</button>
+        <button class="filter-btn" onclick="setHistorialPeriod('quarter',this)">Trimestre</button>
+        <button class="filter-btn" onclick="setHistorialPeriod('year',this)">Año</button>
+        <button class="filter-btn" onclick="setHistorialPeriod('all',this)">Todo</button>
+        <button class="filter-btn" id="historialRangoBtn" onclick="toggleHistorialRango()">📅 Rango...</button>
+      </div>
+      <div id="historialRangoBox" style="display:none;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+        <input type="date" id="historialDesde" class="client-search-inp" style="width:auto;flex:1;min-width:130px;">
+        <span style="color:var(--muted);font-size:12px;">a</span>
+        <input type="date" id="historialHasta" class="client-search-inp" style="width:auto;flex:1;min-width:130px;">
+        <button class="filter-btn active" onclick="aplicarHistorialRango()">Aplicar</button>
+      </div>
+
+      <!-- Qué precio -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+        <button class="filter-btn active" onclick="setHistorialCampo('',this)">Todos</button>
+        <button class="filter-btn" onclick="setHistorialCampo('precio_pesos',this)">💰 Precio venta</button>
+        <button class="filter-btn" onclick="setHistorialCampo('precio_pvp',this)">🏷️ PVP</button>
+      </div>
+
+      <!-- Buscador -->
+      <div class="client-search-wrap">
+        <input class="client-search-inp" id="historialSearchInp" type="text"
+          placeholder="🔎 Buscar por SKU o nombre de producto..."
+          oninput="renderHistorialList()">
+      </div>
+
+      <!-- KPIs -->
+      <div class="ctacte-summary" id="historialSummary" style="display:none;">
+        <div class="ctacte-kpi"><div class="ctacte-kpi-val" id="histKpiCambios">-</div><div class="ctacte-kpi-lbl">Cambios</div></div>
+        <div class="ctacte-kpi"><div class="ctacte-kpi-val" id="histKpiProductos">-</div><div class="ctacte-kpi-lbl">Productos</div></div>
+        <div class="ctacte-kpi"><div class="ctacte-kpi-val" id="histKpiSubeBaja">-</div><div class="ctacte-kpi-lbl">Subieron / Bajaron</div></div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+        <button class="setting-btn" onclick="exportarHistorialCSV()">⬇️ Exportar CSV</button>
+      </div>
+
+      <!-- Lista -->
+      <div id="historialList" style="display:flex;flex-direction:column;gap:6px;">
+        <div class="loading">Cargando historial...</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -918,6 +967,7 @@ function switchTab(tab, el){
 
   if(tab==='productos')    loadProdTable();
   if(tab==='ctacte'){ loadCtaCte(); checkMoraBadge(); }
+  if(tab==='historial') loadHistorialPrecios();
   if(tab==='estadisticas'){
     if(allOrdersData && allOrdersData.orders && allOrdersData.orders.length > 0){
       renderStats();
@@ -1951,6 +2001,185 @@ async function agregarTelefonoCliente(clientId, uid) {
   } catch (e) {
     alert('Error de conexión al guardar el teléfono');
   }
+}
+
+// ── HISTORIAL DE PRECIOS ──────────────────────────────────────────────────────
+let historialPeriod = 'month'; // 'month' | 'quarter' | 'year' | 'all' | {desde,hasta}
+let historialCampo = '';       // '' (todos) | 'precio_pesos' | 'precio_pvp'
+let _historialRaw = [];        // filas del período actual, ya con nombre/marca
+
+// "Ahora" en hora de Buenos Aires (GMT-3, sin horario de verano actualmente), para
+// calcular los límites de mes/trimestre/año sin depender de dónde esté el admin.
+function _ahoraAR(){ return new Date(Date.now() - 3*3600*1000); }
+function _isoAR(y, m, d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}T00:00:00`; }
+
+function setHistorialPeriod(p, el){
+  historialPeriod = p;
+  document.getElementById('historialRangoBox').style.display = 'none';
+  [...el.parentElement.children].forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  loadHistorialPrecios();
+}
+
+function toggleHistorialRango(){
+  const box = document.getElementById('historialRangoBox');
+  box.style.display = box.style.display === 'none' ? 'flex' : 'none';
+}
+
+function aplicarHistorialRango(){
+  const desde = document.getElementById('historialDesde').value;
+  const hasta = document.getElementById('historialHasta').value;
+  if (!desde || !hasta) { alert('Elegí las dos fechas'); return; }
+  document.querySelectorAll('#tab-historial > div:first-child .filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('historialRangoBtn').classList.add('active');
+  historialPeriod = { desde, hasta };
+  loadHistorialPrecios();
+}
+
+function setHistorialCampo(campo, el){
+  historialCampo = campo;
+  [...el.parentElement.children].forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderHistorialList();
+}
+
+function _rangoHistorial(){
+  if (typeof historialPeriod === 'object') {
+    return { desde: historialPeriod.desde + 'T00:00:00', hasta: historialPeriod.hasta + 'T23:59:59' };
+  }
+  const ahora = _ahoraAR();
+  const y = ahora.getUTCFullYear(), m = ahora.getUTCMonth(), d = ahora.getUTCDate();
+  if (historialPeriod === 'month')   return { desde: _isoAR(y, m, 1), hasta: null };
+  if (historialPeriod === 'quarter') return { desde: _isoAR(y, m - (m % 3), 1), hasta: null };
+  if (historialPeriod === 'year')    return { desde: _isoAR(y, 0, 1), hasta: null };
+  return { desde: null, hasta: null }; // 'all'
+}
+
+async function loadHistorialPrecios(){
+  const listEl = document.getElementById('historialList');
+  const summaryEl = document.getElementById('historialSummary');
+  listEl.innerHTML = '<div class="loading">Cargando historial...</div>';
+  summaryEl.style.display = 'none';
+
+  const { desde, hasta } = _rangoHistorial();
+  let q = 'productos_historial_precios_ar?select=*&order=changed_at_ar.desc&limit=2000';
+  if (desde) q += '&changed_at_ar=gte.' + encodeURIComponent(desde);
+  if (hasta) q += '&changed_at_ar=lte.' + encodeURIComponent(hasta);
+
+  try {
+    const rows = await api(q);
+    if (!Array.isArray(rows)) throw new Error('Respuesta inesperada del servidor');
+
+    const nameMap = {};
+    (window.allProducts || allProducts || []).forEach(p => { nameMap[p.sku] = { name: p.name, brand: p.brand }; });
+
+    _historialRaw = rows.map(r => ({
+      ...r,
+      nombre: nameMap[r.codigo]?.name || null,
+      marca: nameMap[r.codigo]?.brand || null
+    }));
+
+    renderHistorialList();
+  } catch (e) {
+    listEl.innerHTML = '<div class="empty">Error al cargar el historial: ' + e.message + '</div>';
+  }
+}
+
+function renderHistorialList(){
+  const listEl = document.getElementById('historialList');
+  const summaryEl = document.getElementById('historialSummary');
+  const search = (document.getElementById('historialSearchInp').value || '').trim().toLowerCase();
+
+  let rows = _historialRaw;
+  if (historialCampo) rows = rows.filter(r => r.campo === historialCampo);
+  if (search) rows = rows.filter(r =>
+    String(r.codigo).toLowerCase().includes(search) ||
+    (r.nombre || '').toLowerCase().includes(search)
+  );
+
+  const productosDistintos = new Set(rows.map(r => r.codigo)).size;
+  const subieron = rows.filter(r => Number(r.valor_nuevo) > Number(r.valor_anterior)).length;
+  const bajaron = rows.filter(r => Number(r.valor_nuevo) < Number(r.valor_anterior)).length;
+  document.getElementById('histKpiCambios').textContent = rows.length;
+  document.getElementById('histKpiProductos').textContent = productosDistintos;
+  document.getElementById('histKpiSubeBaja').innerHTML = `<span style="color:var(--red)">↑${subieron}</span> / <span style="color:var(--green)">↓${bajaron}</span>`;
+  summaryEl.style.display = rows.length ? 'grid' : 'none';
+
+  if (!rows.length) {
+    listEl.innerHTML = `<div class="empty">${_historialRaw.length ? 'Ningún cambio coincide con el filtro' : 'Sin cambios de precio registrados en este período'}</div>`;
+    return;
+  }
+
+  listEl.innerHTML = rows.map(_renderHistorialRow).join('');
+}
+
+function _renderHistorialRow(r){
+  const anterior = Number(r.valor_anterior);
+  const nuevo = Number(r.valor_nuevo);
+  const subio = nuevo > anterior;
+  const diffPct = anterior ? ((nuevo - anterior) / anterior * 100) : 0;
+  const color = subio ? 'var(--red)' : 'var(--green)';
+  const flecha = subio ? '▲' : '▼';
+  const campoLabel = r.campo === 'precio_pvp' ? '🏷️ PVP' : '💰 Precio venta';
+
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:10px;">
+      <div style="min-width:0;flex:1;">
+        <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.nombre || ('SKU ' + r.codigo)}</div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">SKU ${r.codigo}${r.marca ? ' · ' + r.marca : ''} · ${campoLabel} · ${fmtFechaAR(r.changed_at_ar)}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:12px;color:var(--muted);text-decoration:line-through;">${fmt(anterior)}</div>
+        <div style="font-size:13px;font-weight:800;color:${color};">${fmt(nuevo)} ${flecha}</div>
+        <div style="font-size:10px;color:${color};">${diffPct > 0 ? '+' : ''}${diffPct.toFixed(1)}%</div>
+      </div>
+    </div>
+  `;
+}
+
+// Formatea un timestamp "naive" que ya viene en hora de Buenos Aires (de la vista
+// productos_historial_precios_ar), SIN volver a interpretarlo con otro huso horario:
+// new Date(str).toLocaleString() lo reinterpretaría con el huso del navegador de
+// quien lo mira, no con el de Buenos Aires, así que se parsean los dígitos a mano.
+function fmtFechaAR(iso){
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return iso;
+  const [, y, mo, d, h, mi] = m;
+  return `${d}/${mo}/${y} ${h}:${mi}`;
+}
+
+function exportarHistorialCSV(){
+  const search = (document.getElementById('historialSearchInp').value || '').trim().toLowerCase();
+  let rows = _historialRaw;
+  if (historialCampo) rows = rows.filter(r => r.campo === historialCampo);
+  if (search) rows = rows.filter(r =>
+    String(r.codigo).toLowerCase().includes(search) ||
+    (r.nombre || '').toLowerCase().includes(search)
+  );
+  if (!rows.length) { alert('No hay filas para exportar con estos filtros'); return; }
+
+  const header = ['Fecha (AR)', 'SKU', 'Producto', 'Marca', 'Campo', 'Valor anterior', 'Valor nuevo', 'Diferencia %'];
+  const lines = [header.join(';')];
+  rows.forEach(r => {
+    const anterior = Number(r.valor_anterior), nuevo = Number(r.valor_nuevo);
+    const diffPct = anterior ? ((nuevo - anterior) / anterior * 100) : 0;
+    const campoLabel = r.campo === 'precio_pvp' ? 'PVP' : 'Precio venta';
+    const fila = [fmtFechaAR(r.changed_at_ar), r.codigo, r.nombre || '', r.marca || '', campoLabel, anterior, nuevo, diffPct.toFixed(1) + '%'];
+    lines.push(fila.map(v => {
+      const s = String(v);
+      return /[;",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(';'));
+  });
+
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'historial_precios_' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 async function openClientDetailModal(uid) {
