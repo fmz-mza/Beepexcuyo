@@ -5289,6 +5289,16 @@
       el.onerror = () => { thumbFail.add(sku); tryLoadImg(el, sku); };
       el.src = thumbUrl(sku);
     }
+    // Miniatura en una lista chica (carrito, "la última vez pediste"): thumb, luego la original
+    // si no existe la miniatura; si ninguna carga, onFail (o nada) y queda el placeholder.
+    function loadThumbInto(el, sku, onLoad, onFail) {
+      el.onload = () => { if (onLoad) onLoad(); };
+      el.onerror = () => {
+        if (!el.dataset.f) { el.dataset.f = '1'; el.src = imgBase(sku, 'webp'); }
+        else if (onFail) onFail();
+      };
+      el.src = thumbUrl(sku);
+    }
     function onImgLoaded(el) {
       el.classList.add('visible');
       const ph = el.parentElement.querySelector('.ph');
@@ -6956,10 +6966,9 @@
               available.forEach(s => {
                 const p = productMap[s.sku];
                 const precio = mayorista(p);
-                const cached = imgCache[s.sku] && imgCache[s.sku] !== 'error' ? imgCache[s.sku] : null;
-                const imgHtml = cached
-                  ? `<img src="${cached}" alt="${p.name}">`
-                  : `<div class="freq-item-ph">📦</div>`;
+                // Miniatura directa (no depende de que la card ya se haya visto); si falla, queda el 📦
+                const imgHtml = `<img src="${thumbUrl(s.sku)}" alt="${_listEsc(p.name)}" loading="lazy" decoding="async" ` +
+                  `onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${imgBase(s.sku, 'webp')}'}else{this.outerHTML='<div class=&quot;freq-item-ph&quot;>📦</div>'}">`;
                 emptyHtml += `<div class="freq-item" onclick="addFreq('${s.sku}',${s.qty})">
               ${imgHtml}
               <div class="freq-item-info">
@@ -6974,6 +6983,9 @@
           }
         } catch (e) { }
         box.innerHTML = emptyHtml;
+        // Olvidar la lista de SKUs dibujada: si no, al volver a agregar los MISMOS productos
+        // el diff cree que no cambió nada y deja el mensaje de "vacío" con el total actualizado.
+        delete box.dataset.skuList;
         document.getElementById('totals').innerHTML = '';
         document.getElementById('waBtn').disabled = true;
         document.getElementById('pdfBtn').disabled = true;
@@ -6988,7 +7000,8 @@
       const newSkuList = items.map(c => c.product.sku).join(',');
       const oldSkuList = box.dataset.skuList || '';
 
-      if (newSkuList !== oldSkuList) {
+      // (además de cambiar la lista, se redibuja si el DOM no tiene filas: red de seguridad)
+      if (newSkuList !== oldSkuList || !box.querySelector('.cart-item')) {
         // Lista de productos cambió → reconstruir HTML completo
         let html = '';
         Object.entries(groups).forEach(([brand, list]) => {
@@ -7017,14 +7030,11 @@
         box.innerHTML = html;
         box.dataset.skuList = newSkuList;
         // Cargar imágenes solo para items nuevos
+        // Miniatura (400px) para todos: la foto se ve a ~60px y la original pesa ~4 MB decodificada.
+        // Las variantes no vistas en el grid no tienen imgCache, así que no se depende de él.
         items.forEach(c => {
           const el = document.getElementById(`ci-${c.product.sku}`); if (!el) return;
-          const cached = imgCache[c.product.sku];
-          if (cached && cached !== 'error') {
-            el.src = cached; el.onload = () => { el.classList.add('visible'); document.getElementById(`cp-${c.product.sku}`)?.remove(); };
-          } else {
-            loadCardImg(el, c.product.sku);
-          }
+          loadThumbInto(el, c.product.sku, () => { el.classList.add('visible'); document.getElementById(`cp-${c.product.sku}`)?.remove(); });
         });
       } else {
         // Mismos productos → solo actualizar cantidades y precios sin tocar imágenes
