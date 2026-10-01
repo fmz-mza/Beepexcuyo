@@ -592,6 +592,171 @@
       color: var(--text);
     }
 
+    .count-sort-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .view-toggle {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .view-toggle:active {
+      color: var(--text);
+    }
+
+    /* Vista lista */
+    .list-view {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 6px 16px 140px;
+    }
+
+    .l-hint {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 4px 2px 6px;
+    }
+
+    .l-group {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'Syne', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 16px 2px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .l-group-ns {
+      color: var(--red);
+    }
+
+    .lrow {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      padding: 9px 4px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .lrow.in-cart {
+      background: rgba(74, 124, 255, .08);
+    }
+
+    .l-name {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.25;
+      cursor: pointer;
+    }
+
+    .l-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .l-ok {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .l-prev {
+      color: var(--preventa);
+      font-weight: 700;
+    }
+
+    .l-ns {
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    .l-price {
+      margin-top: 3px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .l-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
+    }
+
+    .l-step {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .l-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1;
+      font-family: inherit;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .l-btn:active {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .l-qty {
+      width: 46px;
+      height: 34px;
+      text-align: center;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 16px;
+      /* 16px evita el zoom automático de iOS al enfocar */
+      font-family: inherit;
+      outline: none;
+    }
+
+    .l-qty:focus {
+      border-color: var(--accent);
+    }
+
+    .l-btn:disabled,
+    .l-qty:disabled {
+      opacity: .35;
+      cursor: not-allowed;
+    }
+
+    .l-sub {
+      min-height: 14px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent2);
+    }
+
     .grid {
       max-width: 960px;
       margin: 0 auto;
@@ -4169,14 +4334,18 @@
     <div class="rubro-chips" id="rubroChips"></div>
     <div class="count-sort-row">
       <div class="product-count" id="productCount"></div>
-      <select class="sort-select" id="sortSelect" onchange="setSort(this.value)">
-        <option value="default">Orden original</option>
-        <option value="price-asc">Precio ↑</option>
-        <option value="price-desc">Precio ↓</option>
-      </select>
+      <div class="count-sort-actions">
+        <button class="view-toggle" id="viewToggle" onclick="toggleView()" aria-label="Cambiar entre vista de tarjetas y lista">☰ Lista</button>
+        <select class="sort-select" id="sortSelect" onchange="setSort(this.value)">
+          <option value="default">Orden original</option>
+          <option value="price-asc">Precio ↑</option>
+          <option value="price-desc">Precio ↓</option>
+        </select>
+      </div>
     </div>
   </div>
   <div class="grid" id="grid"></div>
+  <div class="list-view" id="listView" style="display:none"></div>
   <div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
   <div class="pwd-overlay" id="pwdOverlay">
     <div class="pwd-modal">
@@ -4729,6 +4898,7 @@
 
     // ── Patch de precios: actualiza precio en todas las cards según auth ─────────
     function patchPrices() {
+      if (listActive()) { renderGrid(); return; } // la lista rehace sus filas (precio/IVA/login)
       lastRenderedSkus.forEach(sku => {
         const p = productMap[sku]; if (!p) return;
         const cardEl = document.getElementById('card-' + sku);
@@ -4883,11 +5053,160 @@
       }, 200);
     }
 
+    // ── Vista lista ───────────────────────────────────────────────────────────────
+    // Tabla de filas sin fotos para cargar pedidos rápido: sin imágenes decodificadas
+    // y con pocos nodos por fila, es la vista más liviana para celulares. Usa el mismo
+    // carrito que las tarjetas (chg), así que todo lo demás (total, PDF, envío) sigue igual.
+    let listMode = false;
+    try { listMode = localStorage.getItem('beepex_view') === 'list'; } catch (e) { }
+    const listActive = () => listMode && !saleMode;
+    let _listToken = 0, _listRaf = 0;
+    const _listEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    function toggleView() {
+      listMode = !listMode;
+      try { localStorage.setItem('beepex_view', listMode ? 'list' : 'cards'); } catch (e) { }
+      window.scrollTo(0, 0);
+      renderGrid();
+    }
+    function syncViewUI() {
+      const on = listActive();
+      const grid = document.getElementById('grid'), lv = document.getElementById('listView'), btn = document.getElementById('viewToggle');
+      if (grid) grid.style.display = on ? 'none' : '';
+      if (lv) lv.style.display = on ? '' : 'none';
+      if (btn) {
+        btn.style.display = saleMode ? 'none' : '';
+        btn.textContent = on ? '▦ Tarjetas' : '☰ Lista';
+      }
+    }
+
+    function listRowHtml(p) {
+      const qty = cart[p.sku]?.qty || 0;
+      const st = stockType(p.stock);
+      let stock;
+      if (st === 'STOCK') stock = `<span class="l-ok">${Math.round(p.stock_fisico || 0)} u</span>`;
+      else if (st === 'PREVENTA') {
+        const eta = /\(([^)]+)\)/.exec(p.stock || '');
+        stock = `<span class="l-prev">${Math.round(p.stock_ingresos || 0)} u${eta ? ' · ' + _listEsc(eta[1]) : ''}</span>`;
+      } else stock = '<span class="l-ns">Sin stock</span>';
+      const dis = st === 'NOSTOCK' ? ' disabled' : '';
+      const sub = qty && userApproved && p.price ? fmt(mayorista(p) * qty) : '';
+      return `<div class="lrow${qty ? ' in-cart' : ''}" data-sku="${_listEsc(p.sku)}">` +
+        `<div class="l-main"><div class="l-name" data-act="info">${_listEsc(p.name)}</div>` +
+        `<div class="l-meta">SKU ${_listEsc(p.sku)} · ${stock}${isLiquidacion(p.stock) ? ' <span class="liqui-fire">🔥</span>' : ''}</div>` +
+        `<div class="l-price">${priceDisplay(p)}</div></div>` +
+        `<div class="l-right"><div class="l-step"><button class="l-btn" data-act="dec"${dis} aria-label="Quitar uno">−</button>` +
+        `<input class="l-qty" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="next" placeholder="0" value="${qty || ''}"${dis} aria-label="Cantidad">` +
+        `<button class="l-btn" data-act="inc"${dis} aria-label="Agregar uno">+</button></div>` +
+        `<div class="l-sub">${sub}</div></div></div>`;
+    }
+
+    function renderList(listAvail, listNoStock, hint) {
+      const el = document.getElementById('listView');
+      const token = ++_listToken;
+      cancelAnimationFrame(_listRaf);
+      if (!listAvail.length && !listNoStock.length) {
+        el.innerHTML = '<div class="no-results" style="display:block">😿 No se encontraron productos' + hint + '</div>';
+        return;
+      }
+      // Por rubro (orden alfabético) salvo que se ordene por precio; sin stock al final
+      const parts = [];
+      const addGroup = (title, items, cls) => {
+        parts.push(`<div class="l-group${cls || ''}"><span>${_listEsc(title)}</span><span>${items.length}</span></div>`);
+        items.forEach(p => parts.push(listRowHtml(p)));
+      };
+      if (activeSort === 'default') {
+        const byRubro = new Map();
+        listAvail.forEach(p => { const k = p.rubro && p.rubro.toLowerCase() !== 'nan' ? p.rubro : 'Otros'; (byRubro.get(k) || byRubro.set(k, []).get(k)).push(p); });
+        [...byRubro.keys()].sort().forEach(k => addGroup(k, byRubro.get(k)));
+      } else {
+        listAvail.forEach(p => parts.push(listRowHtml(p)));
+      }
+      if (listNoStock.length) addGroup('Sin stock', listNoStock, ' l-group-ns');
+
+      el.innerHTML = `<div class="l-hint">Escribí la cantidad y apretá Enter para pasar al siguiente. Precios ${includeIVA ? 'con' : 'sin'} IVA.</div>`;
+      // Render por lotes para no bloquear el hilo principal con cientos de filas
+      const FIRST = 120, CHUNK = 200;
+      el.insertAdjacentHTML('beforeend', parts.slice(0, FIRST).join(''));
+      let idx = FIRST;
+      const next = () => {
+        if (token !== _listToken || idx >= parts.length) return;
+        el.insertAdjacentHTML('beforeend', parts.slice(idx, idx + CHUNK).join(''));
+        idx += CHUNK;
+        _listRaf = requestAnimationFrame(next);
+      };
+      _listRaf = requestAnimationFrame(next);
+    }
+
+    function listPatchRow(row) {
+      const sku = row.dataset.sku, p = productMap[sku];
+      const qty = cart[sku]?.qty || 0;
+      row.classList.toggle('in-cart', qty > 0);
+      const inp = row.querySelector('.l-qty');
+      if (inp && document.activeElement !== inp && inp.value !== String(qty || '')) inp.value = qty || '';
+      const subEl = row.querySelector('.l-sub');
+      const t = qty && userApproved && p && p.price ? fmt(mayorista(p) * qty) : '';
+      if (subEl && subEl.textContent !== t) subEl.textContent = t;
+    }
+    function listRefresh() {
+      if (!listActive()) return;
+      document.querySelectorAll('#listView .lrow').forEach(listPatchRow);
+    }
+    function listSetQty(sku, q) {
+      const cur = cart[sku]?.qty || 0;
+      q = Math.max(0, Math.min(99999, q | 0));
+      if (q === cur) return;
+      chg(sku, q - cur);
+      // Si no está logueado chg abre el login y no toca el carrito: restaurar el valor
+      const inp = document.querySelector(`#listView .lrow[data-sku="${CSS.escape(sku)}"] .l-qty`);
+      if (inp && (cart[sku]?.qty || 0) !== q) inp.value = cart[sku]?.qty || '';
+    }
+    (function initListEvents() {
+      const lv = document.getElementById('listView');
+      if (!lv) return;
+      lv.addEventListener('click', e => {
+        const t = e.target.closest('[data-act]'); if (!t) return;
+        const sku = t.closest('.lrow')?.dataset.sku; if (!sku) return;
+        if (t.dataset.act === 'inc') chg(sku, 1);
+        else if (t.dataset.act === 'dec') chg(sku, -1);
+        else if (t.dataset.act === 'info') openDesc(sku);
+      });
+      lv.addEventListener('focusin', e => { if (e.target.classList.contains('l-qty')) e.target.select(); });
+      lv.addEventListener('input', e => {
+        if (e.target.classList.contains('l-qty')) e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5);
+      });
+      lv.addEventListener('change', e => {
+        if (!e.target.classList.contains('l-qty')) return;
+        listSetQty(e.target.closest('.lrow').dataset.sku, parseInt(e.target.value, 10) || 0);
+      });
+      lv.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' || !e.target.classList.contains('l-qty')) return;
+        e.preventDefault();
+        const inputs = [...lv.querySelectorAll('.l-qty:not(:disabled)')];
+        const next = inputs[inputs.indexOf(e.target) + 1];
+        listSetQty(e.target.closest('.lrow').dataset.sku, parseInt(e.target.value, 10) || 0); // confirma ya (blur/change lo repite sin efecto)
+        e.target.blur();
+        if (next) { next.focus(); next.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      });
+    })();
+
+    // Si la búsqueda no da nada en este tab pero sí en otro, lo avisamos
+    function noResultsHint(q, matchSearch) {
+      if (!q || saleMode) return '';
+      const hint = CAT_TABS.filter(t => t.id !== activeStock)
+        .map(t => ({ t, n: products.filter(p => baseVisible(p) && tabMatch(p, t.id) && matchSearch(p)).length }))
+        .filter(x => x.n > 0)
+        .map(x => `<button class="rubro-chip" style="margin:10px 4px 0" onclick="setTab('${x.t.id}')">${x.t.label} (${x.n})</button>`)
+        .join('');
+      return hint ? '<div style="margin-top:8px;font-size:12px">Hay resultados en:</div>' + hint : '';
+    }
+
     // ── Grid: DOM diferencial — show/hide + CSS order, nunca destruye nodos ────
     function renderGrid() {
       // Limpiar spinner de carga inicial si existe
       const spinner = document.querySelector('#grid > div:first-child:not(.card):not(.section-title)');
       if (spinner) spinner.remove();
+      syncViewUI();
 
       const q = normalize(document.getElementById('searchInput').value);
       const matchSearch = p => {
@@ -4928,12 +5247,31 @@
         showNoStock ? '1' : '0',
         saleMode ? '1' : '0',
         includeIVA ? '1' : '0',
-        userApproved ? '1' : '0'
+        userApproved ? '1' : '0',
+        listActive() ? 'L' : 'G'
       ].join('|');
       lastRenderedSkus = sortedSkus;
       const grid = document.getElementById('grid');
       document.getElementById('productCount').textContent =
         `${list.length} producto${list.length !== 1 ? 's' : ''}${saleMode ? '' : ' · Precios ' + (includeIVA ? 'con' : 'sin') + ' IVA'}`;
+
+      // ── Vista lista: filas livianas sin fotos, en vez de cards ────────────────
+      if (listActive()) {
+        const lv = document.getElementById('listView');
+        if (renderKey === _gridRenderKey && lv.childElementCount) { listRefresh(); return; }
+        _gridRenderKey = renderKey;
+        // Liberar las cards (y observers) de la vista de tarjetas
+        grid.querySelectorAll('.card[id^="card-"]').forEach(el => {
+          const box = el.querySelector('.card-img');
+          if (box) imgObserver.unobserve(box);
+        });
+        grid.querySelectorAll('.card[id^="card-"], .section-title, #grid-sentinel').forEach(el => el.remove());
+        _pagedList = []; _pagedIdx = 0;
+        renderList(listAvail, listNoStock, noResultsHint(q, matchSearch));
+        return;
+      }
+      const lvOld = document.getElementById('listView');
+      if (lvOld && lvOld.firstChild) lvOld.innerHTML = '';
 
       if (renderKey === _gridRenderKey && grid.querySelector('.card[id^="card-"]')) {
         lastRenderedSkus.forEach(sku => {
@@ -4951,17 +5289,7 @@
         grid.querySelectorAll('.section-title').forEach(el => el.classList.add('hidden'));
         let noRes = grid.querySelector('.no-results');
         if (!noRes) { noRes = document.createElement('div'); noRes.className = 'no-results'; grid.appendChild(noRes); }
-        // Si la búsqueda no da nada en este tab pero sí en otro, lo avisamos
-        let hint = '';
-        if (q && !saleMode) {
-          hint = CAT_TABS.filter(t => t.id !== activeStock)
-            .map(t => ({ t, n: products.filter(p => baseVisible(p) && tabMatch(p, t.id) && matchSearch(p)).length }))
-            .filter(x => x.n > 0)
-            .map(x => `<button class="rubro-chip" style="margin:10px 4px 0" onclick="setTab('${x.t.id}')">${x.t.label} (${x.n})</button>`)
-            .join('');
-          if (hint) hint = '<div style="margin-top:8px;font-size:12px">Hay resultados en:</div>' + hint;
-        }
-        noRes.innerHTML = '😿 No se encontraron productos' + hint;
+        noRes.innerHTML = '😿 No se encontraron productos' + noResultsHint(q, matchSearch);
         noRes.style.display = '';
         _gridRenderKey = renderKey;
         return;
@@ -5277,6 +5605,7 @@
     }
 
     function updateCount() {
+      listRefresh(); // vista lista: cantidades y subtotales (no-op si está inactiva)
       const items = Object.values(cart).filter(c => c.qty > 0);
       const count = items.reduce((a, c) => a + c.qty, 0);
       const badgeEl = document.getElementById('cartCount');
