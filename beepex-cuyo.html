@@ -784,16 +784,26 @@
       margin-right: 3px;
     }
 
+    /* Fila de acción de la tarjeta de grupo: misma altura (36px) y posición (pegada al fondo)
+       que la fila "− 0 +" de las tarjetas sueltas, para que los botones queden simétricos */
+    .g-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: auto;
+      padding-top: 8px;
+    }
+
     .g-open {
-      width: 100%;
-      margin-top: 8px;
+      flex: 1;
+      height: 36px;
       background: var(--accent);
       border: none;
       border-radius: 8px;
       color: #fff;
       font-size: 13px;
       font-weight: 700;
-      padding: 10px;
+      padding: 0 10px;
       cursor: pointer;
       font-family: inherit;
       touch-action: manipulation;
@@ -808,8 +818,19 @@
       font-size: 12px;
       font-weight: 800;
       color: var(--green);
-      margin-top: 6px;
-      min-height: 16px;
+      min-width: 30px;
+      padding: 0 2px;
+      opacity: 0;
+      transition: opacity .2s;
+      flex-shrink: 0;
+    }
+
+    .g-incart.visible {
+      opacity: 1;
+    }
+
+    .card.is-preventa .g-incart {
+      color: var(--preventa);
     }
 
     /* Modal de variantes */
@@ -1679,7 +1700,8 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      margin-top: 8px;
+      margin-top: auto;
+      padding-top: 8px;
     }
 
     .qty-btn {
@@ -5932,8 +5954,10 @@
       <div class="prod-name">${_listEsc(g.name)}</div>
       <div class="sku">${nv} variantes</div>
       <div class="g-price">${groupPriceHtml(g)}</div>
-      <div class="g-incart"></div>
-      <button class="g-open" onclick="openGroup('${g.sku}')">Ver opciones</button>
+      <div class="g-row">
+        <button class="g-open" onclick="openGroup('${g.sku}')">Ver opciones</button>
+        <span class="g-incart"></span>
+      </div>
     </div>`;
       const imgEl = div.querySelector('img');
       imgEl.decoding = 'async';
@@ -5945,8 +5969,11 @@
       const g = _groupMap[el.dataset.g]; if (!g) return;
       const n = g.variants.reduce((a, v) => a + (cart[v.sku]?.qty || 0), 0);
       el.classList.toggle('in-cart', n > 0);
-      const inc = el.querySelector('.g-incart'), t = n > 0 ? `✓ ${n} en pedido` : '';
-      if (inc && inc.textContent !== t) inc.textContent = t;
+      const inc = el.querySelector('.g-incart'), t = n > 0 ? `✓ ${n}` : '';
+      if (inc) {
+        if (inc.textContent !== t) inc.textContent = t;
+        inc.classList.toggle('visible', n > 0);
+      }
       const pr = el.querySelector('.g-price'), h = groupPriceHtml(g);
       if (pr && pr.innerHTML !== h) pr.innerHTML = h;
     }
