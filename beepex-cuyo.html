@@ -943,6 +943,44 @@
       font-weight: 600;
     }
 
+    /* Mismo color que "PVP sugerido" de las tarjetas sin variantes */
+    .grp-detail-i .pvp-val {
+      color: var(--accent2);
+    }
+
+    .grp-desc-chip {
+      margin-left: auto;
+      background: var(--tag-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: none;
+      padding: 4px 10px;
+      font-family: inherit;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .grp-desc-chip.open {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .grp-desc {
+      margin-bottom: 10px;
+      padding: 10px 12px;
+      background: var(--card);
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+
     .grp-body {
       flex: 1 1 0;
       min-height: 0;
@@ -4864,7 +4902,7 @@
         <div class="grp-detail" id="grpDetail">
           <div class="grp-detail-i"><b>Cód</b><span id="gdCod">-</span></div>
           <div class="grp-detail-i"><b>EAN</b><span id="gdEan">-</span></div>
-          <div class="grp-detail-i"><b>PVP</b><span id="gdPvp">-</span></div>
+          <div class="grp-detail-i"><b>PVP</b><span id="gdPvp" class="pvp-val">-</span></div>
           <div class="grp-detail-i wide"><b>Disponibilidad</b><span id="gdStock">-</span></div>
         </div>
       </div>
@@ -5850,13 +5888,15 @@
       _grp = { g, qty: {}, sel: null };
       const vs = sortVariants(g.variants);
       const brandClass = g.brand === 'BEEPAW' ? 'brand-beepaw' : 'brand-gen';
+      const hayDesc = !!grpDescFor(g.cover.sku);
       document.getElementById('grpMeta').innerHTML =
-        `<span class="tag ${brandClass}">${_listEsc(g.brand)}</span><span>${_listEsc(g.rubro || '')}</span>`;
+        `<span class="tag ${brandClass}">${_listEsc(g.brand)}</span><span>${_listEsc(g.rubro || '')}</span>` +
+        (hayDesc ? '<button type="button" class="grp-desc-chip" id="grpDescChip" onclick="grpToggleDesc()">📄 Descripción</button>' : '');
       document.getElementById('grpTitle').textContent = g.name;
       // Secciones por medida cuando hay dos ejes (medida y color)
       const caracts = [...new Set(vs.map(v => v.caract).filter(Boolean))];
       const colors = new Set(vs.map(v => v.color).filter(Boolean));
-      let html = '<div class="var-list">';
+      let html = '<div class="grp-desc" id="grpDesc" style="display:none"></div><div class="var-list">';
       if (caracts.length > 1 && colors.size > 1) {
         caracts.forEach(c => {
           html += `<div class="var-section-title">${_listEsc(c)}</div>`;
@@ -5917,14 +5957,35 @@
       }
       document.getElementById('gdStock').innerHTML = html;
     }
-    // Tocar una variante: cambia la foto, el detalle y el stock; si tiene stock y estaba en 0 pasa a 1
-    function grpSelect(sku, tap) {
+    // Tocar una variante solo la selecciona: cambia la foto, el detalle y el stock.
+    // La cantidad se carga únicamente con − / + o escribiéndola.
+    function grpSelect(sku) {
       const v = productMap[sku]; if (!v || !_grp) return;
       _grp.sel = sku;
       document.querySelectorAll('#grpBody .var-row').forEach(r => r.classList.toggle('active', r.dataset.sku === sku));
       grpSetImg(document.getElementById('grpImg'), sku);
-      if (tap && stockType(v.stock) !== 'NOSTOCK' && !(_grp.qty[sku] > 0)) grpSetQty(sku, 1, false);
       grpDetail(v, false);
+      grpRefreshDesc();
+    }
+    // Descripción (chip "Descripción"): la de la variante elegida, o la del grupo si esa no tiene
+    function grpDescFor(sku) {
+      const own = productMeta[sku] && productMeta[sku].desc;
+      if (own) return own;
+      for (const v of _grp.g.variants) { const d = productMeta[v.sku] && productMeta[v.sku].desc; if (d) return d; }
+      return '';
+    }
+    function grpRefreshDesc() {
+      const el = document.getElementById('grpDesc');
+      if (el && el.style.display !== 'none') el.textContent = grpDescFor(_grp.sel || _grp.g.cover.sku);
+    }
+    function grpToggleDesc() {
+      const el = document.getElementById('grpDesc'), chip = document.getElementById('grpDescChip');
+      if (!el || !_grp) return;
+      const open = el.style.display === 'none';
+      el.style.display = open ? '' : 'none';
+      chip.classList.toggle('open', open);
+      chip.textContent = open ? '✕ Ocultar descripción' : '📄 Descripción';
+      if (open) { grpRefreshDesc(); document.getElementById('grpBody').scrollTop = 0; }
     }
     function grpSetQty(sku, n, select) {
       if (!_grp) return;
@@ -5934,7 +5995,7 @@
       if (inp && inp.value !== String(n)) inp.value = n;
       const row = document.getElementById('vr_' + sku);
       if (row) row.classList.toggle('has-qty', n > 0);
-      if (select && n > 0) grpSelect(sku, false);
+      if (select && n > 0) grpSelect(sku);
       grpUpdateBtn();
     }
     function grpUpdateBtn() {
@@ -5967,7 +6028,7 @@
           return;
         }
         if (e.target.tagName === 'INPUT') return;
-        grpSelect(sku, true);
+        grpSelect(sku);
       });
       body.addEventListener('focusin', e => { if (e.target.tagName === 'INPUT') e.target.select(); });
       body.addEventListener('input', e => { if (e.target.tagName === 'INPUT') e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); });
