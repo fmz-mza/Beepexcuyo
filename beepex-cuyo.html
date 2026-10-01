@@ -1172,9 +1172,64 @@
 
     .grp-foot {
       flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
       padding: 10px 14px;
       border-top: 1px solid var(--border);
       background: var(--surface);
+    }
+
+    /* Modo compartir: casilla por variante, sin selector de cantidad */
+    .var-chk {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 2px solid var(--border);
+      flex-shrink: 0;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    #grpBody.sharing .var-chk {
+      display: inline-flex;
+    }
+
+    #grpBody.sharing .var-qty {
+      display: none;
+    }
+
+    .var-row.shared {
+      border-color: #25D366;
+      background: rgba(37, 211, 102, .08);
+    }
+
+    .var-row.shared .var-chk {
+      background: #25D366;
+      border-color: #25D366;
+    }
+
+    .var-row.shared .var-chk::after {
+      content: '✓';
+    }
+
+    #grpSharePanel {
+      gap: 8px;
+      padding: 10px;
+    }
+
+    /* En modo compartir se achica la foto y se oculta el detalle para que entre la lista */
+    .grp-overlay.sharing .grp-img {
+      height: 18vh;
+      min-height: 100px;
+    }
+
+    .grp-overlay.sharing .grp-detail {
+      display: none;
     }
 
     .grp-add {
@@ -4908,6 +4963,24 @@
       </div>
       <div class="grp-body" id="grpBody"></div>
       <div class="grp-foot">
+        <div class="desc-share-row" id="grpShareRow" style="display:none">
+          <button class="desc-share-btn" id="grpShareBtn" onclick="grpToggleShare()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
+            <span id="grpShareBtnTxt">Compartir producto</span>
+          </button>
+        </div>
+        <div class="share-price-panel" id="grpSharePanel" style="display:none">
+          <label id="grpShareLabel">Tocá las variantes que querés compartir</label>
+          <div class="share-price-input-row">
+            <span class="share-price-prefix">$</span>
+            <input class="share-price-input" id="grpSharePrice" type="number" inputmode="numeric"
+              placeholder="Precio al cliente (vacío = PVP de cada una)">
+          </div>
+          <div class="share-price-btns">
+            <button class="share-pvp-tag" id="grpShareAll" onclick="grpShareAll()">Todas</button>
+            <button class="share-send-btn" id="grpShareGo" onclick="grpShareGo()">Compartir imágenes</button>
+          </div>
+        </div>
         <button class="grp-add" id="grpAdd" onclick="grpAddAll()" disabled>Agregar al pedido</button>
       </div>
     </div>
@@ -5855,7 +5928,7 @@
       const inCart = cart[v.sku]?.qty || 0;
       const sku = _listEsc(v.sku);
       return `<div class="var-row${no ? ' sin-stock' : ''}" id="vr_${sku}" data-sku="${sku}">` +
-        `<div class="var-info">${tags}<span class="var-sku">${sku}</span></div>` +
+        `<div class="var-info"><span class="var-chk" aria-hidden="true"></span>${tags}<span class="var-sku">${sku}</span></div>` +
         `<div class="var-bottom"><div class="var-price">${price}</div>` +
         (no ? '' : `<div class="var-qty"><button type="button" data-act="dec" aria-label="Quitar uno">−</button>` +
           `<input id="vq_${sku}" type="text" inputmode="numeric" pattern="[0-9]*" value="0" aria-label="Cantidad">` +
@@ -5887,7 +5960,10 @@
     function openGroup(gsku, showDesc) {
       const g = _groupMap[gsku]; if (!g) return;
       trackEvent('product_views', { sku: g.cover.sku });
-      _grp = { g, qty: {}, sel: null };
+      _grp = { g, qty: {}, sel: null, share: false, shareSel: new Set() };
+      grpResetShareUI();
+      // "Compartir producto" igual que en las tarjetas sueltas: solo con sesión iniciada
+      document.getElementById('grpShareRow').style.display = userApproved ? '' : 'none';
       const vs = sortVariants(g.variants);
       const brandClass = g.brand === 'BEEPAW' ? 'brand-beepaw' : 'brand-gen';
       const hayDesc = !!grpDescFor(g.cover.sku);
@@ -5931,6 +6007,8 @@
     function closeGroup() {
       document.getElementById('grpOverlay').classList.remove('open');
       _grp = null;
+      _shareCache = null;
+      grpResetShareUI();
       if (document.body.dataset.grpScrollY !== undefined) {
         const sy = parseInt(document.body.dataset.grpScrollY || '0', 10);
         document.body.style.position = '';
@@ -6008,6 +6086,97 @@
       btn.disabled = units === 0;
       btn.textContent = units > 0 ? `Agregar ${units} un. · ${items} variante${items > 1 ? 's' : ''}` : 'Agregar al pedido';
     }
+    // ── Compartir producto (grupos): el cliente elige variantes y se genera una imagen por cada una ──
+    // Cada imagen es la misma tarjeta que se comparte desde un producto suelto (foto, marca,
+    // nombre, precio al comprador final, descripción), así que se ven todas iguales.
+    const SHARE_MAX = 10;
+    let _shareCache = null; // { key, files }: si iOS corta el gesto, el 2.º toque comparte al instante
+    const GRP_SHARE_GO_HTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg> Compartir imágenes';
+    function grpResetShareUI() {
+      const body = document.getElementById('grpBody'), panel = document.getElementById('grpSharePanel');
+      if (body) body.classList.remove('sharing');
+      document.getElementById('grpOverlay').classList.remove('sharing');
+      if (panel) panel.style.display = 'none';
+      const add = document.getElementById('grpAdd'); if (add) add.style.display = '';
+      const btn = document.getElementById('grpShareBtn'); if (btn) btn.classList.remove('open');
+      const t = document.getElementById('grpShareBtnTxt'); if (t) t.textContent = 'Compartir producto';
+      const price = document.getElementById('grpSharePrice'); if (price) price.value = '';
+      document.querySelectorAll('#grpBody .var-row.shared').forEach(r => r.classList.remove('shared'));
+    }
+    function grpToggleShare() {
+      if (!_grp) return;
+      if (!userApproved) { openAuth(); return; }
+      _grp.share = !_grp.share;
+      if (!_grp.share) { _grp.shareSel.clear(); _shareCache = null; grpResetShareUI(); return; }
+      document.getElementById('grpBody').classList.add('sharing');
+      document.getElementById('grpOverlay').classList.add('sharing');
+      document.getElementById('grpSharePanel').style.display = '';
+      document.getElementById('grpAdd').style.display = 'none';
+      document.getElementById('grpShareBtn').classList.add('open');
+      document.getElementById('grpShareBtnTxt').textContent = 'Cerrar compartir';
+      // Arranca con la variante que se está viendo, si hay
+      if (_grp.sel) grpToggleShareSku(_grp.sel);
+      grpUpdateShareUI();
+    }
+    function grpToggleShareSku(sku) {
+      const set = _grp.shareSel;
+      if (set.has(sku)) set.delete(sku);
+      else if (set.size >= SHARE_MAX) { showToast(`Podés compartir hasta ${SHARE_MAX} variantes por vez`); return; }
+      else set.add(sku);
+      const row = document.getElementById('vr_' + sku);
+      if (row) row.classList.toggle('shared', set.has(sku));
+      grpUpdateShareUI();
+    }
+    function grpShareAll() {
+      if (!_grp) return;
+      const all = _grp.g.variants.slice(0, SHARE_MAX).map(v => v.sku);
+      const allOn = all.every(s => _grp.shareSel.has(s));
+      _grp.shareSel.clear();
+      if (!allOn) all.forEach(s => _grp.shareSel.add(s));
+      document.querySelectorAll('#grpBody .var-row').forEach(r => r.classList.toggle('shared', _grp.shareSel.has(r.dataset.sku)));
+      if (!allOn && _grp.g.variants.length > SHARE_MAX) showToast(`Se marcaron las primeras ${SHARE_MAX}`);
+      grpUpdateShareUI();
+    }
+    function grpUpdateShareUI() {
+      const n = _grp.shareSel.size;
+      document.getElementById('grpShareLabel').textContent = n === 0
+        ? 'Tocá las variantes que querés compartir'
+        : `${n} variante${n > 1 ? 's' : ''} seleccionada${n > 1 ? 's' : ''}`;
+      document.getElementById('grpShareGo').disabled = n === 0;
+      const all = _grp.g.variants.slice(0, SHARE_MAX);
+      document.getElementById('grpShareAll').textContent = all.every(s => _grp.shareSel.has(s.sku)) ? 'Ninguna' : 'Todas';
+    }
+    async function grpShareGo() {
+      if (!_grp) return;
+      if (!userApproved) { openAuth(); return; }
+      const skus = [..._grp.shareSel].filter(s => productMap[s]);
+      if (!skus.length) { showToast('Elegí al menos una variante'); return; }
+      const priceRaw = document.getElementById('grpSharePrice').value;
+      const custom = priceRaw ? parseInt(priceRaw, 10) : null;
+      const key = skus.join(',') + '|' + (custom || '');
+      const btn = document.getElementById('grpShareGo');
+      btn.disabled = true; btn.textContent = skus.length > 1 ? 'Generando imágenes...' : 'Generando...';
+      try {
+        let files;
+        if (_shareCache && _shareCache.key === key) files = _shareCache.files;
+        else {
+          files = await Promise.all(skus.map(sku => {
+            const p = productMap[sku];
+            // Precio al comprador final: el escrito, o el PVP de cada variante (si no tiene, el de lista)
+            return buildProductShareFile(p, custom || (p.pvp > 0 ? p.pvp : null));
+          }));
+          _shareCache = { key, files };
+        }
+        await shareFiles(files, _grp.g.name);
+      } catch (e) {
+        if (e.name === 'NotAllowedError') showToast('Tocá "Compartir imágenes" otra vez para abrir WhatsApp');
+        else if (e.name !== 'AbortError') { console.error(e); showToast('❌ Error al generar imágenes'); }
+      } finally {
+        btn.disabled = !_grp || _grp.shareSel.size === 0;
+        btn.innerHTML = GRP_SHARE_GO_HTML;
+      }
+    }
+
     function grpAddAll() {
       if (!_grp) return;
       const entries = Object.entries(_grp.qty).filter(([, q]) => q > 0);
@@ -6031,6 +6200,8 @@
           return;
         }
         if (e.target.tagName === 'INPUT') return;
+        // En modo compartir, tocar una variante la marca/desmarca (y también muestra su foto)
+        if (_grp.share) grpToggleShareSku(sku);
         grpSelect(sku);
       });
       body.addEventListener('focusin', e => { if (e.target.tagName === 'INPUT') e.target.select(); });
@@ -7385,6 +7556,118 @@
       const p = productMap[descActiveSku];
       if (p && p.pvp > 0) document.getElementById('sharePriceInput').value = p.pvp;
     }
+    // Imagen del producto para compartir: la del caché, o la original webp
+    function loadShareImage(sku) {
+      const url = imgCache[sku] && imgCache[sku] !== 'error' ? imgCache[sku] : imgBase(sku, 'webp');
+      return new Promise(res => {
+        const im = new Image();
+        im.crossOrigin = 'anonymous';
+        im.onload = () => res(im);
+        im.onerror = () => res(null); // si falla, se comparte sin foto
+        im.src = url;
+      });
+    }
+    // Arma la imagen (PNG) de un producto: foto, marca, nombre, precio y descripción
+    async function buildProductShareFile(p, customPrice) {
+      const meta = productMeta[p.sku];
+      // ── Dimensiones del canvas ────────────────────────────────────────────
+      const W = 1080, PAD = 48;
+      let y = PAD;
+
+      // ── Imagen del producto (si existe) ───────────────────────────────────
+      const productImg = await loadShareImage(p.sku);
+
+      // ── Calcular altura total del canvas ──────────────────────────────────
+      const IMG_H = productImg ? 560 : 0;
+      // Texto wrapeado para descripcion
+      const tempC = document.createElement('canvas');
+      tempC.width = W; const tempCtx = tempC.getContext('2d');
+      const descText = meta && meta.desc && meta.desc !== 'Sin descripción disponible.' ? meta.desc : '';
+      tempCtx.font = '28px system-ui,sans-serif';
+      const descLines = wrapText(tempCtx, descText, W - PAD * 2, 34);
+      const totalH = PAD + IMG_H + (IMG_H ? 24 : 0) + 60 + 44 + 50 + (descLines.length ? (descLines.length * 38 + 24) : 0) + 80 + PAD;
+
+      // ── Crear canvas ──────────────────────────────────────────────────────
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = totalH;
+      const ctx = canvas.getContext('2d');
+
+      // Fondo oscuro con gradiente sutil
+      const grad = ctx.createLinearGradient(0, 0, 0, totalH);
+      grad.addColorStop(0, '#1a1b22'); grad.addColorStop(1, '#12131a');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, W, totalH);
+
+      // ── Imagen del producto ───────────────────────────────────────────────
+      if (productImg) {
+        // Recuadro redondeado para la imagen
+        // Contain: escalar para que quepa completa
+        const maxW = W - PAD * 2;
+        const scale = Math.min(maxW / productImg.width, IMG_H / productImg.height);
+        const iw = productImg.width * scale, ih = productImg.height * scale;
+        const actualH = Math.ceil(ih);
+        // Fondo redondeado del tamaño real de la imagen
+        roundRect(ctx, PAD + (maxW - iw) / 2, y, iw, actualH, 16);
+        ctx.save(); ctx.clip();
+        ctx.drawImage(productImg, PAD + (maxW - iw) / 2, y, iw, actualH);
+        ctx.restore();
+        y += actualH + 24;
+      }
+
+      // ── Marca ─────────────────────────────────────────────────────────────
+      if (p.brand) {
+        ctx.font = 'bold 26px system-ui,sans-serif';
+        ctx.fillStyle = '#6b7280'; ctx.textAlign = 'left';
+        ctx.fillText(p.brand.toUpperCase(), PAD, y + 26); y += 44;
+      }
+
+      // ── Nombre ────────────────────────────────────────────────────────────
+      ctx.font = 'bold 44px system-ui,sans-serif';
+      ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left';
+      const nameLines = wrapText(ctx, p.name, W - PAD * 2, 52);
+      nameLines.forEach(l => { ctx.fillText(l, PAD, y + 46); y += 52; });
+      y += 8;
+
+      // ── Precio ────────────────────────────────────────────────────────────
+      const displayPrice = customPrice ? fmt(customPrice) : fmt(mayorista(p));
+      ctx.font = 'bold 56px system-ui,sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(displayPrice, PAD, y + 56); y += 72;
+
+      // ── Descripción ───────────────────────────────────────────────────────
+      if (descLines.length) {
+        ctx.font = '28px system-ui,sans-serif';
+        ctx.fillStyle = '#9ca3af';
+        descLines.forEach(l => { ctx.fillText(l, PAD, y + 32); y += 38; });
+        y += 16;
+      }
+
+      // ── Footer con marca Beepex ───────────────────────────────────────────
+      y += 16;
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.fillRect(0, y, W, 1); y += 20;
+      ctx.font = '24px system-ui,sans-serif';
+      ctx.fillStyle = '#4a4b55'; ctx.textAlign = 'center';
+      ctx.fillText('🐾 Beepex Cuyo', W / 2, y + 24);
+
+      // ── Convertir a blob ──────────────────────────────────────────────────
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.95));
+      const fileName = p.name.replace(/[^a-z0-9]/gi, '_') + '.png';
+      return new File([blob], fileName, { type: 'image/png' });
+    }
+    // Hoja nativa de compartir del celular; si el navegador no puede, descarga las imágenes
+    async function shareFiles(files, title) {
+      if (navigator.canShare && navigator.canShare({ files })) {
+        await navigator.share({ files, title, text: 'Consultanos para más información' });
+      } else {
+        files.forEach(f => {
+          const url = URL.createObjectURL(f);
+          const a = document.createElement('a');
+          a.href = url; a.download = f.name; a.click();
+          URL.revokeObjectURL(url);
+        });
+        showToast(files.length > 1 ? '📥 ' + files.length + ' imágenes descargadas' : '📥 Imagen descargada');
+      }
+    }
     async function shareProductImage() {
       if (!userApproved) { openAuth(); return; }
       const capBtn = document.getElementById('shareCapBtn');
@@ -7393,113 +7676,8 @@
         const p = productMap[descActiveSku]; if (!p) return;
         const priceRaw = document.getElementById('sharePriceInput')?.value;
         const customPrice = priceRaw ? parseInt(priceRaw) : null;
-        const meta = productMeta[descActiveSku];
-
-        // ── Dimensiones del canvas ────────────────────────────────────────────
-        const W = 1080, PAD = 48;
-        let y = PAD;
-
-        // ── Cargar imagen del producto (si existe) ────────────────────────────
-        let productImg = null;
-        const imgUrl = imgCache[descActiveSku] && imgCache[descActiveSku] !== 'error' ? imgCache[descActiveSku] : null;
-        if (imgUrl) {
-          try {
-            productImg = await new Promise((res, rej) => {
-              const im = new Image();
-              im.crossOrigin = 'anonymous';
-              im.onload = () => res(im);
-              im.onerror = () => res(null); // si falla, continuar sin imagen
-              im.src = imgUrl;
-            });
-          } catch (e) { productImg = null; }
-        }
-
-        // ── Calcular altura total del canvas ──────────────────────────────────
-        const IMG_H = productImg ? 560 : 0;
-        // Texto wrapeado para descripcion
-        const tempC = document.createElement('canvas');
-        tempC.width = W; const tempCtx = tempC.getContext('2d');
-        const descText = meta && meta.desc && meta.desc !== 'Sin descripción disponible.' ? meta.desc : '';
-        tempCtx.font = '28px system-ui,sans-serif';
-        const descLines = wrapText(tempCtx, descText, W - PAD * 2, 34);
-        const totalH = PAD + IMG_H + (IMG_H ? 24 : 0) + 60 + 44 + 50 + (descLines.length ? (descLines.length * 38 + 24) : 0) + 80 + PAD;
-
-        // ── Crear canvas ──────────────────────────────────────────────────────
-        const canvas = document.createElement('canvas');
-        canvas.width = W; canvas.height = totalH;
-        const ctx = canvas.getContext('2d');
-
-        // Fondo oscuro con gradiente sutil
-        const grad = ctx.createLinearGradient(0, 0, 0, totalH);
-        grad.addColorStop(0, '#1a1b22'); grad.addColorStop(1, '#12131a');
-        ctx.fillStyle = grad; ctx.fillRect(0, 0, W, totalH);
-
-        // ── Imagen del producto ───────────────────────────────────────────────
-        if (productImg) {
-          // Recuadro redondeado para la imagen
-          // Contain: escalar para que quepa completa
-          const maxW = W - PAD * 2;
-          const scale = Math.min(maxW / productImg.width, IMG_H / productImg.height);
-          const iw = productImg.width * scale, ih = productImg.height * scale;
-          const actualH = Math.ceil(ih);
-          // Fondo redondeado del tamaño real de la imagen
-          roundRect(ctx, PAD + (maxW - iw) / 2, y, iw, actualH, 16);
-          ctx.save(); ctx.clip();
-          ctx.drawImage(productImg, PAD + (maxW - iw) / 2, y, iw, actualH);
-          ctx.restore();
-          y += actualH + 24;
-        }
-
-        // ── Marca ─────────────────────────────────────────────────────────────
-        if (p.brand) {
-          ctx.font = 'bold 26px system-ui,sans-serif';
-          ctx.fillStyle = '#6b7280'; ctx.textAlign = 'left';
-          ctx.fillText(p.brand.toUpperCase(), PAD, y + 26); y += 44;
-        }
-
-        // ── Nombre ────────────────────────────────────────────────────────────
-        ctx.font = 'bold 44px system-ui,sans-serif';
-        ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left';
-        const nameLines = wrapText(ctx, p.name, W - PAD * 2, 52);
-        nameLines.forEach(l => { ctx.fillText(l, PAD, y + 46); y += 52; });
-        y += 8;
-
-        // ── Precio ────────────────────────────────────────────────────────────
-        const displayPrice = customPrice ? fmt(customPrice) : fmt(mayorista(p));
-        ctx.font = 'bold 56px system-ui,sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(displayPrice, PAD, y + 56); y += 72;
-
-        // ── Descripción ───────────────────────────────────────────────────────
-        if (descLines.length) {
-          ctx.font = '28px system-ui,sans-serif';
-          ctx.fillStyle = '#9ca3af';
-          descLines.forEach(l => { ctx.fillText(l, PAD, y + 32); y += 38; });
-          y += 16;
-        }
-
-        // ── Footer con marca Beepex ───────────────────────────────────────────
-        y += 16;
-        ctx.fillStyle = 'rgba(255,255,255,0.06)';
-        ctx.fillRect(0, y, W, 1); y += 20;
-        ctx.font = '24px system-ui,sans-serif';
-        ctx.fillStyle = '#4a4b55'; ctx.textAlign = 'center';
-        ctx.fillText('🐾 Beepex Cuyo', W / 2, y + 24);
-
-        // ── Convertir a blob y compartir ──────────────────────────────────────
-        const blob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.95));
-        const fileName = p.name.replace(/[^a-z0-9]/gi, '_') + '.png';
-        const file = new File([blob], fileName, { type: 'image/png' });
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: p.name, text: 'Consultanos para más información' });
-        } else {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url; a.download = fileName; a.click();
-          URL.revokeObjectURL(url);
-          showToast('📥 Imagen descargada');
-        }
+        const file = await buildProductShareFile(p, customPrice);
+        await shareFiles([file], p.name);
       } catch (e) {
         if (e.name !== 'AbortError') { console.error(e); showToast('❌ Error al generar imagen'); }
       } finally {
