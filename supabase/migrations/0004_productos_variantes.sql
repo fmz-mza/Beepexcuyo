@@ -9,7 +9,9 @@
 --   agrupador       nombre del producto que agrupa a las variantes (ej. "CLEAN-E")
 --   caracteristica  medida / modelo / talle de la variante (ej. "M", "50X80CM")
 --   color           color de la variante
---   categorizacion  eje de variación: "Por tamaño", "Por color", "Por tamaño y color"
+--   categorizacion  ruta de categoría en la API (ej. "COMEDEROS > FOOD-E"); hoy el
+--                   catálogo no la usa, los ejes de variación se deducen de
+--                   caracteristica / color de cada grupo
 --
 -- Son columnas nuevas, nullable y sin default: no cambian filas existentes ni
 -- el trigger de historial de precios. sync.py las llena en cada corrida horaria
