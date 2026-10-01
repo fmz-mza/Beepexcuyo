@@ -4427,56 +4427,25 @@
     // ── Lazy loading con IntersectionObserver ────────────────────────────────────
     const imgObserver = new IntersectionObserver((entries) => {
       entries.forEach(e => {
-        if (!e.isIntersecting) return;
         // Se observa el contenedor .card-img (el <img> tiene display:none hasta cargar
         // y un elemento oculto nunca intersecta con el viewport).
         const box = e.target, el = box.querySelector('img'), sku = el && el.dataset.sku;
-        if (sku && !el.getAttribute('src')) loadCardImg(el, sku);
-        imgObserver.unobserve(box);
+        if (!el || !sku) return;
+        if (e.isIntersecting) {
+          if (!el.getAttribute('src')) loadCardImg(el, sku);
+        } else if (el.getAttribute('src')) {
+          // Tope de memoria: al alejarse la card, se suelta la imagen para que el
+          // navegador libere el bitmap decodificado (iOS Safari mata la pestaña si
+          // se acumulan cientos). Al volver, loadCardImg la repone desde el caché HTTP.
+          el.classList.remove('visible');
+          el.onload = el.onerror = null;
+          el.removeAttribute('src');
+        }
       });
-    }, { rootMargin: '400px', threshold: 0 });
-
-    // ── Efecto 1: scroll-triggered — slide desde lados según columna ─────────────
-    let _cardEnterIdx = 0;
-    const cardObserver = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (!e.isIntersecting) return;
-        const el = e.target;
-        cardObserver.unobserve(el);
-        if (el.dataset.entered) return;
-        el.dataset.entered = '1';
-
-        // Detectar columna: comparar posición X del card con el centro del grid
-        const grid = document.getElementById('grid');
-        const gridRect = grid.getBoundingClientRect();
-        const cardRect = el.getBoundingClientRect();
-        const cardCenterX = cardRect.left + cardRect.width / 2;
-        const gridCenterX = gridRect.left + gridRect.width / 2;
-
-        // Dirección: izquierda si está a la izquierda del centro, derecha si está a la derecha
-        const fromLeft = cardCenterX < gridCenterX;
-        const tx = fromLeft ? '-52px' : '52px';
-
-        // Delay corto para las primeras 8 (stagger suave en pantalla inicial)
-        const delay = Math.min(_cardEnterIdx, 7) * 45;
-        _cardEnterIdx++;
-
-        el.style.transition = 'none';
-        el.style.opacity = '0';
-        el.style.transform = `translateX(${tx})`;
-
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          el.style.transition = `opacity .4s ease ${delay}ms, transform .45s cubic-bezier(.25,.46,.45,.94) ${delay}ms`;
-          el.style.opacity = '1';
-          el.style.transform = 'translateX(0)';
-          setTimeout(() => {
-            el.style.transition = '';
-            el.style.opacity = '';
-            el.style.transform = '';
-          }, delay + 500);
-        }));
-      });
-    }, { rootMargin: '40px', threshold: 0.08 });
+    }, { rootMargin: '1200px 0px', threshold: 0 });
+    // Sin animaciones de entrada/filtro por card: cada card animada con opacity/transform
+    // inline se promueve a su propia capa de compositing, y con cientos de cards eso
+    // satura la GPU/memoria en iOS (el proveedor tampoco las usa).
 
     // ── Helpers de stock ─────────────────────────────────────────────────────────
     function stockType(s) {
@@ -4720,59 +4689,17 @@
     }
 
     function setRubro(r) {
-      activeRubro = r; renderRubros(); _cardEnterIdx = 0; _applyFilterAnim(); setTimeout(() => renderGrid(), 0);
+      activeRubro = r; renderRubros(); setTimeout(() => renderGrid(), 0);
     }
     function setSaleBrand(b) {
       activeBrand = b; renderBrands(); renderGrid();
     }
-    // ── Efecto 2: flip-Y al cambiar filtros ──────────────────────────────────────
-    let _filterAnimPending = false;
-    // Techo de cards a animar: si el usuario venía bajando con el scroll infinito
-    // puede haber cientos de cards ya en el DOM. Animarlas todas (aunque estén fuera
-    // de pantalla, invisibles para el usuario) es trabajo puro desperdiciado y, en
-    // celulares de gama baja, suficiente para trabar el hilo principal el tiempo
-    // necesario para que el navegador dé la página por congelada y la recargue solo.
-    const MAX_ANIM_CARDS = 40;
-    function _cardsEnViewport(nodeList) {
-      const margen = 400; // px de margen arriba/abajo del viewport
-      return nodeList.filter(el => {
-        const r = el.getBoundingClientRect();
-        return r.bottom > -margen && r.top < window.innerHeight + margen;
-      }).slice(0, MAX_ANIM_CARDS);
-    }
-    function _applyFilterAnim() {
-      if (_filterAnimPending) return;
-      _filterAnimPending = true;
-      const visibles = _cardsEnViewport([...document.querySelectorAll('#grid .card:not(.hidden)')]);
-      visibles.forEach(el => {
-        el.style.transition = 'opacity 250ms ease, transform 250ms cubic-bezier(.4,.2,.2,1)';
-        el.style.opacity = '0';
-        el.style.transform = 'rotateY(90deg)';
-      });
-      setTimeout(() => {
-        _filterAnimPending = false;
-        const newVisible = _cardsEnViewport([...document.querySelectorAll('#grid .card:not(.hidden)')]);
-        newVisible.forEach((el, i) => {
-          el.style.transition = 'none';
-          el.style.opacity = '0';
-          el.style.transform = 'rotateY(-90deg)';
-          requestAnimationFrame(() => {
-            el.style.transition = `opacity 300ms ease ${i * 18}ms, transform 300ms cubic-bezier(.34,1.56,.64,1) ${i * 18}ms`;
-            el.style.opacity = '1';
-            el.style.transform = 'rotateY(0deg)';
-          });
-        });
-      }, 260);
-    }
-
     function setBrand(b) {
       activeBrand = b; renderBrands();
-      _cardEnterIdx = 0;
-      _applyFilterAnim();
       setTimeout(() => renderGrid(), 0);
       if (typeof gtag !== 'undefined' && b !== 'ALL') gtag('event', 'select_item', { item_list_name: 'filtro_marca', item_list_id: b });
     }
-    function setStock(s) { activeStock = activeStock === s ? 'ALL' : s; renderBrands(); _cardEnterIdx = 0; _applyFilterAnim(); setTimeout(() => renderGrid(), 0); }
+    function setStock(s) { activeStock = activeStock === s ? 'ALL' : s; renderBrands(); setTimeout(() => renderGrid(), 0); }
     function setSort(v) { activeSort = v; renderGrid(); }
 
     // ── Debounce para el buscador ─────────────────────────────────────────────────
@@ -4880,7 +4807,6 @@
       // una sesión larga esto va acumulando memoria hasta que el navegador mata la
       // pestaña por falta de memoria y la recarga sola.
       grid.querySelectorAll('.card[id^="card-"]').forEach(el => {
-        cardObserver.unobserve(el);
         const box = el.querySelector('.card-img');
         if (box) imgObserver.unobserve(box);
       });
@@ -5055,10 +4981,6 @@
         imgEl.decoding = 'async';
         imgObserver.observe(imgEl.parentElement);
       }
-      // ── Efecto 1: registrar card para animación al entrar en viewport ────────────
-      div.style.opacity = '0';
-      div.style.transform = 'translateX(0)'; // dirección la asigna cardObserver
-      cardObserver.observe(div);
       return div;
     }
 
