@@ -757,6 +757,412 @@
       color: var(--accent2);
     }
 
+    /* Tarjeta de grupo de variantes */
+    .card-group .card-img {
+      cursor: pointer;
+    }
+
+    .badge-variants {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      z-index: 2;
+      background: rgba(14, 15, 20, .8);
+      border: 1px solid rgba(255, 255, 255, .12);
+      color: var(--text);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+      letter-spacing: .3px;
+    }
+
+    .price-from {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-right: 3px;
+    }
+
+    .g-open {
+      width: 100%;
+      margin-top: 8px;
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .g-open:active {
+      transform: scale(.97);
+    }
+
+    .g-incart {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--green);
+      margin-top: 6px;
+      min-height: 16px;
+    }
+
+    /* Modal de variantes */
+    .grp-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .7);
+      z-index: 380;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .grp-overlay.open {
+      display: flex;
+    }
+
+    .grp-modal {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px 18px 0 0;
+      width: 100%;
+      max-width: 520px;
+      height: 92vh;
+      max-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: slideUp .2s ease;
+    }
+
+    @media (min-width: 600px) {
+      .grp-overlay {
+        align-items: center;
+        padding: 16px;
+      }
+
+      .grp-modal {
+        border-radius: 18px;
+        height: auto;
+        max-height: 90vh;
+      }
+    }
+
+    .grp-top {
+      flex-shrink: 0;
+    }
+
+    .grp-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 2;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(0, 0, 0, .6);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .grp-img {
+      display: block;
+      width: 100%;
+      height: 34vh;
+      min-height: 150px;
+      max-height: 260px;
+      object-fit: contain;
+      background: var(--card);
+    }
+
+    .grp-head {
+      padding: 10px 14px 0;
+    }
+
+    .grp-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .4px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .grp-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-top: 3px;
+    }
+
+    .grp-detail {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 14px;
+      margin: 8px 14px 0;
+      padding: 8px 10px;
+      background: var(--card);
+      border-radius: 8px;
+      font-size: 11px;
+    }
+
+    .grp-detail-i {
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+    }
+
+    .grp-detail-i.wide {
+      flex-basis: 100%;
+      flex-wrap: wrap;
+    }
+
+    .grp-detail-i b {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .grp-detail-i span {
+      font-weight: 600;
+    }
+
+    .grp-body {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 10px 12px;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .var-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+
+    @media (min-width: 440px) {
+      .var-list {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .var-section-title {
+      grid-column: 1 / -1;
+      margin-top: 4px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .var-section-title:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    .var-row {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 8px 10px;
+      min-width: 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .var-row.active {
+      border-color: var(--accent);
+      background: rgba(74, 124, 255, .1);
+    }
+
+    .var-row.has-qty:not(.active) {
+      border-color: rgba(74, 124, 255, .5);
+    }
+
+    .var-row.sin-stock {
+      opacity: .5;
+      cursor: default;
+    }
+
+    .var-info {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .var-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 5px;
+      background: var(--tag-bg);
+      white-space: nowrap;
+    }
+
+    .var-tag.size {
+      color: var(--preventa);
+    }
+
+    .var-tag.out {
+      color: var(--red);
+    }
+
+    .var-tag.pv {
+      color: var(--preventa);
+      background: rgba(167, 139, 250, .12);
+    }
+
+    .var-swatch {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, .35);
+      flex-shrink: 0;
+    }
+
+    .var-sku {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .var-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .var-price {
+      font-size: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .var-qty {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+
+    .var-qty button {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 17px;
+      line-height: 1;
+      font-family: inherit;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .var-qty button:active {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .var-qty input {
+      width: 42px;
+      height: 32px;
+      text-align: center;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 16px;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .var-qty input:focus {
+      border-color: var(--accent);
+    }
+
+    .var-stk {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--green);
+    }
+
+    .var-stk.pv {
+      color: var(--preventa);
+    }
+
+    .var-stk.no {
+      color: var(--red);
+    }
+
+    .var-incart {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--accent2);
+    }
+
+    .grp-foot {
+      flex-shrink: 0;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .grp-add {
+      width: 100%;
+      background: var(--accent);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+      padding: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      touch-action: manipulation;
+    }
+
+    .grp-add:disabled {
+      background: var(--tag-bg);
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+
+    .grp-add:not(:disabled):active {
+      transform: scale(.98);
+    }
+
     .grid {
       max-width: 960px;
       margin: 0 auto;
@@ -4445,6 +4851,29 @@
       </button>
     </div>
   </div>
+  <!-- Modal de variantes: una foto + una fila por variante (color / medida) -->
+  <div class="grp-overlay" id="grpOverlay" onclick="if(event.target===this)closeGroup()">
+    <div class="grp-modal" role="dialog" aria-modal="true" aria-labelledby="grpTitle">
+      <div class="grp-top">
+        <button type="button" class="grp-close" onclick="closeGroup()" aria-label="Cerrar">✕</button>
+        <img class="grp-img" id="grpImg" alt="">
+        <div class="grp-head">
+          <div class="grp-meta" id="grpMeta"></div>
+          <div class="grp-title" id="grpTitle"></div>
+        </div>
+        <div class="grp-detail" id="grpDetail">
+          <div class="grp-detail-i"><b>Cód</b><span id="gdCod">-</span></div>
+          <div class="grp-detail-i"><b>EAN</b><span id="gdEan">-</span></div>
+          <div class="grp-detail-i"><b>PVP</b><span id="gdPvp">-</span></div>
+          <div class="grp-detail-i wide"><b>Disponibilidad</b><span id="gdStock">-</span></div>
+        </div>
+      </div>
+      <div class="grp-body" id="grpBody"></div>
+      <div class="grp-foot">
+        <button class="grp-add" id="grpAdd" onclick="grpAddAll()" disabled>Agregar al pedido</button>
+      </div>
+    </div>
+  </div>
   <div class="desc-overlay" id="descOverlay" onclick="closeDesc(event)">
     <div class="desc-modal" id="descModal">
       <img class="desc-modal-img" id="descModalImg" alt="">
@@ -4692,7 +5121,7 @@
     }
     function onImgError(sku) {
       // Todos los elementos ph de este sku dejan de animar
-      document.querySelectorAll(`#card-${sku} .ph, #img-modal-${sku}`).forEach(el => {
+      document.querySelectorAll(`#card-${sku} .ph, .card[data-cover="${sku}"] .ph, #img-modal-${sku}`).forEach(el => {
         if (el.classList.contains('ph')) el.classList.add('no-img');
       });
       // También el modal si está abierto
@@ -4748,7 +5177,7 @@
     async function loadProducts() {
       try {
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,stock_fisico,stock_ingresos,description:descripcion,rubro,ean&order=marca.asc,producto.asc`,
+          `${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,stock_fisico,stock_ingresos,description:descripcion,rubro,ean,agrupador,caracteristica,color,categorizacion&order=marca.asc,producto.asc`,
           {
             headers: {
               'apikey': SUPABASE_ANON,
@@ -4789,7 +5218,12 @@
             stock_fisico: sFisico,
             stock_ingresos: sIngresos,
             rubro: r.rubro || null,
-            ean: r.ean || ''
+            ean: r.ean || '',
+            // Variantes (agrupador = producto que agrupa; caract = medida/modelo)
+            group: r.agrupador || null,
+            caract: r.caracteristica || '',
+            color: r.color || '',
+            cat: r.categorizacion || ''
           };
         });
 
@@ -4899,6 +5333,7 @@
     // ── Patch de precios: actualiza precio en todas las cards según auth ─────────
     function patchPrices() {
       if (listActive()) { renderGrid(); return; } // la lista rehace sus filas (precio/IVA/login)
+      refreshGroupCards();
       lastRenderedSkus.forEach(sku => {
         const p = productMap[sku]; if (!p) return;
         const cardEl = document.getElementById('card-' + sku);
@@ -5190,6 +5625,365 @@
       });
     })();
 
+    // ── Variantes: tarjeta de grupo + modal ──────────────────────────────────────
+    // Los SKUs que son variantes (color / medida) de un mismo producto vienen con el
+    // mismo `agrupador` desde la API de Beepaw. En el grid se muestran como UNA tarjeta
+    // ("Desde $X · N variantes") y un modal lista cada variante con su stock y cantidad.
+    // El carrito sigue siendo por SKU, así que precios, PDF y envío no cambian.
+    let _groupMap = {};
+    const COLOR_HEX = {
+      'negro': '#1D1D1F', 'blanco': '#FFFFFF', 'gris': '#9AA0A6', 'grafito': '#4B4B4F', 'plata': '#C4C4C9', 'plateado': '#C4C4C9',
+      'azul': '#2563EB', 'celeste': '#38BDF8', 'marino': '#1E3A8A', 'turquesa': '#14B8A6',
+      'rojo': '#EF4444', 'bordo': '#7F1D1D', 'vino': '#7F1D1D', 'coral': '#FB7185',
+      'verde': '#16A34A', 'militar': '#4B5320', 'lima': '#84CC16',
+      'rosa': '#F472B6', 'rosado': '#F472B6', 'fucsia': '#D946EF',
+      'violeta': '#8B5CF6', 'morado': '#8B5CF6', 'lila': '#C4B5FD',
+      'amarillo': '#FFD400', 'naranja': '#F97316', 'mostaza': '#D4A017',
+      'marron': '#92400E', 'cafe': '#6F4E37', 'beige': '#D8C9A8', 'crema': '#EFE7D3', 'arena': '#D8C9A8',
+      'dorado': '#D4AF37', 'oro': '#D4AF37'
+    };
+    function colorToCss(name) {
+      if (!name) return null;
+      const n = String(name).toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      if (COLOR_HEX[n]) return COLOR_HEX[n];
+      const parts = n.split(/\s+y\s+|\/|\s*-\s*|\s+con\s+/).map(s => COLOR_HEX[s.trim()]).filter(Boolean);
+      if (parts.length >= 2) return `linear-gradient(135deg,${parts[0]} 0 50%,${parts[1]} 50% 100%)`;
+      if (parts.length === 1) return parts[0];
+      for (const tok of n.split(/\s+/)) if (COLOR_HEX[tok]) return COLOR_HEX[tok];
+      return null;
+    }
+    function colorSwatch(name) {
+      const c = colorToCss(name);
+      return c ? `<span class="var-swatch" style="background:${c}"></span>` : '';
+    }
+    function talleOrder(t) {
+      if (!t) return 999;
+      const s = String(t).toUpperCase().trim();
+      const map = { 'XS': 1, 'S': 2, 'M': 3, 'L': 4, 'XL': 5, 'XXL': 6, 'XXXL': 7, '2XL': 6, '3XL': 7, '4XL': 8 };
+      if (map[s] !== undefined) return map[s];
+      const first = s.split(/[\s\-_/]+/)[0];
+      if (map[first] !== undefined) return map[first];
+      const num = parseFloat(s);
+      if (!isNaN(num)) return 100 + num;
+      return 500 + s.charCodeAt(0);
+    }
+    const sortVariants = vs => [...vs].sort((a, b) =>
+      (talleOrder(a.caract) - talleOrder(b.caract)) ||
+      (a.color || '').localeCompare(b.color || '', 'es') ||
+      String(a.name).localeCompare(String(b.name), 'es'));
+
+    // Título del grupo: prefijo común de los nombres de las variantes ("CAMA NIDO FLORES"),
+    // o el agrupador de la API si no hay un prefijo útil.
+    function groupTitle(vs, fallback) {
+      const words = vs.map(v => String(v.name || '').split(' / ')[0].replace(/\s+/g, ' ').trim().split(' '));
+      let prefix = words[0].slice();
+      words.forEach(w => { let i = 0; while (i < prefix.length && i < w.length && prefix[i] === w[i]) i++; prefix = prefix.slice(0, i); });
+      const t = prefix.join(' ').replace(/(\s+(DE|CON|PARA|Y|EN|X|-))+$/i, '').trim();
+      return t.split(' ').length >= 2 && t.length >= 6 ? t : fallback;
+    }
+    // Etiqueta de la variante si faltan caracteristica/color en la base
+    function variantLabel(v, title) {
+      const l = [v.caract, v.color].filter(Boolean).join(' ');
+      if (l) return l;
+      const n = String(v.name || '').replace(/\s+/g, ' ').trim();
+      const rest = n.startsWith(title) ? n.slice(title.length) : n;
+      return rest.replace(/^[\s/_-]+/, '') || v.sku;
+    }
+
+    function makeGroupItem(key, members) {
+      const sorted = members;
+      const availM = sorted.filter(v => stockType(v.stock) !== 'NOSTOCK');
+      const cover = availM[0] || sorted[0];
+      const sv = sorted.find(v => stockType(v.stock) === 'STOCK');
+      const pv = sorted.find(v => stockType(v.stock) === 'PREVENTA');
+      const gsku = 'g_' + key.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      const g = {
+        isGroup: true, sku: gsku, key,
+        name: groupTitle(sorted, key), brand: cover.brand, rubro: cover.rubro, iva: cover.iva,
+        stock: sv ? 'STOCK' : pv ? pv.stock : 'NOSTOCK',
+        cover, variants: sorted
+      };
+      _groupMap[gsku] = g;
+      return g;
+    }
+
+    // Une las variantes en tarjetas de grupo (≥2 variantes visibles); el resto queda como está
+    function buildDisplayItems(listAvail, listNoStock) {
+      _groupMap = {};
+      const byG = new Map();
+      [...listAvail, ...listNoStock].forEach(p => {
+        if (!p.group) return;
+        if (!byG.has(p.group)) byG.set(p.group, []);
+        byG.get(p.group).push(p);
+      });
+      const emitted = new Set();
+      const build = arr => {
+        const out = [];
+        arr.forEach(p => {
+          const members = p.group ? byG.get(p.group) : null;
+          if (!members || members.length < 2) { out.push(p); return; }
+          if (emitted.has(p.group)) return;
+          emitted.add(p.group);
+          out.push(makeGroupItem(p.group, members));
+        });
+        return out;
+      };
+      const avail = build(listAvail);
+      const nostock = build(listNoStock);
+      return { avail, nostock };
+    }
+
+    function groupStats(g) {
+      let st = 0, pv = 0;
+      g.variants.forEach(v => {
+        const t = stockType(v.stock);
+        if (t === 'STOCK') st += v.stock_fisico || 0;
+        else if (t === 'PREVENTA') pv += v.stock_ingresos || 0;
+      });
+      return { st, pv };
+    }
+    function groupPriceHtml(g) {
+      if (!userApproved) return '<span class="price-locked" onclick="openAuth()" title="Iniciá sesión para ver el precio">🔒 Ver precio</span>';
+      const prices = g.variants.map(v => mayorista(v)).filter(x => x > 0);
+      if (!prices.length) return '<span class="price">Consultar</span>';
+      const min = Math.min(...prices);
+      const varied = new Set(prices).size > 1;
+      return `${varied ? '<span class="price-from">Desde</span>' : ''}<span class="price">${fmt(min)}</span>`;
+    }
+    function createGroupCard(g) {
+      const cover = g.cover, st = stockType(g.stock);
+      const { st: units, pv } = groupStats(g);
+      const isPrev = st === 'PREVENTA', isNoStock = st === 'NOSTOCK';
+      const brandClass = g.brand === 'BEEPAW' ? 'brand-beepaw' : 'brand-gen';
+      const tagClass = st === 'STOCK' ? 't-stock' : st === 'PREVENTA' ? 't-preventa' : 't-nostock';
+      const div = document.createElement('div');
+      div.id = `card-${g.sku}`;
+      div.dataset.g = g.sku;
+      div.dataset.cover = cover.sku;
+      div.className = `card card-group${isPrev ? ' is-preventa' : ''}${isNoStock ? ' is-nostock' : ''}`;
+      div.style.position = 'relative';
+      const nv = g.variants.length;
+      div.innerHTML = `
+    <div class="card-img" onclick="openGroup('${g.sku}')">
+      <img id="img-${_listEsc(cover.sku)}" data-sku="${_listEsc(cover.sku)}" alt="${_listEsc(g.name)}">
+      <div class="ph">📷</div>
+      <div class="badge-variants">${nv} variantes</div>
+      ${!isNoStock ? `<div class="stock-chip ${isPrev ? 'preventa' : ''}">${isPrev ? '📦' : '✅'} ${Math.round(isPrev ? pv : units)} UN.</div>` : ''}
+    </div>
+    <div class="card-body">
+      <div class="tags">
+        <span class="tag ${brandClass}">${_listEsc(g.brand)}</span>
+        <span class="tag ${tagClass}">${_listEsc(stockLabel(g.stock))}</span>${g.variants.some(v => isLiquidacion(v.stock)) ? '<span class="liqui-fire" aria-label="Liquidación">🔥</span>' : ''}
+      </div>
+      <div class="prod-name">${_listEsc(g.name)}</div>
+      <div class="sku">${nv} variantes</div>
+      <div class="g-price">${groupPriceHtml(g)}</div>
+      <div class="g-incart"></div>
+      <button class="g-open" onclick="openGroup('${g.sku}')">Ver opciones</button>
+    </div>`;
+      const imgEl = div.querySelector('img');
+      imgEl.decoding = 'async';
+      imgObserver.observe(imgEl.parentElement);
+      patchGroupCard(div);
+      return div;
+    }
+    function patchGroupCard(el) {
+      const g = _groupMap[el.dataset.g]; if (!g) return;
+      const n = g.variants.reduce((a, v) => a + (cart[v.sku]?.qty || 0), 0);
+      el.classList.toggle('in-cart', n > 0);
+      const inc = el.querySelector('.g-incart'), t = n > 0 ? `✓ ${n} en pedido` : '';
+      if (inc && inc.textContent !== t) inc.textContent = t;
+      const pr = el.querySelector('.g-price'), h = groupPriceHtml(g);
+      if (pr && pr.innerHTML !== h) pr.innerHTML = h;
+    }
+    function refreshGroupCards() {
+      document.querySelectorAll('#grid .card-group').forEach(patchGroupCard);
+    }
+
+    // ── Modal de variantes ──
+    let _grp = null; // { g, qty: {sku: n}, sel: sku }
+    function grpRowHtml(v, title) {
+      const t = stockType(v.stock), no = t === 'NOSTOCK';
+      let tags = '';
+      if (v.caract) tags += `<span class="var-tag size">${_listEsc(v.caract)}</span>`;
+      if (v.color) tags += `<span class="var-tag">${colorSwatch(v.color)}${_listEsc(v.color)}</span>`;
+      if (!v.caract && !v.color) tags += `<span class="var-tag">${_listEsc(variantLabel(v, title))}</span>`;
+      if (no) tags += '<span class="var-tag out">Sin stock</span>';
+      else if (t === 'PREVENTA') tags += '<span class="var-tag pv">Preventa</span>';
+      const price = !userApproved ? '<span class="price-locked" onclick="event.stopPropagation();openAuth()">🔒 Ver precio</span>'
+        : (v.price === 0 ? 'Consultar' : fmt(mayorista(v)));
+      const stk = variantStockHtml(v);
+      const inCart = cart[v.sku]?.qty || 0;
+      const sku = _listEsc(v.sku);
+      return `<div class="var-row${no ? ' sin-stock' : ''}" id="vr_${sku}" data-sku="${sku}">` +
+        `<div class="var-info">${tags}<span class="var-sku">${sku}</span></div>` +
+        `<div class="var-bottom"><div class="var-price">${price}</div>` +
+        (no ? '' : `<div class="var-qty"><button type="button" data-act="dec" aria-label="Quitar uno">−</button>` +
+          `<input id="vq_${sku}" type="text" inputmode="numeric" pattern="[0-9]*" value="0" aria-label="Cantidad">` +
+          `<button type="button" data-act="inc" aria-label="Agregar uno">+</button></div>`) +
+        `</div>${stk ? `<div class="var-stk${t === 'PREVENTA' ? ' pv' : ''}">${stk}</div>` : ''}` +
+        (inCart ? `<div class="var-incart">✓ ${inCart} en pedido</div>` : '') + `</div>`;
+    }
+    function variantStockHtml(v) {
+      const t = stockType(v.stock);
+      if (t === 'STOCK') return `● ${Math.round(v.stock_fisico || 0)} un. en stock`;
+      if (t === 'PREVENTA') {
+        const eta = /\(([^)]+)\)/.exec(v.stock || '');
+        return `🕐 Preventa · ${Math.round(v.stock_ingresos || 0)} u${eta ? ' · ' + _listEsc(eta[1]) : ''}`;
+      }
+      return '<span style="color:var(--red)">● Sin stock</span>';
+    }
+    function grpTotalHtml(vs) {
+      let st = 0, pv = 0;
+      vs.forEach(v => { const t = stockType(v.stock); if (t === 'STOCK') st += v.stock_fisico || 0; else if (t === 'PREVENTA') pv += v.stock_ingresos || 0; });
+      const parts = [];
+      if (st > 0) parts.push(`<span style="color:var(--green)">●</span> ${Math.round(st)} un. en stock${vs.length > 1 ? ' en total' : ''}`);
+      if (pv > 0) parts.push(`<span style="color:var(--preventa)">🕐 ${st > 0 ? '+' : ''}${Math.round(pv)} en preventa</span>`);
+      if (!parts.length) parts.push('<span style="color:var(--red)">● Sin stock</span>');
+      if (vs.length > 1) parts.push(`${vs.length} variantes`);
+      return parts.join(' · ');
+    }
+
+    function openGroup(gsku) {
+      const g = _groupMap[gsku]; if (!g) return;
+      trackEvent('product_views', { sku: g.cover.sku });
+      _grp = { g, qty: {}, sel: null };
+      const vs = sortVariants(g.variants);
+      const brandClass = g.brand === 'BEEPAW' ? 'brand-beepaw' : 'brand-gen';
+      document.getElementById('grpMeta').innerHTML =
+        `<span class="tag ${brandClass}">${_listEsc(g.brand)}</span><span>${_listEsc(g.rubro || '')}</span>`;
+      document.getElementById('grpTitle').textContent = g.name;
+      // Secciones por medida cuando hay dos ejes (medida y color)
+      const caracts = [...new Set(vs.map(v => v.caract).filter(Boolean))];
+      const colors = new Set(vs.map(v => v.color).filter(Boolean));
+      let html = '<div class="var-list">';
+      if (caracts.length > 1 && colors.size > 1) {
+        caracts.forEach(c => {
+          html += `<div class="var-section-title">${_listEsc(c)}</div>`;
+          vs.filter(v => v.caract === c).forEach(v => { html += grpRowHtml(v, g.name); });
+        });
+        const rest = vs.filter(v => !v.caract);
+        if (rest.length) { html += '<div class="var-section-title">Otras</div>'; rest.forEach(v => { html += grpRowHtml(v, g.name); }); }
+      } else {
+        vs.forEach(v => { html += grpRowHtml(v, g.name); });
+      }
+      document.getElementById('grpBody').innerHTML = html + '</div>';
+      document.getElementById('grpBody').scrollTop = 0;
+      grpUpdateBtn();
+      // El modal abre con la foto de la tarjeta; sin variante elegida todavía
+      const img = document.getElementById('grpImg');
+      img.dataset.sku = '';
+      grpSetImg(img, g.cover.sku);
+      grpDetail(g.cover, true);
+      // Bloquear scroll del body (mismo patrón que los otros modales)
+      if (document.body.style.position !== 'fixed') {
+        const sy = window.scrollY;
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${sy}px`;
+        document.body.style.width = '100%';
+        document.body.dataset.grpScrollY = sy;
+      }
+      document.getElementById('grpOverlay').classList.add('open');
+    }
+    function closeGroup() {
+      document.getElementById('grpOverlay').classList.remove('open');
+      _grp = null;
+      if (document.body.dataset.grpScrollY !== undefined) {
+        const sy = parseInt(document.body.dataset.grpScrollY || '0', 10);
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        delete document.body.dataset.grpScrollY;
+        window.scrollTo(0, sy);
+      }
+    }
+    function grpSetImg(img, sku) {
+      if (!_grp) return;
+      if (imgCache[sku] === 'error') sku = _grp.g.cover.sku;
+      if (img.dataset.sku === sku) return;
+      img.dataset.sku = sku;
+      const known = imgCache[sku] && imgCache[sku] !== 'error' ? imgCache[sku] : null;
+      img.onerror = () => tryLoadImg(img, sku); // otras extensiones si no existe el webp
+      img.src = known || imgBase(sku, 'webp');
+    }
+    function grpDetail(v, initial) {
+      const vs = _grp.g.variants;
+      document.getElementById('gdCod').textContent = v.sku;
+      document.getElementById('gdEan').textContent = v.ean || '-';
+      document.getElementById('gdPvp').textContent = userApproved && v.pvp > 0 ? fmt(v.pvp) : '-';
+      let html = grpTotalHtml(vs);
+      if (!initial && vs.length > 1) {
+        html += `<br><small style="font-weight:400">Esta variante (${_listEsc(variantLabel(v, _grp.g.name))}): ${variantStockHtml(v)}</small>`;
+      }
+      document.getElementById('gdStock').innerHTML = html;
+    }
+    // Tocar una variante: cambia la foto, el detalle y el stock; si tiene stock y estaba en 0 pasa a 1
+    function grpSelect(sku, tap) {
+      const v = productMap[sku]; if (!v || !_grp) return;
+      _grp.sel = sku;
+      document.querySelectorAll('#grpBody .var-row').forEach(r => r.classList.toggle('active', r.dataset.sku === sku));
+      grpSetImg(document.getElementById('grpImg'), sku);
+      if (tap && stockType(v.stock) !== 'NOSTOCK' && !(_grp.qty[sku] > 0)) grpSetQty(sku, 1, false);
+      grpDetail(v, false);
+    }
+    function grpSetQty(sku, n, select) {
+      if (!_grp) return;
+      n = Math.max(0, Math.min(99999, parseInt(n, 10) || 0));
+      _grp.qty[sku] = n;
+      const inp = document.getElementById('vq_' + sku);
+      if (inp && inp.value !== String(n)) inp.value = n;
+      const row = document.getElementById('vr_' + sku);
+      if (row) row.classList.toggle('has-qty', n > 0);
+      if (select && n > 0) grpSelect(sku, false);
+      grpUpdateBtn();
+    }
+    function grpUpdateBtn() {
+      const btn = document.getElementById('grpAdd'); if (!btn || !_grp) return;
+      let items = 0, units = 0;
+      Object.values(_grp.qty).forEach(q => { if (q > 0) { items++; units += q; } });
+      btn.disabled = units === 0;
+      btn.textContent = units > 0 ? `Agregar ${units} un. · ${items} variante${items > 1 ? 's' : ''}` : 'Agregar al pedido';
+    }
+    function grpAddAll() {
+      if (!_grp) return;
+      const entries = Object.entries(_grp.qty).filter(([, q]) => q > 0);
+      if (!entries.length) return;
+      if (!userApproved) { openAuth(() => grpAddAll()); return; }
+      let total = 0;
+      entries.forEach(([sku, q]) => { chg(sku, q); total += q; });
+      closeGroup();
+      showToast(`✓ ${total} un. agregadas al pedido`);
+    }
+    (function initGroupEvents() {
+      const body = document.getElementById('grpBody');
+      if (!body) return;
+      body.addEventListener('click', e => {
+        const row = e.target.closest('.var-row'); if (!row) return;
+        const sku = row.dataset.sku;
+        const act = e.target.closest('[data-act]');
+        if (act) {
+          const cur = _grp.qty[sku] || 0;
+          grpSetQty(sku, cur + (act.dataset.act === 'inc' ? 1 : -1), true);
+          return;
+        }
+        if (e.target.tagName === 'INPUT') return;
+        grpSelect(sku, true);
+      });
+      body.addEventListener('focusin', e => { if (e.target.tagName === 'INPUT') e.target.select(); });
+      body.addEventListener('input', e => { if (e.target.tagName === 'INPUT') e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); });
+      body.addEventListener('change', e => {
+        if (e.target.tagName !== 'INPUT') return;
+        grpSetQty(e.target.closest('.var-row').dataset.sku, e.target.value, true);
+      });
+      body.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+          grpSetQty(e.target.closest('.var-row').dataset.sku, e.target.value, true);
+          e.target.blur();
+        }
+      });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape' && _grp) closeGroup(); });
+    })();
+
     // Si la búsqueda no da nada en este tab pero sí en otro, lo avisamos
     function noResultsHint(q, matchSearch) {
       if (!q || saleMode) return '';
@@ -5279,6 +6073,7 @@
           const cardEl = document.getElementById('card-' + sku);
           if (p && cardEl) patchCard(cardEl, p);
         });
+        refreshGroupCards();
         return;
       }
       _gridRenderKey = renderKey;
@@ -5299,8 +6094,12 @@
       // Ocultar siempre el mensaje de sin resultados cuando hay resultados
       grid.querySelectorAll('.no-results').forEach(el => el.style.display = 'none');
 
+      // Variantes: una tarjeta por grupo (no en modo venta, que selecciona SKU por SKU)
+      const disp = saleMode ? { avail: listAvail, nostock: listNoStock } : buildDisplayItems(listAvail, listNoStock);
+      const pagedItems = [...disp.avail, ...disp.nostock];
+
       // Guardar lista completa para paginación progresiva
-      _pagedList = sortedList;
+      _pagedList = pagedItems;
       _pagedIdx = 0;
 
       // Limpiar cards existentes del DOM (liberamos memoria de la lista anterior).
@@ -5321,14 +6120,16 @@
       if (oldSentinel) oldSentinel.remove();
 
       // Renderizar primera página
-      _renderPage(grid, sortedList, listNoStock, 0, Math.min(PAGE_SIZE, sortedList.length));
-      _pagedIdx = Math.min(PAGE_SIZE, sortedList.length);
+      _renderPage(grid, pagedItems, disp.nostock, 0, Math.min(PAGE_SIZE, pagedItems.length));
+      _pagedIdx = Math.min(PAGE_SIZE, pagedItems.length);
 
       // Si quedan más, agregar sentinel para infinite scroll
-      if (_pagedIdx < sortedList.length) {
+      if (_pagedIdx < pagedItems.length) {
         const sentinel = document.createElement('div');
         sentinel.id = 'grid-sentinel';
-        sentinel.style.cssText = 'grid-column:1/-1;height:40px;';
+        // order alto: las cards/títulos tienen order:9999; sin esto el centinela quedaba
+        // ARRIBA de la grilla y el scroll infinito cargaba una página con cada scroll.
+        sentinel.style.cssText = 'grid-column:1/-1;height:40px;order:10000;';
         grid.appendChild(sentinel);
         _sentinelObserver.observe(sentinel);
       }
@@ -5434,6 +6235,7 @@
 
     // Crear una card nueva completa
     function createCard(p) {
+      if (p.isGroup) return createGroupCard(p);
       const qty = cart[p.sku]?.qty || 0;
       const precio = mayorista(p);
       const st = stockType(p.stock);
@@ -5606,6 +6408,7 @@
 
     function updateCount() {
       listRefresh(); // vista lista: cantidades y subtotales (no-op si está inactiva)
+      refreshGroupCards(); // tarjetas de variantes: "✓ N en pedido"
       const items = Object.values(cart).filter(c => c.qty > 0);
       const count = items.reduce((a, c) => a + c.qty, 0);
       const badgeEl = document.getElementById('cartCount');
