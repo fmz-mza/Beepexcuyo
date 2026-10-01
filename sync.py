@@ -140,6 +140,33 @@ def limpiar_stock(val):
         pass
     return 0
 
+THUMB_SIZE = 400
+THUMB_QUALITY = 72
+
+def thumb_path(sku):
+    return f"thumbs/{sku}.webp"
+
+def make_thumb(img):
+    """Devuelve una copia reducida a THUMB_SIZE px (no modifica la original)."""
+    t = img.copy()
+    t.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
+    return t
+
+def upload_webp(bucket_name, path, img, quality, sku):
+    """Codifica a WEBP y sube con upsert. Loguea errores sin cortar el sync."""
+    buffer = BytesIO()
+    img.save(buffer, format="WEBP", quality=quality)
+    try:
+        supabase.storage.from_(bucket_name).upload(
+            path=path,
+            file=buffer.getvalue(),
+            file_options={"content-type": "image/webp", "x-upsert": "true"}
+        )
+    except Exception as upload_err:
+        # Si ya existe y upsert falló por RLS, lo ignoramos suavemente
+        if "already exists" not in str(upload_err).lower():
+            print(f"❌ Error Storage en {sku} ({path}): {upload_err}")
+
 def process_image(drive_id, sku):
     """Descarga, optimiza y sube la imagen a Supabase Storage"""
     bucket_name = FOTOS_BUCKET
@@ -204,28 +231,15 @@ def process_image(drive_id, sku):
         else:
             img = img.convert("RGB")
 
-        img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
-        
-        buffer = BytesIO()
-        img.save(buffer, format="WEBP", quality=75) # Calidad 75 para máximo ahorro
-        buffer.seek(0)
+        # Original (lightbox / descargar / compartir): 1024px
+        original = img.copy()
+        original.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+        upload_webp(bucket_name, file_path, original, 75, sku)  # Calidad 75 para máximo ahorro
 
-        # Upload
-        try:
-            supabase.storage.from_(bucket_name).upload(
-                path=file_path,
-                file=buffer.read(),
-                file_options={"content-type": "image/webp", "x-upsert": "true"}
-            )
-        except Exception as upload_err:
-            # Si ya existe y upsert falló por RLS, intentamos capturarlo suavemente
-            if "already exists" in str(upload_err).lower():
-                pass # Ignoramos si ya existe y no pudimos sobrescribir
-            else:
-                print(f"❌ Error Storage en {sku}: {upload_err}")
-                # No retornamos None si el archivo ya existe (aunque no lo hayamos podido actualizar)
-                # para que el link público siga funcionando en la DB.
-        
+        # Miniatura para las cards del catálogo: 400px. Una imagen de 1024x1024 ocupa
+        # ~4 MB decodificada en RAM; la miniatura ~0.6 MB (clave en celulares).
+        upload_webp(bucket_name, thumb_path(sku), make_thumb(img), THUMB_QUALITY, sku)
+
         return supabase.storage.from_(bucket_name).get_public_url(file_path)
     except Exception as e:
         print(f"⚠️ Error procesando {sku}: {e}")

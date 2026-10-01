@@ -1,0 +1,31 @@
+name: Backfill miniaturas (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Regenerar también las miniaturas que ya existen (1 = sí)'
+        required: false
+        default: '0'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Generar fotos/thumbs/<sku>.webp
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        FORCE: ${{ inputs.force }}
+      run: python backfill_thumbs.py

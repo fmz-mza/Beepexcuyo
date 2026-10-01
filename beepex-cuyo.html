@@ -4390,6 +4390,25 @@
       el.onload = () => { imgCache[sku] = url; onImgLoaded(el); };
       el.src = url;
     }
+    // ── Miniaturas (400px) para las cards ────────────────────────────────────────
+    // Una imagen de 1024x1024 ocupa ~4 MB decodificada en RAM aunque se vea a ~160px;
+    // con cientos de cards eso mata la pestaña en celulares. Las cards cargan
+    // fotos/thumbs/<sku>.webp (~0.6 MB decodificada); lightbox, modal de info, PDF y
+    // compartir siguen usando la original de 1024px vía imgCache.
+    const thumbFail = new Set(); // skus sin miniatura (aún no generada) → caen a la original
+    function thumbUrl(sku) { return `${BUCKET_URL}/thumbs/${sku}.webp`; }
+    function loadCardImg(el, sku) {
+      if (imgCache[sku] === 'error') return;
+      if (thumbFail.has(sku)) { tryLoadImg(el, sku); return; }
+      el.onload = () => {
+        // Si existe la miniatura existe la original: dejamos su URL en imgCache para
+        // el resto de la app, sin descargarla hasta que alguien la abra.
+        if (!imgCache[sku]) imgCache[sku] = imgBase(sku, 'webp');
+        onImgLoaded(el);
+      };
+      el.onerror = () => { thumbFail.add(sku); tryLoadImg(el, sku); };
+      el.src = thumbUrl(sku);
+    }
     function onImgLoaded(el) {
       el.classList.add('visible');
       const ph = el.parentElement.querySelector('.ph');
@@ -4409,9 +4428,11 @@
     const imgObserver = new IntersectionObserver((entries) => {
       entries.forEach(e => {
         if (!e.isIntersecting) return;
-        const el = e.target, sku = el.dataset.sku;
-        if (sku && !el.getAttribute('src')) tryLoadImg(el, sku);
-        imgObserver.unobserve(el);
+        // Se observa el contenedor .card-img (el <img> tiene display:none hasta cargar
+        // y un elemento oculto nunca intersecta con el viewport).
+        const box = e.target, el = box.querySelector('img'), sku = el && el.dataset.sku;
+        if (sku && !el.getAttribute('src')) loadCardImg(el, sku);
+        imgObserver.unobserve(box);
       });
     }, { rootMargin: '400px', threshold: 0 });
 
@@ -4860,7 +4881,8 @@
       // pestaña por falta de memoria y la recarga sola.
       grid.querySelectorAll('.card[id^="card-"]').forEach(el => {
         cardObserver.unobserve(el);
-        imgObserver.unobserve(el);
+        const box = el.querySelector('.card-img');
+        if (box) imgObserver.unobserve(box);
       });
       grid.querySelectorAll('.card[id^="card-"], .section-title').forEach(el => el.remove());
 
@@ -5027,12 +5049,11 @@
         <span class="in-cart-badge${qty > 0 ? ' visible' : ''}">✓ ${qty}</span>
       </div>
     </div>`;
-      // Cargar imagen: directo si hay cache, lazy si no
+      // Imagen lazy: imgObserver carga la miniatura recién cuando la card está cerca del viewport
       const imgEl = div.querySelector(`[id="img-${p.sku}"]`);
       if (imgEl) {
-        // Siempre intentar cargar — el observer se encarga de no recargar si ya cargó
-        tryLoadImg(imgEl, p.sku);
-        imgObserver.observe(imgEl);
+        imgEl.decoding = 'async';
+        imgObserver.observe(imgEl.parentElement);
       }
       // ── Efecto 1: registrar card para animación al entrar en viewport ────────────
       div.style.opacity = '0';
@@ -5468,7 +5489,7 @@
           if (cached && cached !== 'error') {
             el.src = cached; el.onload = () => { el.classList.add('visible'); document.getElementById(`cp-${c.product.sku}`)?.remove(); };
           } else {
-            tryLoadImg(el, c.product.sku);
+            loadCardImg(el, c.product.sku);
           }
         });
       } else {
