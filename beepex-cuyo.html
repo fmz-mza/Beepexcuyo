@@ -331,15 +331,100 @@
       border-color: var(--accent);
     }
 
-    .filters {
+    /* Tabs de estado: Disponible / Oportunidades / Preventa */
+    .cat-tabs {
       display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 6px;
-      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
     }
 
+    .cat-tab {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 10px 2px 9px;
+      margin-bottom: -1px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      transition: color .15s, border-color .15s;
+    }
+
+    .cat-tab.active {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+    }
+
+    .cat-tab.t-oport.active {
+      border-bottom-color: #ff6a00;
+    }
+
+    .cat-tab.t-prev.active {
+      border-bottom-color: var(--preventa);
+    }
+
+    .cat-tab-n {
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      padding: 2px 5px;
+      border-radius: 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .cat-tab.active .cat-tab-n {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Marca: control segmentado */
+    .filters {
+      display: flex;
+      flex-wrap: nowrap;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .filters .filter-btn {
+      flex: 1 1 0;
+      min-width: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 8px 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .filters .filter-btn:hover {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .filters .filter-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* Rubros: una sola fila con scroll horizontal en mobile */
     .rubro-chips {
+      position: relative;
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
@@ -347,6 +432,27 @@
       max-height: none;
       overflow: visible;
       justify-content: center;
+    }
+
+    @media (max-width: 720px) {
+      .rubro-chips {
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        overflow-x: auto;
+        margin: 0 -16px;
+        padding: 6px 16px 4px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+      }
+
+      .rubro-chips::-webkit-scrollbar {
+        display: none;
+      }
+
+      .rubro-chip {
+        flex: 0 0 auto;
+      }
     }
 
     /* Ocultar iconos nativos de type="search" para mantener consistencia visual */
@@ -4058,6 +4164,7 @@
         spellcheck="false">
       <button class="search-clear" id="searchClear" onclick="clearSearch()" aria-label="Limpiar búsqueda">✕</button>
     </div>
+    <div class="cat-tabs" id="catTabs" role="tablist"></div>
     <div class="filters" id="brandFilters"></div>
     <div class="rubro-chips" id="rubroChips"></div>
     <div class="count-sort-row">
@@ -4539,7 +4646,7 @@
     }
 
     // ── Estado ────────────────────────────────────────────────────────────────────
-    let cart = {}, includeIVA = false, activeBrand = 'ALL', activeStock = 'ALL', activeRubro = 'ALL', activeSort = 'default', descActiveSku = null, newSkus = new Set(), showNoStock = false;
+    let cart = {}, includeIVA = false, activeBrand = 'ALL', activeStock = 'DISP', activeRubro = 'ALL', activeSort = 'default', descActiveSku = null, newSkus = new Set(), showNoStock = false;
     const PAGE_SIZE = 20; // cards por página en mobile
     let _pagedList = [], _pagedIdx = 0, _loadingMore = false;
     let preSaleBrand = 'ALL'; // guarda filtro de marca antes de entrar a modo venta
@@ -4660,46 +4767,103 @@
       } else {
         const brands = ['ALL', ...new Set(products.map(p => p.brand).filter(Boolean))];
         html += brands.map(b => `<button class="filter-btn ${b === activeBrand ? 'active' : ''}" onclick="setBrand('${b}')">${b === 'ALL' ? '🐾 Todos' : b}</button>`).join('');
-
-        // Preventa: solo si hay productos en preventa
-        const hayPreventa = products.some(p => p.stock && p.stock.toUpperCase().startsWith('PREVENTA'));
-        if (hayPreventa) html += `<button class="filter-btn f-preventa ${activeStock === 'PREVENTA' ? 'active' : ''}" onclick="setStock('PREVENTA')">🕐 Preventa</button>`;
-        // Liquidación: solo si hay productos con estado LIQUIDACION
-        const hayLiqui = products.some(p => isLiquidacion(p.stock));
-        if (hayLiqui) html += `<button class="filter-btn f-liqui ${activeStock === 'LIQUIDACION' ? 'active' : ''}" onclick="setStock('LIQUIDACION')">🔥 Liquidación</button>`;
       }
       document.getElementById('brandFilters').innerHTML = html;
+      renderTabs();
       renderRubros();
+    }
+
+    // ── Tabs de estado ────────────────────────────────────────────────────────────
+    // activeStock guarda el tab activo: 'DISP' (stock + liquidación; los sin stock van
+    // al final solo si showNoStock, como siempre), 'LIQUIDACION' o 'PREVENTA'.
+    const CAT_TABS = [
+      { id: 'DISP', label: 'Disponible', cls: '' },
+      { id: 'LIQUIDACION', label: 'Oportunidades', cls: 't-oport' },
+      { id: 'PREVENTA', label: 'Preventa', cls: 't-prev' }
+    ];
+    function tabMatch(p, tab) {
+      if (tab === 'LIQUIDACION') return isLiquidacion(p.stock);
+      if (tab === 'PREVENTA') return stockType(p.stock) === 'PREVENTA';
+      return stockType(p.stock) !== 'PREVENTA';
+    }
+    // Reglas previas a tab/marca/rubro/búsqueda (SKUs deshabilitados y "sin stock")
+    function baseVisible(p) {
+      const okNoStock = showNoStock || !p.stock || p.stock.toUpperCase() !== 'NOSTOCK';
+      return okNoStock && !disabledSkus.has(String(p.sku));
+    }
+    function renderTabs() {
+      const el = document.getElementById('catTabs');
+      if (!el) return;
+      if (saleMode) { el.innerHTML = ''; el.style.display = 'none'; return; }
+      const counts = { DISP: 0, LIQUIDACION: 0, PREVENTA: 0 };
+      products.forEach(p => {
+        if (!baseVisible(p)) return;
+        for (const t in counts) if (tabMatch(p, t)) counts[t]++;
+      });
+      if (!CAT_TABS.some(t => t.id === activeStock) || (activeStock !== 'DISP' && !counts[activeStock])) activeStock = 'DISP';
+      el.style.display = '';
+      el.innerHTML = CAT_TABS.filter(t => t.id === 'DISP' || counts[t.id] > 0).map(t =>
+        `<button role="tab" aria-selected="${activeStock === t.id}" class="cat-tab ${t.cls} ${activeStock === t.id ? 'active' : ''}" onclick="setTab('${t.id}')">${t.label}<span class="cat-tab-n">${counts[t.id]}</span></button>`
+      ).join('');
+    }
+    function setTab(t) {
+      if (activeStock === t) return;
+      activeStock = t;
+      saveFilters();
+      renderBrands();
+      setTimeout(() => renderGrid(), 0);
+      if (typeof gtag !== 'undefined') gtag('event', 'select_item', { item_list_name: 'tab_estado', item_list_id: t });
+    }
+
+    // Recordar tab/marca/rubro durante la sesión (sobrevive a recargas del navegador)
+    const FILTERS_KEY = 'beepex_filters';
+    function saveFilters() {
+      if (saleMode) return;
+      try { sessionStorage.setItem(FILTERS_KEY, JSON.stringify({ tab: activeStock, brand: activeBrand, rubro: activeRubro })); } catch (e) { }
+    }
+    function restoreFilters() {
+      if (saleMode) return;
+      try {
+        const f = JSON.parse(sessionStorage.getItem(FILTERS_KEY) || 'null');
+        if (!f) return;
+        if (CAT_TABS.some(t => t.id === f.tab)) activeStock = f.tab;
+        if (f.brand === 'ALL' || products.some(p => p.brand === f.brand)) activeBrand = f.brand || 'ALL';
+        if (f.rubro === 'ALL' || products.some(p => p.rubro === f.rubro)) activeRubro = f.rubro || 'ALL';
+      } catch (e) { }
     }
 
     function renderRubros() {
       const el = document.getElementById('rubroChips');
       if (!el || saleMode) { if (el) el.innerHTML = ''; return; }
-      // Rubros con al menos 1 producto en stock (o que pase el filtro actual de brand)
-      const base = products.filter(p => {
-        if (activeBrand !== 'ALL' && p.brand !== activeBrand) return false;
-        if (showNoStock) return true;
-        return p.stock && p.stock.toUpperCase() !== 'NOSTOCK';
-      });
+      // Rubros con productos en el tab y la marca actuales
+      const base = products.filter(p =>
+        (activeBrand === 'ALL' || p.brand === activeBrand) && baseVisible(p) && tabMatch(p, activeStock));
       const rubros = [...new Set(base.map(p => p.rubro).filter(r => r && r.toLowerCase() !== 'nan'))].sort();
       if (!rubros.length) { el.innerHTML = ''; return; }
+      if (activeRubro !== 'ALL' && !rubros.includes(activeRubro)) activeRubro = 'ALL';
+      const prevScroll = el.scrollLeft; // innerHTML lo resetea; lo conservamos
       let html = `<button class="rubro-chip ${activeRubro === 'ALL' ? 'active' : ''}" onclick="setRubro('ALL')">Todos los rubros</button>`;
       html += rubros.map(r => `<button class="rubro-chip ${activeRubro === r ? 'active' : ''}" onclick="setRubro('${r}')">${r}</button>`).join('');
       el.innerHTML = html;
+      el.scrollLeft = prevScroll;
+      const act = el.querySelector('.rubro-chip.active');
+      if (act && el.scrollWidth > el.clientWidth) {
+        // Centrar el chip activo dentro de la fila (sin mover la página)
+        el.scrollTo({ left: act.offsetLeft - (el.clientWidth - act.offsetWidth) / 2, behavior: 'smooth' });
+      }
     }
 
     function setRubro(r) {
-      activeRubro = r; renderRubros(); setTimeout(() => renderGrid(), 0);
+      activeRubro = r; saveFilters(); renderRubros(); setTimeout(() => renderGrid(), 0);
     }
     function setSaleBrand(b) {
       activeBrand = b; renderBrands(); renderGrid();
     }
     function setBrand(b) {
-      activeBrand = b; renderBrands();
+      activeBrand = b; saveFilters(); renderBrands();
       setTimeout(() => renderGrid(), 0);
       if (typeof gtag !== 'undefined' && b !== 'ALL') gtag('event', 'select_item', { item_list_name: 'filtro_marca', item_list_id: b });
     }
-    function setStock(s) { activeStock = activeStock === s ? 'ALL' : s; renderBrands(); setTimeout(() => renderGrid(), 0); }
     function setSort(v) { activeSort = v; renderGrid(); }
 
     // ── Debounce para el buscador ─────────────────────────────────────────────────
@@ -4726,17 +4890,18 @@
       if (spinner) spinner.remove();
 
       const q = normalize(document.getElementById('searchInput').value);
+      const matchSearch = p => {
+        if (!q) return true;
+        const meta = productMeta[p.sku];
+        return matchQuery(normalize(`${p.name} ${p.sku} ${p.brand || ''} ${meta ? meta.tags : ''}`), q);
+      };
       const list = products.filter(p => {
         const okBrand = activeBrand === 'ALL' || p.brand === activeBrand;
         const okRubro = activeRubro === 'ALL' || p.rubro === activeRubro;
-        const okNoStock = showNoStock || !p.stock || p.stock.toUpperCase() !== 'NOSTOCK';
-        const meta = productMeta[p.sku];
-        const searchStr = normalize(`${p.name} ${p.sku} ${p.brand || ''} ${meta ? meta.tags : ''}`);
-        const okQ = !q || matchQuery(searchStr, q);
-        const okStock = activeStock === 'ALL' || (activeStock === 'LIQUIDACION' ? isLiquidacion(p.stock) : stockType(p.stock) === activeStock);
-        // Ocultar productos desactivados
-        const okDisabled = !disabledSkus.has(String(p.sku));
-        return okBrand && okRubro && okQ && okStock && okDisabled && okNoStock;
+        // Modo venta no usa tabs (muestra todo, como antes); en compra, filtra por tab
+        const okStock = saleMode || tabMatch(p, activeStock);
+        // baseVisible: SKUs desactivados en admin y "sin stock" según ajuste del admin
+        return okBrand && okRubro && matchSearch(p) && okStock && baseVisible(p);
       });
 
       // Sin stock siempre al final
@@ -4785,7 +4950,18 @@
         grid.querySelectorAll('.card').forEach(el => el.classList.add('hidden'));
         grid.querySelectorAll('.section-title').forEach(el => el.classList.add('hidden'));
         let noRes = grid.querySelector('.no-results');
-        if (!noRes) { noRes = document.createElement('div'); noRes.className = 'no-results'; noRes.textContent = '😿 No se encontraron productos'; grid.appendChild(noRes); }
+        if (!noRes) { noRes = document.createElement('div'); noRes.className = 'no-results'; grid.appendChild(noRes); }
+        // Si la búsqueda no da nada en este tab pero sí en otro, lo avisamos
+        let hint = '';
+        if (q && !saleMode) {
+          hint = CAT_TABS.filter(t => t.id !== activeStock)
+            .map(t => ({ t, n: products.filter(p => baseVisible(p) && tabMatch(p, t.id) && matchSearch(p)).length }))
+            .filter(x => x.n > 0)
+            .map(x => `<button class="rubro-chip" style="margin:10px 4px 0" onclick="setTab('${x.t.id}')">${x.t.label} (${x.n})</button>`)
+            .join('');
+          if (hint) hint = '<div style="margin-top:8px;font-size:12px">Hay resultados en:</div>' + hint;
+        }
+        noRes.innerHTML = '😿 No se encontraron productos' + hint;
         noRes.style.display = '';
         _gridRenderKey = renderKey;
         return;
@@ -7685,11 +7861,11 @@ _${text}_`;
         }
         // Productos desactivados
         try { disabledSkus = new Set(JSON.parse(s.disabled_skus || '[]').map(String)); } catch (e) { disabledSkus = new Set(); }
-        if (disabledSkus.size > 0) renderGrid();
         // Margen de ganancia
         margenActive = s.margen_active === 'true';
         // NOSTOCK visibility — default: ocultar (false)
         showNoStock = s.catalog_show_nostock === 'true';
+        renderBrands(); // contadores de tabs y rubros dependen de SKUs desactivados y NOSTOCK
         renderGrid(); // re-renderizar con la configuración de NOSTOCK
       } catch (e) { console.warn('loadSettings error:', e.message); }
     }
@@ -8266,6 +8442,7 @@ _${text}_`;
         localStorage.setItem(key, JSON.stringify(allSkus));
       } catch (e) { }
 
+      restoreFilters();
       renderBrands();
       renderGrid();
 
