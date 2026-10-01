@@ -5807,6 +5807,7 @@
       <div class="ph">📷</div>
       <div class="badge-variants">${nv} variantes</div>
       ${!isNoStock ? `<div class="stock-chip ${isPrev ? 'preventa' : ''}">${isPrev ? '📦' : '✅'} ${Math.round(isPrev ? pv : units)} UN.</div>` : ''}
+      <div class="info-chip" onclick="event.stopPropagation();openGroup('${g.sku}', true)">+ info</div>
     </div>
     <div class="card-body">
       <div class="tags">
@@ -5882,7 +5883,8 @@
       return parts.join(' · ');
     }
 
-    function openGroup(gsku) {
+    // showDesc: lo usa el chip "+ info" de la tarjeta, abre el modal con la descripción ya desplegada
+    function openGroup(gsku, showDesc) {
       const g = _groupMap[gsku]; if (!g) return;
       trackEvent('product_views', { sku: g.cover.sku });
       _grp = { g, qty: {}, sel: null };
@@ -5924,6 +5926,7 @@
         document.body.dataset.grpScrollY = sy;
       }
       document.getElementById('grpOverlay').classList.add('open');
+      if (showDesc && hayDesc) grpToggleDesc();
     }
     function closeGroup() {
       document.getElementById('grpOverlay').classList.remove('open');
