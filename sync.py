@@ -140,6 +140,11 @@ def limpiar_stock(val):
         pass
     return 0
 
+def clean_text(v):
+    """Texto limpio o None (la API manda null / '' / 'nan' cuando no aplica)."""
+    s = "" if v is None else str(v).strip()
+    return None if s == "" or s.lower() in ("nan", "none", "null") else s
+
 THUMB_SIZE = 400
 THUMB_QUALITY = 72
 
@@ -441,6 +446,11 @@ def run_sync():
             "marca": marca,
             "ingresos": fecha_ingreso,
             "stock_ingresos": stock_ingresos,
+            # Variantes: la API ya agrupa los SKUs que son color/medida de un mismo producto
+            "agrupador": clean_text(row.get("agrupador")),
+            "caracteristica": clean_text(row.get("caracteristica")),
+            "color": clean_text(row.get("colorCol")),
+            "categorizacion": clean_text(row.get("categorizacion")),
             "updated_at": datetime.now().isoformat()
         }
 
