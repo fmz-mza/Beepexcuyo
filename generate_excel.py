@@ -46,7 +46,7 @@ def generate_client_excel():
     wb = Workbook()
     ws = wb.active
     ws.title = "LISTA DE PRECIOS"
-    headers = ["FOTO", "MARCA", "CÓDIGO", "PRODUCTO", "RUBRO", "DESCRIPCIÓN", "PRECIO PESOS", "PVP", "IVA", "ESTADO"]
+    headers = ["FOTO", "MARCA", "CÓDIGO", "PRODUCTO", "RUBRO", "DESCRIPCIÓN", "PRECIO PESOS", "PVP", "IVA", "ESTADO", "STOCK"]
     ws.append(headers)
 
     # Estilos
@@ -69,6 +69,7 @@ def generate_client_excel():
     ws.column_dimensions['H'].width = 15
     ws.column_dimensions['I'].width = 8
     ws.column_dimensions['J'].width = 18
+    ws.column_dimensions['K'].width = 12
 
     # 3. Procesamiento
     added_count = 0
@@ -88,7 +89,7 @@ def generate_client_excel():
         is_liquidacion = 'LIQUIDACION' in stock_estado
         if not is_preventa and not is_liquidacion and stock_fisico <= 1:
             continue
-        if stock_estado == 'NOSTOCK':
+        if stock_estado.startswith('NOSTOCK'):
             continue
         if precio <= 0:
             continue
@@ -133,10 +134,11 @@ def generate_client_excel():
         
         ws.cell(row=current_row, column=9, value=f"{p.get('iva')}%")
         ws.cell(row=current_row, column=10, value=p.get('stock_estado'))
+        ws.cell(row=current_row, column=11, value=int(stock_fisico))
 
         # Estilo de fila
         ws.row_dimensions[current_row].height = 110
-        for col in range(1, 11):
+        for col in range(1, 12):
             ws.cell(row=current_row, column=col).alignment = center_aligned
 
         # Insertar imagen anclada y un poco desplazada para centrar visualmente
