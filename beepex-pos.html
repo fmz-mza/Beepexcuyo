@@ -1018,11 +1018,16 @@ async function confirmSale(){
   const dt=document.getElementById('discType').value;
   const montoRecibido=payMethod==='cta_cte'?0:(parseFloat(document.getElementById('payAmt').value)||0);
 
+  // Saldo del cliente ANTES de esta venta (independiente de si se marcó "cobrar junto")
+  const saldoPrevio = clienteSaldoPendiente;
   // Cuánto va a la venta actual vs al saldo pendiente
   const pagadoVenta = payMethod==='cta_cte' ? 0 : Math.min(montoRecibido, total);
   const pagadoSaldo = cobrarSaldoJunto && montoRecibido > total
-    ? Math.min(montoRecibido - total, clienteSaldoPendiente)
+    ? Math.min(montoRecibido - total, saldoPrevio)
     : 0;
+  // Saldo resultante en cta cte después de esta venta: lo que no se cobró del saldo previo
+  // + lo que de ESTA venta no se pagó (va a cta cte aunque no se haya tocado el toggle)
+  const saldoRestante = Math.max(0, saldoPrevio - pagadoSaldo + Math.max(0, total - pagadoVenta));
 
   const btn=document.getElementById('confirmBtn');
   btn.disabled=true; btn.textContent='Procesando...';
@@ -1041,9 +1046,26 @@ async function confirmSale(){
     cantidad:c.qty, subtotal:(c.precioFinal||0)*c.qty
   }));
 
+  const ticketBase={
+    clientId,
+    subtotal,                    // subtotal sin descuento
+    descMonto: desc||0,          // monto descuento
+    descPct: dt==='pct'?dv:0,   // % si fue porcentual
+    descTipo: dt,                // 'pct' o 'monto'
+    totalVenta: total,           // venta con descuento
+    total: totalFinal,           // venta + saldo cobrado (si corresponde)
+    pagado: montoRecibido,
+    pagadoVenta,
+    payMethod,
+    saldoCobrado: pagadoSaldo,
+    saldoAnterior: saldoPrevio,
+    saldoRestante
+  };
+
   if(!isOnline){
     pendingSync.push({orderData,items,pagado:pagadoVenta,payMethod,ts:Date.now()});
     localStorage.setItem('pos_pending_sync',JSON.stringify(pendingSync));
+    lastTicket={...ticketBase, order:{ticket_display:'OFFLINE'}, items};
     showSuccess('OFFLINE',totalFinal,montoRecibido); resetSale(); return;
   }
 
@@ -1073,20 +1095,7 @@ async function confirmSale(){
     // 5. Registrar movimientos de stock (fire & forget — no bloquea la venta)
     registrarMovimientosStock(items, order.id, clientId);
 
-    lastTicket={
-      order, items, clientId,
-      subtotal,                    // subtotal sin descuento
-      descMonto: desc||0,          // monto descuento
-      descPct: dt==='pct'?dv:0,   // % si fue porcentual
-      descTipo: dt,                // 'pct' o 'monto'
-      totalVenta: total,           // venta con descuento
-      total: totalFinal,           // venta + saldo cobrado
-      pagado: montoRecibido,
-      payMethod,
-      saldoCobrado: pagadoSaldo,
-      saldoAnterior: cobrarSaldoJunto ? clienteSaldoPendiente : 0,
-      saldoRestante: cobrarSaldoJunto ? Math.max(0, clienteSaldoPendiente - pagadoSaldo) : 0
-    };
+    lastTicket={...ticketBase, order, items};
     showSuccess(order.ticket_display, totalFinal, montoRecibido);
     resetSale();
   }catch(err){
@@ -1142,34 +1151,30 @@ function showSuccessSoloPago(pagadoSaldo, montoRecibido, saldoRestante){
 function showSuccess(ticket, total, pagado){
   document.getElementById('sucTicket').textContent = '#'+ticket;
   const t = lastTicket;
+  const saldoAnterior = t?.saldoAnterior || 0;
+  const saldoRestante = t?.saldoRestante || 0;
+  const pagadoSaldo = t?.saldoCobrado || 0;
+  const pagadoVenta = t?.pagadoVenta || 0;
+  const vuelto = Math.max(0, pagado - pagadoVenta - pagadoSaldo);
   let lines = [];
 
-  if(t?.saldoAnterior > 0){
-    lines.push('Venta: '+fmt(t.totalVenta));
-    lines.push('Saldo anterior: '+fmt(t.saldoAnterior));
-    lines.push('Total cobrado: '+fmt(total));
-    if(pagado > 0 && t.payMethod !== 'cta_cte'){
-      lines.push('Recibido: '+fmt(pagado));
-      if(t.saldoRestante > 0)
-        lines.push('Queda a cta cte: '+fmt(t.saldoRestante));
-      else if(pagado > total)
-        lines.push('Vuelto: '+fmt(pagado - total));
-      else
-        lines.push('Cuenta cancelada ✓');
-    }
-  } else {
-    // flujo normal sin saldo
-    const diff = total - pagado;
-    if(t?.payMethod === 'cta_cte') lines.push('Total a cta cte: '+fmt(total));
-    else if(pagado > 0){
-      lines.push('Total: '+fmt(total));
-      lines.push('Recibido: '+fmt(pagado));
-      if(diff > 0) lines.push('Queda a cta cte: '+fmt(diff));
-      else if(diff < 0) lines.push('Vuelto: '+fmt(Math.abs(diff)));
-      else lines.push('Pagado ✓');
-    } else {
-      lines.push('Total: '+fmt(total));
-    }
+  lines.push('Venta: '+fmt(t.totalVenta));
+  if(saldoAnterior > 0) lines.push('Saldo anterior: '+fmt(saldoAnterior));
+
+  if(t?.payMethod === 'cta_cte'){
+    lines.push('Total a cta cte: '+fmt(t.totalVenta));
+    if(saldoAnterior > 0) lines.push('Nuevo saldo cta cte: '+fmt(saldoRestante));
+  } else if(pagado > 0){
+    lines.push('Recibido: '+fmt(pagado));
+    if(pagadoSaldo > 0) lines.push('Abonado a saldo anterior: '+fmt(pagadoSaldo));
+    if(saldoRestante > 0)
+      lines.push((saldoAnterior > 0 ? 'Nuevo saldo cta cte: ' : 'Queda a cta cte: ')+fmt(saldoRestante));
+    else if(vuelto > 0)
+      lines.push('Vuelto: '+fmt(vuelto));
+    else
+      lines.push(saldoAnterior > 0 ? 'Cuenta cancelada ✓' : 'Pagado ✓');
+  } else if(saldoRestante > 0){
+    lines.push('Queda a cta cte: '+fmt(saldoRestante));
   }
 
   document.getElementById('sucSub').innerHTML = lines.join('<br>');
@@ -1191,7 +1196,8 @@ async function compartirPDF(){
   const {jsPDF} = window.jspdf;
   const doc = new jsPDF({unit:'mm', format:[80,200]});
   const {t, client, ml} = buildTicketLines();
-  const {order, items, totalVenta, total, pagado, saldoAnterior, saldoRestante} = t;
+  const {order, items, totalVenta, pagado, saldoAnterior, saldoRestante, saldoCobrado:pagadoSaldo, pagadoVenta} = t;
+  const vuelto = Math.max(0, pagado - (pagadoVenta||0) - (pagadoSaldo||0));
   let y = 8;
 
   doc.setFont('helvetica','bold'); doc.setFontSize(13);
@@ -1225,34 +1231,35 @@ async function compartirPDF(){
   }
   doc.setFont('helvetica','bold'); doc.setFontSize(10);
   doc.text('Venta: '+fmt(totalVenta), 4, y); y+=4;
-  if(saldoAnterior > 0){
-    doc.text('Saldo anterior: '+fmt(saldoAnterior), 4, y); y+=4;
-    doc.setFontSize(11);
-    doc.text('TOTAL COBRADO: '+fmt(total), 4, y); y+=5;
-  } else {
-    doc.setFontSize(11);
-    doc.text('TOTAL: '+fmt(total), 4, y); y+=5;
-  }
+  if(saldoAnterior > 0){ doc.text('Saldo anterior: '+fmt(saldoAnterior), 4, y); y+=4; }
+  doc.setFontSize(11);
+  doc.text((saldoAnterior > 0 ? 'TOTAL VENTA: ' : 'TOTAL: ')+fmt(totalVenta), 4, y); y+=5;
 
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
   doc.text('Método: '+(ml[t.payMethod]||t.payMethod), 4, y); y+=4;
-  if(pagado > 0 && t.payMethod !== 'cta_cte'){
-    doc.text('Recibido: '+fmt(pagado), 4, y); y+=4;
-    if(saldoAnterior > 0){
-      if(saldoRestante > 0){
-        doc.text('Saldo restante cta cte: '+fmt(saldoRestante), 4, y); y+=4;
-      } else {
-        doc.setFont('helvetica','bold');
-        doc.text('Cuenta cancelada ✓', 4, y); y+=4;
-        doc.setFont('helvetica','normal');
-      }
-    } else {
-      const diff = total - pagado;
-      if(diff > 0){ doc.text('Queda a cta cte: '+fmt(diff), 4, y); y+=4; }
-      else if(diff < 0){ doc.text('Vuelto: '+fmt(Math.abs(diff)), 4, y); y+=4; }
-    }
-  } else if(t.payMethod === 'cta_cte'){
+  if(t.payMethod === 'cta_cte'){
     doc.text('Total a cta cte: '+fmt(totalVenta), 4, y); y+=4;
+    if(saldoAnterior > 0){
+      doc.setFont('helvetica','bold');
+      doc.text('Nuevo saldo cta cte: '+fmt(saldoRestante), 4, y); y+=4;
+      doc.setFont('helvetica','normal');
+    }
+  } else if(pagado > 0){
+    doc.text('Recibido: '+fmt(pagado), 4, y); y+=4;
+    if(pagadoSaldo > 0){ doc.text('Abonado a saldo anterior: '+fmt(pagadoSaldo), 4, y); y+=4; }
+    if(saldoRestante > 0){
+      doc.setFont('helvetica','bold');
+      doc.text((saldoAnterior > 0 ? 'Nuevo saldo cta cte: ' : 'Queda a cta cte: ')+fmt(saldoRestante), 4, y); y+=4;
+      doc.setFont('helvetica','normal');
+    } else if(vuelto > 0){
+      doc.text('Vuelto: '+fmt(vuelto), 4, y); y+=4;
+    } else {
+      doc.setFont('helvetica','bold');
+      doc.text(saldoAnterior > 0 ? 'Cuenta cancelada ✓' : 'Pagado ✓', 4, y); y+=4;
+      doc.setFont('helvetica','normal');
+    }
+  } else if(saldoRestante > 0){
+    doc.text('Queda a cta cte: '+fmt(saldoRestante), 4, y); y+=4;
   }
 
   y+=2; doc.line(4,y,76,y); y+=4;
@@ -1335,7 +1342,8 @@ function shareWA(){
   if(!lastTicket) return;
   if(lastTicket.soloPago){ shareWASoloPago(); return; }
   const {t, client, ml} = buildTicketLines();
-  const {order, items, totalVenta, total, pagado, saldoAnterior, saldoRestante} = t;
+  const {order, items, totalVenta, pagado, saldoAnterior, saldoRestante, saldoCobrado:pagadoSaldo, pagadoVenta} = t;
+  const vuelto = Math.max(0, pagado - (pagadoVenta||0) - (pagadoSaldo||0));
 
   let msg = '🐾 *BEEPEX CUYO*\n';
   msg += 'Ticket #'+order.ticket_display+'\n';
@@ -1355,27 +1363,23 @@ function shareWA(){
     msg += descLbl+'\n';
   }
   msg += 'Venta: '+fmt(totalVenta)+'\n';
-  if(saldoAnterior > 0){
-    msg += 'Saldo anterior: '+fmt(saldoAnterior)+'\n';
-    msg += '*TOTAL COBRADO: '+fmt(total)+'*\n';
-  } else {
-    msg += '*TOTAL: '+fmt(total)+'*\n';
-  }
+  if(saldoAnterior > 0) msg += 'Saldo anterior: '+fmt(saldoAnterior)+'\n';
+  msg += '*'+(saldoAnterior > 0 ? 'TOTAL VENTA' : 'TOTAL')+': '+fmt(totalVenta)+'*\n';
   msg += 'Método: '+(ml[t.payMethod]||t.payMethod)+'\n';
-  if(pagado > 0 && t.payMethod !== 'cta_cte'){
-    msg += 'Recibido: '+fmt(pagado)+'\n';
-    if(saldoAnterior > 0){
-      if(saldoRestante > 0)
-        msg += '⚠️ Saldo restante cta cte: '+fmt(saldoRestante)+'\n';
-      else
-        msg += '✅ Cuenta cancelada\n';
-    } else {
-      const diff = total - pagado;
-      if(diff > 0) msg += 'Queda a cta cte: '+fmt(diff)+'\n';
-      else if(diff < 0) msg += 'Vuelto: '+fmt(Math.abs(diff))+'\n';
-    }
-  } else if(t.payMethod === 'cta_cte'){
+  if(t.payMethod === 'cta_cte'){
     msg += 'Total a cta cte: '+fmt(totalVenta)+'\n';
+    if(saldoAnterior > 0) msg += '⚠️ *Nuevo saldo cta cte: '+fmt(saldoRestante)+'*\n';
+  } else if(pagado > 0){
+    msg += 'Recibido: '+fmt(pagado)+'\n';
+    if(pagadoSaldo > 0) msg += 'Abonado a saldo anterior: '+fmt(pagadoSaldo)+'\n';
+    if(saldoRestante > 0)
+      msg += '⚠️ '+(saldoAnterior > 0 ? 'Nuevo saldo cta cte: ' : 'Queda a cta cte: ')+fmt(saldoRestante)+'\n';
+    else if(vuelto > 0)
+      msg += 'Vuelto: '+fmt(vuelto)+'\n';
+    else
+      msg += saldoAnterior > 0 ? '✅ Cuenta cancelada\n' : '✅ Pagado\n';
+  } else if(saldoRestante > 0){
+    msg += 'Queda a cta cte: '+fmt(saldoRestante)+'\n';
   }
 
   const wa = client?.telefono_wa || WA_NUMBER;
