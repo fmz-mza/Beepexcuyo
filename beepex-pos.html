@@ -512,6 +512,8 @@ function toggleIVA(){
   lbl.textContent = includeIVA ? 'Con IVA' : 'Sin IVA';
   btn.style.color = includeIVA ? 'var(--accent2)' : 'var(--text)';
   btn.style.borderColor = includeIVA ? 'var(--accent2)' : 'var(--border)';
+  // Recalcular precio de ítems del carrito que no fueron modificados a mano
+  cart.forEach(item=>{ if(!item.precioModificado) item.precioFinal=mayorista(item.product); });
   renderProds(products);
   renderCart();
 }
@@ -646,7 +648,7 @@ function addToCart(sku){
   const ex=cart.find(c=>c.product.codigo===sku);
   if(ex) ex.qty++;
   else{
-    cart.push({product:p,qty:1,precioFinal:p.precio_pesos,precioModificado:null,motivoPrecio:''});
+    cart.push({product:p,qty:1,precioFinal:mayorista(p),precioModificado:null,motivoPrecio:''});
     if(!p.stock_estado||p.stock_estado==='NOSTOCK') showToast('⚠️ '+p.producto+' sin stock — se agrega igual','err');
   }
   const pc=document.getElementById('pc-'+sku);
@@ -685,9 +687,10 @@ function clearCart(){
 }
 function onPriceChange(sku,val){
   const item=cart.find(c=>c.product.codigo===sku); if(!item) return;
-  const np=parseFloat(val)||item.product.precio_pesos;
+  const base=mayorista(item.product);
+  const np=parseFloat(val)||base;
   item.precioFinal=np;
-  item.precioModificado=np!==item.product.precio_pesos?np:null;
+  item.precioModificado=np!==base?np:null;
   const inp=document.getElementById('cpi-'+sku);
   if(inp) inp.classList.toggle('modified',!!item.precioModificado);
   const mot=document.getElementById('cmot-'+sku);
@@ -1098,8 +1101,8 @@ function cancelOrder(){
 }
 function resetSale(){
   cart.forEach(c=>{
-    const pc=document.getElementById('pc-'+c.product.sku);
-    const pb=document.getElementById('pb-'+c.product.sku);
+    const pc=document.getElementById('pc-'+c.product.codigo);
+    const pb=document.getElementById('pb-'+c.product.codigo);
     if(pc) pc.classList.remove('in-cart');
     if(pb){pb.style.display='none';pb.textContent='';}
   });
