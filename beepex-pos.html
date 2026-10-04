@@ -1214,7 +1214,9 @@ async function compartirPDF(){
 
   // Items
   items.forEach(i=>{
-    const p = i.precio_modificado ?? i.precio_unitario;
+    // Precio realmente cobrado por unidad (incluye IVA si corresponde) — no precio_unitario,
+    // que en la DB siempre guarda el precio SIN IVA (lo usa el admin para "subtotalSinIva").
+    const p = i.cantidad ? Math.round(i.subtotal/i.cantidad) : (i.precio_modificado ?? i.precio_unitario);
     doc.setFontSize(8);
     const nm = i.nombre.length>30 ? i.nombre.slice(0,30)+'…' : i.nombre;
     doc.text(nm, 4, y); y+=3.5;
@@ -1352,7 +1354,9 @@ function shareWA(){
   msg += '━━━━━━━━━━━━━━\n';
 
   items.forEach(i=>{
-    const p = i.precio_modificado ?? i.precio_unitario;
+    // Precio realmente cobrado por unidad (incluye IVA si corresponde) — no precio_unitario,
+    // que en la DB siempre guarda el precio SIN IVA (lo usa el admin para "subtotalSinIva").
+    const p = i.cantidad ? Math.round(i.subtotal/i.cantidad) : (i.precio_modificado ?? i.precio_unitario);
     msg += '• '+i.nombre+'\n  '+i.cantidad+' × '+fmt(p)+' = '+fmt(p*i.cantidad)+'\n';
   });
 
