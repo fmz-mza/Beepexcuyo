@@ -145,6 +145,13 @@ def clean_text(v):
     s = "" if v is None else str(v).strip()
     return None if s == "" or s.lower() in ("nan", "none", "null") else s
 
+def clean_drive_id(v):
+    """ID de archivo de Google Drive, o None si el valor es una URL / 'prueba' / vacío."""
+    s = clean_text(v)
+    if not s or s.lower() == "prueba" or s.startswith(("http://", "https://")) or len(s) <= 5:
+        return None
+    return s
+
 THUMB_SIZE = 400
 THUMB_QUALITY = 72
 
@@ -453,6 +460,11 @@ def run_sync():
             "categorizacion": clean_text(row.get("categorizacion")),
             "updated_at": datetime.now().isoformat()
         }
+
+        # ID de la foto en Drive (para "Descargar foto" en JPG); solo se escribe si la API lo trae
+        drive_id = clean_drive_id(foto_id)
+        if drive_id:
+            product_data["drive_id"] = drive_id
 
         # Lógica de Imagen: Si no tiene imagen en Supabase, intentamos buscarla
         if not existing.get("img_url"):
