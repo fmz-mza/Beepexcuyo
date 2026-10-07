@@ -757,6 +757,42 @@
       color: var(--accent2);
     }
 
+    /* Chip "Descargar" sobre la foto de los modales */
+    .img-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .img-dl-chip {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(14, 15, 20, .78);
+      border: 1px solid rgba(255, 255, 255, .15);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-family: inherit;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .img-dl-chip:active {
+      background: var(--accent);
+    }
+
+    .img-dl-chip:disabled {
+      opacity: .6;
+      cursor: wait;
+    }
+
     /* Tarjeta de grupo de variantes */
     .card-group .card-img {
       cursor: pointer;
@@ -5013,7 +5049,13 @@
     <div class="grp-modal" role="dialog" aria-modal="true" aria-labelledby="grpTitle">
       <div class="grp-top">
         <button type="button" class="grp-close" onclick="closeGroup()" aria-label="Cerrar">✕</button>
-        <img class="grp-img" id="grpImg" alt="">
+        <div class="img-wrap">
+          <img class="grp-img" id="grpImg" alt="">
+          <button type="button" class="img-dl-chip" onclick="downloadPhoto(document.getElementById('grpImg').dataset.sku || (_grp && _grp.g.cover.sku), this)" aria-label="Descargar foto">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M5 21h14"/></svg>
+            Descargar
+          </button>
+        </div>
         <div class="grp-head">
           <div class="grp-meta" id="grpMeta"></div>
           <div class="grp-title" id="grpTitle"></div>
@@ -5051,7 +5093,13 @@
   </div>
   <div class="desc-overlay" id="descOverlay" onclick="closeDesc(event)">
     <div class="desc-modal" id="descModal">
-      <img class="desc-modal-img" id="descModalImg" alt="">
+      <div class="img-wrap">
+        <img class="desc-modal-img" id="descModalImg" alt="">
+        <button type="button" class="img-dl-chip" onclick="downloadPhoto(descActiveSku, this)" aria-label="Descargar foto">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M5 21h14"/></svg>
+          Descargar
+        </button>
+      </div>
       <div class="desc-modal-body">
         <div class="desc-modal-header-row">
           <div class="desc-modal-name" id="descModalName"></div>
@@ -5362,7 +5410,7 @@
     async function loadProducts() {
       try {
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,stock_fisico,stock_ingresos,description:descripcion,rubro,ean,agrupador,caracteristica,color,categorizacion&order=marca.asc,producto.asc`,
+          `${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,stock_fisico,stock_ingresos,description:descripcion,rubro,ean,agrupador,caracteristica,color,categorizacion,drive_id&order=marca.asc,producto.asc`,
           {
             headers: {
               'apikey': SUPABASE_ANON,
@@ -5408,7 +5456,8 @@
             group: r.agrupador || null,
             caract: r.caracteristica || '',
             color: r.color || '',
-            cat: r.categorizacion || ''
+            cat: r.categorizacion || '',
+            driveId: r.drive_id || '' // foto en Drive: se usa para "Descargar foto" en JPG
           };
         });
 
@@ -7733,6 +7782,54 @@
       const fileName = p.name.replace(/[^a-z0-9]/gi, '_') + '.png';
       return new File([blob], fileName, { type: 'image/png' });
     }
+    // ── Descargar foto (JPG de hasta 1024px) ─────────────────────────────────────
+    // Primero se pide el JPG a Drive (lh3 ...=w1024-rj fuerza JPEG y permite CORS), así no hay que
+    // convertir ni subir nada a Storage. Si Drive falla (archivo movido, límite de descargas, SKU
+    // sin drive_id todavía) se usa nuestra foto webp de 1024px convertida a JPG en el navegador.
+    async function fetchPhotoJpg(p) {
+      if (p.driveId) {
+        try {
+          const r = await fetch(`https://lh3.googleusercontent.com/d/${encodeURIComponent(p.driveId)}=w1024-rj`);
+          const b = r.ok ? await r.blob() : null;
+          if (b && b.type === 'image/jpeg' && b.size > 1000) return b;
+        } catch (e) { /* sigue al respaldo */ }
+      }
+      const im = await loadShareImage(p.sku);
+      if (!im) return null;
+      const c = document.createElement('canvas');
+      c.width = im.naturalWidth || im.width; c.height = im.naturalHeight || im.height;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); // JPG no tiene transparencia
+      ctx.drawImage(im, 0, 0);
+      return await new Promise(res => c.toBlob(res, 'image/jpeg', 0.92));
+    }
+    async function downloadPhoto(sku, btn) {
+      const p = productMap[sku]; if (!p || (btn && btn.disabled)) return;
+      const html = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Descargando...'; }
+      try {
+        const blob = await fetchPhotoJpg(p);
+        if (!blob) { showToast('❌ No se pudo descargar la foto'); return; }
+        const name = `${p.sku}_${p.name.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 60)}.jpg`;
+        const file = new File([blob], name, { type: 'image/jpeg' });
+        // En celular, la hoja de compartir permite "Guardar imagen" en Fotos; en PC, descarga directa
+        const touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+        if (touch && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try { await navigator.share({ files: [file], title: p.name }); return; }
+          catch (e) { if (e.name === 'AbortError') return; /* cualquier otro error: descarga normal */ }
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        showToast('📥 Foto descargada');
+      } catch (e) {
+        console.error(e); showToast('❌ No se pudo descargar la foto');
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = html; }
+      }
+    }
+
     // Hoja nativa de compartir del celular; si el navegador no puede, descarga las imágenes
     async function shareFiles(files, title) {
       if (navigator.canShare && navigator.canShare({ files })) {
@@ -8459,17 +8556,9 @@ _${text}_`;
       const W = 1080, PAD = 48;
       let y = PAD;
 
-      // Cargar imagen
-      let productImg = null;
-      const imgUrl = imgCache[item.sku] && imgCache[item.sku] !== 'error' ? imgCache[item.sku] : null;
-      if (imgUrl) {
-        try {
-          productImg = await new Promise((res) => {
-            const im = new Image(); im.crossOrigin = 'anonymous';
-            im.onload = () => res(im); im.onerror = () => res(null); im.src = imgUrl;
-          });
-        } catch (e) { }
-      }
+      // Imagen original (1024px, es una imagen para compartir): ya no depende de imgCache,
+      // que con la carga diferida solo conoce lo que se vio en el grid
+      const productImg = await loadShareImage(item.sku);
 
       const IMG_H = productImg ? 560 : 0;
       const tempC = document.createElement('canvas'); tempC.width = W;
@@ -8585,12 +8674,12 @@ _${text}_`;
 
       const fillBg = () => { doc.setFillColor(...BG); doc.rect(0, 0, W, 297, 'F'); };
 
-      // Precargar imágenes usando imgCache
+      // Precargar fotos en miniatura (400px): en el PDF salen de ~3 cm, y cargar las originales de
+      // todos los productos juntas (~4 MB decodificados c/u) podía saturar la memoria del celular.
+      // No depende de imgCache; si no hay miniatura se usa la original.
       const imgB64 = {};
       await Promise.all(items.map(async item => {
-        const cachedUrl = imgCache[item.sku];
-        if (!cachedUrl || cachedUrl === 'error') return;
-        const b64 = await imgToBase64(cachedUrl);
+        const b64 = (await imgToBase64(thumbUrl(item.sku))) || (await imgToBase64(imgBase(item.sku, 'webp')));
         if (b64) imgB64[item.sku] = b64;
       }));
 
@@ -9704,9 +9793,9 @@ _${text}_`;
 
       el.innerHTML = voiceParsed.map((item, idx) => {
         if (item.chosen) {
-          const img = imgCache[item.chosen.sku] && imgCache[item.chosen.sku] !== 'error'
-            ? `<img class="voice-result-img" src="${imgCache[item.chosen.sku]}" onerror="this.style.display='none'">`
-            : `<div class="voice-result-img" style="background:var(--border);border-radius:6px;"></div>`;
+          // Miniatura (400px) para la foto chica; si no existe, la original; si tampoco, se oculta
+          const img = `<img class="voice-result-img" src="${thumbUrl(item.chosen.sku)}" loading="lazy" decoding="async" ` +
+            `onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${imgBase(item.chosen.sku, 'webp')}'}else{this.style.display='none'}">`;
           const price = item.chosen.price ? '$' + Math.round(item.chosen.price * (includeIVA ? 1 + item.chosen.iva / 100 : 1)).toLocaleString('es-AR') : '';
           return `<div class="voice-result-item matched">
         ${img}
