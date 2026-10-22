@@ -8082,19 +8082,25 @@
     // ── Presencia en tiempo real ──
     async function updatePresence() {
       if (!currentUser) return;
+      // Pestaña en segundo plano no cuenta como "conectado" (inflaba el tiempo en catálogo)
+      if (document.hidden) return;
       const token = localStorage.getItem('sb_access_token');
       if (!token) return;
+      const headers = {
+        'apikey': SUPABASE_ANON,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
       try {
-        await fetch(`${SUPABASE_URL}/rest/v1/presence`, {
-          method: 'POST',
-          headers: {
-            'apikey': SUPABASE_ANON,
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates'
-          },
-          body: JSON.stringify({ user_id: currentUser.id, last_seen: new Date().toISOString() })
-        });
+        await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/presence`, {
+            method: 'POST',
+            headers: { ...headers, 'Prefer': 'resolution=merge-duplicates' },
+            body: JSON.stringify({ user_id: currentUser.id, last_seen: new Date().toISOString() })
+          }),
+          // Una fila por visita en user_sessions: la extiende o abre una nueva (migración 0006)
+          fetch(`${SUPABASE_URL}/rest/v1/rpc/touch_session`, { method: 'POST', headers, body: '{}' })
+        ]);
       } catch (e) { }
     }
     // Heartbeat cada 2 minutos

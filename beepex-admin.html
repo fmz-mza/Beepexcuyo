@@ -146,6 +146,48 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
 .filter-btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;min-height:36px;}
 .filter-btn:hover{color:var(--text);border-color:var(--accent);}
+.ca-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+.ca-kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:0;}
+.ca-kpi-val{font-size:18px;font-weight:800;line-height:1.1;}
+.ca-kpi-lbl{font-size:10.5px;color:var(--muted);margin-top:3px;}
+.ca-filters{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;scrollbar-width:none;}
+.ca-filters::-webkit-scrollbar{display:none;}
+.ca-chip{white-space:nowrap;flex-shrink:0;min-height:32px;padding:6px 11px;}
+.ca-chip-n{display:inline-block;min-width:18px;padding:0 5px;margin-left:4px;border-radius:9px;background:var(--border);color:var(--text);font-size:10.5px;}
+.ca-chip.active .ca-chip-n{background:rgba(255,255,255,.25);color:#fff;}
+.ca-toolbar{display:flex;gap:8px;margin-bottom:10px;}
+.ca-toolbar input,.ca-toolbar select{padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;}
+.ca-toolbar input{flex:1;min-width:0;}
+.ca-list{display:flex;flex-direction:column;gap:8px;max-height:640px;overflow-y:auto;}
+.ca-card{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:border-color .15s;}
+.ca-card:hover{border-color:var(--accent);}
+.ca-card.online{border-left:3px solid var(--green);}
+.ca-avatar{width:36px;height:36px;border-radius:50%;background:var(--surface);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:var(--muted);flex-shrink:0;}
+.ca-card.online .ca-avatar{background:rgba(34,197,94,.15);border-color:var(--green);color:var(--green);}
+.ca-main{min-width:0;flex:1;}
+.ca-name-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.ca-name{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+.ca-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.ca-contact{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ca-online{color:var(--green);font-weight:700;}
+.ca-tag{padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;border:1px solid var(--border);}
+.ca-tag-red{background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3);}
+.ca-tag-blue{background:rgba(74,124,255,.15);color:var(--accent);border-color:rgba(74,124,255,.3);}
+.ca-tag-muted{color:var(--muted);}
+.ca-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;text-align:right;}
+.ca-stat-main{font-size:13px;font-weight:800;color:var(--text);}
+.ca-stat-sub{font-size:10px;color:var(--muted);margin-top:1px;}
+.ca-cart{background:rgba(245,166,35,.15);color:var(--accent2);border:1px solid rgba(245,166,35,.3);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
+.ca-cart.frio{background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.3);}
+.ca-wa{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);flex-shrink:0;font-size:14px;text-decoration:none;}
+.ca-note{font-size:10.5px;color:var(--muted);margin-top:10px;}
+@media(max-width:600px){
+  .ca-kpis{grid-template-columns:repeat(2,1fr);}
+  .ca-card{flex-wrap:wrap;gap:10px;}
+  .ca-main{flex-basis:calc(100% - 48px);}
+  .ca-side{flex-direction:row;align-items:center;flex:1;justify-content:flex-start;margin-left:48px;}
+  .ca-toolbar select{max-width:42%;}
+}
 .filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 
 /* ── Chart ── */
@@ -595,16 +637,25 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 
       <div class="section" style="margin-bottom:16px;">
         <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-          <span class="section-title">👥 Conexión de Clientes, Tiempo & Carritos</span>
+          <span class="section-title">👥 Conexión de clientes</span>
           <span id="activeClientsBadge" style="font-size:12px;color:var(--green);font-weight:700;"></span>
         </div>
         <div class="section-body" style="padding:12px 14px;">
-          <input type="text" id="clientActivitySearch" placeholder="🔎 Buscar cliente por nombre..."
-            oninput="_renderClientActivityList()"
-            style="width:100%;padding:8px 12px;margin-bottom:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">
-          <div id="clientActivityList" style="display:flex;flex-direction:column;gap:8px;">
+          <div class="ca-kpis" id="clientActivityKPIs"></div>
+          <div class="ca-filters" id="clientActivityFilters"></div>
+          <div class="ca-toolbar">
+            <input type="text" id="clientActivitySearch" placeholder="🔎 Buscar por nombre o email..." oninput="_renderClientActivityList()">
+            <select id="clientActivitySort" onchange="setClientActivitySort(this.value)">
+              <option value="reciente">Última conexión</option>
+              <option value="tiempo">Más tiempo en catálogo</option>
+              <option value="carrito">Carrito más grande</option>
+              <option value="nombre">Nombre</option>
+            </select>
+          </div>
+          <div id="clientActivityList" class="ca-list">
             <div class="loading">Cargando actividad de clientes...</div>
           </div>
+          <div class="ca-note">Tiempo y visitas según el período elegido arriba. "≈" = estimado por la actividad (vistas y carrito) para fechas anteriores a la medición de sesiones.</div>
         </div>
       </div>
 
@@ -820,6 +871,9 @@ let allOrdersData={orders:[],views:[],cartEvts:[],profiles:[]};
 let allUsersData=[];
 
 // ── Formato ──
+// Escapa texto que viene de la base antes de meterlo en innerHTML (nombres, emails, etc.
+// los escribe el propio usuario al registrarse: sin esto, un nombre con HTML corre como código).
+function esc(v){ return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 function fmt(n){ return new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0); }
 function fmtDate(d){ return new Date(d).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'}); }
 function fmtDateTime(d){ return new Date(d).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
@@ -942,6 +996,22 @@ async function api(path, opts={}){
   return res.json();
 }
 
+// Igual que api() pero trae TODAS las filas: PostgREST corta en 1000 por pedido, así que
+// se pagina con Range. Usarlo para tablas que crecen (eventos, vistas, ventas, movimientos).
+async function apiAll(path, pageSize=1000){
+  const token=localStorage.getItem('admin_token');
+  const out=[];
+  for(let from=0;;from+=pageSize){
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{
+      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`,'Range-Unit':'items','Range':`${from}-${from+pageSize-1}`}
+    });
+    const rows=await res.json();
+    if(!Array.isArray(rows)) return out.length?out:rows;
+    out.push(...rows);
+    if(rows.length<pageSize) return out;
+  }
+}
+
 // ── Tabs ──
 function switchTab(tab, el){
   // Acotar SOLO a los tab-panel dentro de admin-content
@@ -1017,14 +1087,10 @@ async function loadCtaCte(){
 }
 
 async function enrichClientSaldos(){
-  const token = localStorage.getItem('admin_token');
   // Traer saldos desde account_movements (vista materializada)
   let movs = [];
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/account_movements?select=client_id,monto`, {
-      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
-    });
-    const data = await res.json();
+    const data = await apiAll('account_movements?select=client_id,monto&order=fecha.asc');
     movs = Array.isArray(data) ? data : [];
   } catch(e) { movs = []; }
   if(!movs.length) {
@@ -1044,16 +1110,10 @@ async function enrichClientSaldos(){
   });
 
   // Traer último pago por cliente
-  const [pagosRes, ordersRes] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/payments?select=client_id,fecha&order=fecha.desc`, {
-      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
-    }),
-    fetch(`${SUPABASE_URL}/rest/v1/pos_orders?select=client_id,fecha&estado=eq.cerrada&order=fecha.asc`, {
-      headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
-    })
+  const [pagos, orders] = await Promise.all([
+    apiAll('payments?select=client_id,fecha&order=fecha.desc'),
+    apiAll('pos_orders?select=client_id,fecha&estado=eq.cerrada&order=fecha.asc')
   ]);
-  const pagos = await pagosRes.json();
-  const orders = await ordersRes.json();
 
   const ultimoPago = {};
   if(Array.isArray(pagos)){
@@ -1097,8 +1157,9 @@ function renderCtaCteKPIs(){
 
   // Cobrado hoy
   const token = localStorage.getItem('admin_token');
-  const hoy = new Date().toISOString().slice(0,10);
-  fetch(`${SUPABASE_URL}/rest/v1/payments?fecha=gte.${hoy}T00:00:00&select=monto`, {
+  // Medianoche de hoy en Buenos Aires (toISOString() es UTC: después de las 21 h ya daba "mañana")
+  const hoy = _ahoraAR().toISOString().slice(0,10);
+  fetch(`${SUPABASE_URL}/rest/v1/payments?fecha=gte.${hoy}T00:00:00-03:00&select=monto`, {
     headers:{'apikey':SUPABASE_ANON,'Authorization':`Bearer ${token}`}
   }).then(r=>r.json()).then(data=>{
     const total = Array.isArray(data) ? data.reduce((s,p)=>s+p.monto,0) : 0;
@@ -1118,8 +1179,8 @@ function renderCtaCteGrid(clients){
     const {mora, dias: diasSinPago} = calcMora(c, 30);
     return `
       <div class="client-card${mora?' mora':''}" onclick="openCtaCteModal('${c.id}')">
-        <div class="client-card-name">${c.nombre}</div>
-        <div class="client-card-tel">${c.telefono||c.email||'Sin contacto'}</div>
+        <div class="client-card-name">${esc(c.nombre)}</div>
+        <div class="client-card-tel">${esc(c.telefono||c.email||'Sin contacto')}</div>
         <div class="client-card-saldo ${saldo>0?'deuda':'cero'}">${fmt(Math.abs(saldo))}</div>
         <div class="client-card-meta">
           ${saldo>0?'Debe':'Sin deuda'}
@@ -1185,7 +1246,7 @@ async function loadMovimientos(clientId){
       <div class="mov-row">
         <div class="mov-icon">${esVenta?'🧾':'💳'}</div>
         <div class="mov-ref">
-          <div class="mov-ref-main">${esVenta?('Ticket '+m.referencia):('Pago · '+m.referencia)}</div>
+          <div class="mov-ref-main">${esc(esVenta?('Ticket '+m.referencia):('Pago · '+m.referencia))}</div>
           <div class="mov-ref-date">${fmtDate(m.fecha)}</div>
         </div>
         <div class="mov-amount ${esVenta?'venta':'pago'}">${esVenta?'+':'-'}${fmt(monto)}</div>
@@ -1300,7 +1361,7 @@ async function loadUsers(){
   allUsersData=rows;
 
   // Obtener último pedido por usuario
-  const orders=await api('orders?select=user_id,created_at&order=created_at.desc');
+  const orders=await apiAll('orders?select=user_id,created_at&order=created_at.desc');
   const lastOrder={};
   if(Array.isArray(orders)) orders.forEach(o=>{ if(!lastOrder[o.user_id]) lastOrder[o.user_id]=o.created_at; });
 
@@ -1347,9 +1408,9 @@ async function loadOnlineUsers(){
         const timeStr=mins===0?'ahora mismo':`hace ${mins} min`;
         const initial=(u.nombre||'?').charAt(0).toUpperCase();
         return `<div class="user-row">
-          <div class="user-avatar" style="background:var(--green);font-size:13px;">${initial}</div>
+          <div class="user-avatar" style="background:var(--green);font-size:13px;">${esc(initial)}</div>
           <div class="user-info">
-            <div class="user-name">${u.nombre}</div>
+            <div class="user-name">${esc(u.nombre)}</div>
             <div class="user-meta" style="color:var(--green);">🟢 Activo ${timeStr}</div>
           </div>
         </div>`;
@@ -1373,9 +1434,9 @@ function renderUserList(containerId, users, lastOrder, isPending){
     const badge=u.is_admin?'admin':u.approved?'approved':'pending';
     const badgeText=u.is_admin?'⚙️ Admin':u.approved?'✅ Aprobado':'⏳ Pendiente';
     return `<div class="user-row">
-      <div class="user-avatar">${initial}</div>
+      <div class="user-avatar">${esc(initial)}</div>
       <div class="user-info">
-        <div class="user-name">${u.nombre||'Sin nombre'}</div>
+        <div class="user-name">${esc(u.nombre||'Sin nombre')}</div>
         <div class="user-email">${u.id}</div>
         <div class="user-meta">${last} · Registro: ${fmtDate(u.created_at)}</div>
       </div>
@@ -1476,8 +1537,8 @@ function renderProducts(list){
     const isDisabled=disabled.has(sku);
     return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);opacity:${isDisabled?'.45':'1'}">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:1px">${sku}</div>
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:1px">${esc(sku)}</div>
       </div>
       <button class="product-toggle ${isDisabled?'inactive':'active'}" style="flex-shrink:0" onclick="toggleProduct('${sku}')">${isDisabled?'⚫ Inactivo':'🟢 Activo'}</button>
     </div>`;
@@ -1666,15 +1727,16 @@ async function loadStats(){
     document.getElementById('statsCards').innerHTML='<div class="loading">Cargando estadísticas...</div>';
   }
   try {
-    const [orders, views, cartEvts, profiles, posOrders, posClients, presence, moraRes]=await Promise.all([
-      api('orders?select=*&order=created_at.desc'),
-      api('product_views?select=sku,viewed_at,user_id'),
-      api('cart_events?select=sku,action,user_id,created_at'),
-      api('profiles?select=id,nombre,approved'),
-      api('pos_orders?select=id,ticket_display,fecha,total,estado,client_id&order=fecha.desc&limit=200'),
+    const [orders, views, cartEvts, profiles, posOrders, posClients, presence, moraRes, sessions]=await Promise.all([
+      apiAll('orders?select=*&order=created_at.desc'),
+      apiAll('product_views?select=sku,viewed_at,user_id&order=viewed_at.desc'),
+      apiAll('cart_events?select=sku,action,user_id,created_at&order=created_at.asc'),
+      api('profiles?select=id,nombre,approved,is_admin'),
+      apiAll('pos_orders?select=id,ticket_display,fecha,total,estado,client_id&order=fecha.desc'),
       api('clients?select=id,nombre,email,telefono,telefono_wa,profile_id'),
       api('presence?select=*&order=last_seen.desc'),
-      api('rpc/clientes_en_mora', {method:'POST', body: JSON.stringify({dias: 30})})
+      api('rpc/clientes_en_mora', {method:'POST', body: JSON.stringify({dias: 30})}),
+      apiAll('user_sessions?select=user_id,started_at,last_seen&order=started_at.asc')
     ]);
     // clientes_en_mora es un RPC (POST): api() devuelve el Response crudo, hay que parsearlo a mano
     let clientesEnMora = [];
@@ -1688,7 +1750,8 @@ async function loadStats(){
       posOrders: Array.isArray(posOrders)  ? posOrders  : [],
       posClients:Array.isArray(posClients) ? posClients : [],
       presence:  Array.isArray(presence)   ? presence   : [],
-      clientesEnMora
+      clientesEnMora,
+      sessions:  Array.isArray(sessions)   ? sessions   : []
     };
     // Diagnóstico visible en pantalla
     const diag = document.getElementById('statsDiag');
@@ -1753,7 +1816,7 @@ function renderStats(){
   renderRanking('topUsers', userCount, 5, 'pedidos');
 
   // Nueva Sección: Actividad de Clientes, Tiempo en Catálogo & Carrito Pendiente
-  renderClientActivity(profiles, presence, cartEvts, orders, views, allOrdersData.posClients, allOrdersData.posOrders, allOrdersData.clientesEnMora);
+  renderClientActivity(profiles, presence, cartEvts, orders, views, allOrdersData.posClients, allOrdersData.posOrders, allOrdersData.clientesEnMora, allOrdersData.sessions);
 
   // Evolución mensual (últimos 6 meses)
   renderMonthlyChart(orders);
@@ -1771,212 +1834,271 @@ function renderStats(){
   renderPosKPIs(filtPosOrders, posClients);
 }
 
-// ── ACTIVIDAD DE CLIENTES, TIEMPO Y CARRITOS PENDIENTES ─────────────────────
+// ── CONEXIÓN DE CLIENTES: sesiones, tiempo, carritos ────────────────────────
+// Tiempo en catálogo: `presence` es UNA fila por usuario que se pisa en cada heartbeat, así que
+// no sirve para medir duración. Se usan:
+//   1) user_sessions (una fila por visita, la mantiene touch_session() desde el catálogo), y
+//   2) para lo anterior a esa tabla, una estimación agrupando vistas/eventos de carrito del
+//      usuario en visitas (un hueco de más de 30 min = visita nueva). Esas se marcan con "≈".
 let _clientActivityMap = {};
+let _caFilter = 'activos';
+let _caSort = 'reciente';
+const CA_SESSION_GAP = 30*60*1000;
 
-function renderClientActivity(profiles, presence, cartEvts, orders, views, clients, posOrders, clientesEnMora) {
+function _buildUserSessions(realSessions, eventTimes){
+  const real = (realSessions||[]).map(s => ({ start: new Date(s.started_at).getTime(), end: new Date(s.last_seen).getTime(), real: true }));
+  const est = [];
+  const ts = (eventTimes||[]).slice().sort((a,b)=>a-b);
+  let cur = null;
+  ts.forEach(t => {
+    if (cur && t - cur.end <= CA_SESSION_GAP) cur.end = t;
+    else { cur = { start: t, end: t, real: false }; est.push(cur); }
+  });
+  // Una estimación que se superpone con una sesión real ya está contada por la real
+  const solapa = e => real.some(r => e.start <= r.end + CA_SESSION_GAP && e.end >= r.start - CA_SESSION_GAP);
+  return real.concat(est.filter(e => !solapa(e))).sort((a,b)=>a.start-b.start);
+}
+// Duración de una visita: real = last_seen - started_at (+1 heartbeat que aún no llegó);
+// estimada = primer a último evento + 1 min. Mínimo 1 min en ambos casos.
+function _sessionMinutes(s){ return Math.max(1, Math.round((s.end - s.start)/60000) + (s.real ? 2 : 1)); }
+function _fmtMin(m){ return m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m} min`; }
+function _haceStr(d){
+  if(!d) return 'nunca';
+  const mins = Math.floor((Date.now()-d.getTime())/60000);
+  if(mins < 1) return 'ahora';
+  if(mins < 60) return `hace ${mins} min`;
+  const h = Math.floor(mins/60); if(h < 24) return `hace ${h} h`;
+  const dd = Math.floor(h/24); return dd === 1 ? 'ayer' : `hace ${dd} días`;
+}
+
+function renderClientActivity(profiles, presence, cartEvts, orders, views, clients, posOrders, clientesEnMora, sessions) {
   const container = document.getElementById('clientActivityList');
   if(!container) return;
 
-  const now = new Date();
+  const now = Date.now();
   const presenceMap = {};
   (presence || []).forEach(p => { presenceMap[p.user_id] = p.last_seen; });
 
-  // Datos de contacto (email/teléfono) y el id de cliente, por profile_id — desde la tabla clients.
-  // No todos los profiles tienen una fila en clients (ej. nunca se aprobaron), así que puede faltar.
   const contactByProfileId = {};
   (clients || []).forEach(c => {
     if (c.profile_id) contactByProfileId[c.profile_id] = { clientId: c.id, email: c.email, telefono: c.telefono, telefonoWa: c.telefono_wa };
   });
-
-  // Clientes con saldo vencido (RPC clientes_en_mora), indexado por client_id
   const moraByClientId = {};
   (clientesEnMora || []).forEach(m => { moraByClientId[m.client_id] = m; });
-
-  // Ventas POS cerradas por client_id (para saber si un cliente ya compró, aunque sea solo por POS)
   const posComprasByClientId = {};
   (posOrders || []).forEach(o => {
     if (o.estado === 'cerrada' && o.client_id) posComprasByClientId[o.client_id] = (posComprasByClientId[o.client_id] || 0) + 1;
   });
 
-  // Agrupar eventos de carrito por usuario y determinar carrito pendiente actual
-  const cartByUser = {};
-  (cartEvts || []).forEach(e => {
-    if(!cartByUser[e.user_id]) cartByUser[e.user_id] = {};
-    if(e.action === 'add') {
-      cartByUser[e.user_id][e.sku] = e.created_at;
-    } else if(e.action === 'remove') {
-      delete cartByUser[e.user_id][e.sku];
-    }
-  });
+  // Indexar todo por usuario una sola vez (antes se filtraban los arrays enteros por cada perfil)
+  const by = (arr, key) => { const m = {}; (arr||[]).forEach(x => { const k = x[key]; if(k) (m[k] = m[k] || []).push(x); }); return m; };
+  const cartEvtsBy = by(cartEvts, 'user_id');
+  const viewsBy = by(views, 'user_id');
+  const ordersBy = by(orders, 'user_id');
+  const sessionsBy = by(sessions, 'user_id');
 
-  // Ocultar SKUs que ya fueron comprados en algún pedido
-  (orders || []).forEach(o => {
-    const uid = o.user_id;
-    if(cartByUser[uid]) {
-      (o.items || []).forEach(item => {
-        delete cartByUser[uid][item.sku];
-      });
-    }
-  });
+  const priceBySku = {};
+  (window.allProducts || allProducts || []).forEach(p => { priceBySku[p.sku || p.codigo] = p.price || 0; });
 
   _clientActivityMap = {};
 
   (profiles || []).forEach(prof => {
+    if (prof.is_admin) return;
     const uid = prof.id;
-    const name = prof.nombre || 'Usuario sin nombre';
+    const userCart = (cartEvtsBy[uid] || []).slice().sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+    const userViews = viewsBy[uid] || [];
+    const userOrdersAll = ordersBy[uid] || [];
 
-    // Conexiones e interacciones en el período
-    const userCartEvts = (cartEvts || []).filter(e => e.user_id === uid && periodFilter(e.created_at));
-    const userViews = (views || []).filter(v => v.user_id === uid && periodFilter(v.viewed_at));
-    const userOrders = (orders || []).filter(o => o.user_id === uid && periodFilter(o.created_at));
-
-    const lastSeenRaw = presenceMap[uid] || (userCartEvts[0]?.created_at) || (userOrders[0]?.created_at);
-    const lastSeenDate = lastSeenRaw ? new Date(lastSeenRaw) : null;
-    const isOnline = lastSeenDate && (now - lastSeenDate) < 10 * 60 * 1000;
-
-    const interactionCount = userCartEvts.length + userViews.length + (lastSeenDate && periodFilter(lastSeenRaw) ? 1 : 0);
-    // Estimación tiempo en catálogo (cada interacción/heartbeat representa ~2 min activos)
-    const estimatedMinutes = Math.max(interactionCount * 2, lastSeenDate ? 2 : 0);
-
-    // Items en carrito pendiente, y hace cuánto está el más viejo de ellos sin comprarse
-    const cartMap = cartByUser[uid] || {};
+    // Carrito pendiente: último add sin remove posterior y que no terminó en un pedido después
+    const cartMap = {};
+    userCart.forEach(e => {
+      if (e.action === 'add') cartMap[e.sku] = e.created_at;
+      else if (e.action === 'remove') delete cartMap[e.sku];
+    });
+    userOrdersAll.forEach(o => {
+      (o.items || []).forEach(item => {
+        if (cartMap[item.sku] && new Date(cartMap[item.sku]) <= new Date(o.created_at)) delete cartMap[item.sku];
+      });
+    });
     const pendingSkus = Object.keys(cartMap);
-    const cartAgeHours = pendingSkus.length
-      ? (now - new Date(Math.min(...pendingSkus.map(sku => new Date(cartMap[sku]).getTime())))) / 3600000
-      : 0;
-    const isCartFrio = pendingSkus.length > 0 && cartAgeHours >= 24;
+    const cartOldest = pendingSkus.length ? Math.min(...pendingSkus.map(s => new Date(cartMap[s]).getTime())) : 0;
+    const cartAgeHours = pendingSkus.length ? (now - cartOldest) / 3600000 : 0;
+    const cartMonto = pendingSkus.reduce((s, sku) => s + (priceBySku[sku] || 0), 0);
+
+    // Visitas (sesiones) y tiempo
+    const eventTimes = userViews.map(v => new Date(v.viewed_at).getTime())
+      .concat(userCart.map(e => new Date(e.created_at).getTime()));
+    const allSessions = _buildUserSessions(sessionsBy[uid], eventTimes);
+    const periodSessions = allSessions.filter(s => periodFilter(new Date(s.start).toISOString()));
+    const minutes = periodSessions.reduce((a, s) => a + _sessionMinutes(s), 0);
+    const timeEstimated = periodSessions.some(s => !s.real);
+
+    // Última conexión: lo más nuevo entre presence, sesiones, eventos y pedidos
+    const candidates = [presenceMap[uid] ? new Date(presenceMap[uid]).getTime() : 0, ...eventTimes,
+      ...allSessions.map(s => s.end), ...userOrdersAll.map(o => new Date(o.created_at).getTime())];
+    const lastTs = Math.max(0, ...candidates);
+    const lastSeenDate = lastTs ? new Date(lastTs) : null;
+    const isOnline = !!presenceMap[uid] && (now - new Date(presenceMap[uid]).getTime()) < 5 * 60 * 1000;
 
     const contact = contactByProfileId[uid] || {};
     const clientId = contact.clientId || null;
-
-    // Nunca compró: ni por catálogo (histórico completo, no solo el período filtrado) ni por POS
-    const everPurchasedCatalog = (orders || []).some(o => o.user_id === uid);
+    const everPurchasedCatalog = userOrdersAll.length > 0;
     const everPurchasedPos = clientId ? !!posComprasByClientId[clientId] : false;
-    const neverPurchased = !everPurchasedCatalog && !everPurchasedPos;
-
     const mora = clientId ? moraByClientId[clientId] : null;
+
+    const userOrders = userOrdersAll.filter(o => periodFilter(o.created_at));
+    const viewsCount = userViews.filter(v => periodFilter(v.viewed_at)).length;
+    const lastOrder = userOrdersAll.reduce((m, o) => Math.max(m, new Date(o.created_at).getTime()), 0);
 
     _clientActivityMap[uid] = {
       profile: prof,
-      name,
+      name: prof.nombre || 'Usuario sin nombre',
+      approved: !!prof.approved,
       lastSeenDate,
       isOnline,
-      interactionCount,
-      estimatedMinutes,
+      visits: periodSessions.length,
+      interactionCount: periodSessions.length,
+      estimatedMinutes: minutes,
+      timeEstimated,
       pendingSkus,
-      isCartFrio,
+      cartMonto,
+      cartAgeHours,
+      isCartFrio: pendingSkus.length > 0 && cartAgeHours >= 24,
       ordersCount: userOrders.length,
-      viewsCount: userViews.length,
+      lastOrderDate: lastOrder ? new Date(lastOrder) : null,
+      viewsCount,
       email: contact.email || null,
       telefono: contact.telefono || null,
       telefonoWa: contact.telefonoWa || null,
       clientId,
-      neverPurchased,
-      mora: mora ? { saldo: mora.saldo, diasMora: mora.dias_mora } : null
+      neverPurchased: !everPurchasedCatalog && !everPurchasedPos,
+      mora: mora ? { saldo: mora.saldo, diasMora: mora.dias_mora } : null,
+      activeInPeriod: periodSessions.length > 0 || userOrders.length > 0 || viewsCount > 0
     };
   });
 
-  const onlineCount = Object.values(_clientActivityMap).filter(c => c.isOnline).length;
+  const list = Object.values(_clientActivityMap);
+  const onlineCount = list.filter(c => c.isOnline).length;
   const badgeEl = document.getElementById('activeClientsBadge');
-  if(badgeEl) badgeEl.textContent = onlineCount > 0 ? `🟢 ${onlineCount} en línea` : `${Object.keys(_clientActivityMap).length} clientes`;
+  if(badgeEl) badgeEl.textContent = onlineCount > 0 ? `🟢 ${onlineCount} en línea` : '';
+
+  // KPIs de la sección
+  const activos = list.filter(c => c.activeInPeriod);
+  const conCarrito = list.filter(c => c.pendingSkus.length);
+  const totMin = activos.reduce((a, c) => a + c.estimatedMinutes, 0);
+  const totVis = activos.reduce((a, c) => a + c.visits, 0);
+  const kpi = (val, label, color) => `<div class="ca-kpi"><div class="ca-kpi-val"${color?` style="color:${color}"`:''}>${val}</div><div class="ca-kpi-lbl">${label}</div></div>`;
+  const kpiEl = document.getElementById('clientActivityKPIs');
+  if (kpiEl) kpiEl.innerHTML =
+    kpi(activos.length, 'Clientes activos', 'var(--accent)') +
+    kpi(totVis, 'Visitas') +
+    kpi(totVis ? _fmtMin(Math.round(totMin / totVis)) : '—', 'Promedio por visita', 'var(--green)') +
+    kpi(conCarrito.length, `Carritos abiertos · ${fmt(conCarrito.reduce((a,c)=>a+c.cartMonto,0))}`, 'var(--accent2)');
 
   _renderClientActivityList();
 }
 
-// Renderiza la lista a partir de _clientActivityMap, aplicando el filtro de búsqueda por nombre.
-// Separado de renderClientActivity() para que buscar no recalcule toda la actividad de nuevo.
+const CA_FILTERS = [
+  ['activos',  'Activos en el período', c => c.activeInPeriod],
+  ['online',   '🟢 En línea',            c => c.isOnline],
+  ['24h',      '🕐 Últimas 24 h',        c => !!c.lastSeenDate && (Date.now() - c.lastSeenDate) < 864e5],
+  ['carrito',  '🛒 Con carrito',         c => c.pendingSkus.length > 0],
+  ['frio',     '🥶 Carrito +24 h',       c => c.isCartFrio],
+  ['nunca',    '🆕 Nunca compró',        c => c.neverPurchased && c.approved],
+  ['mora',     '⚠️ En mora',             c => !!c.mora],
+  ['dormidos', '💤 Sin volver +30 días', c => c.approved && (!c.lastSeenDate || (Date.now() - c.lastSeenDate) > 30*864e5)],
+  ['todos',    'Todos',                  c => true],
+];
+
+function setClientActivityFilter(f){ _caFilter = f; _renderClientActivityList(); }
+function setClientActivitySort(v){ _caSort = v; _renderClientActivityList(); }
+
 function _renderClientActivityList() {
   const container = document.getElementById('clientActivityList');
   if(!container) return;
+  const all = Object.values(_clientActivityMap);
+
+  const chipsEl = document.getElementById('clientActivityFilters');
+  if (chipsEl) {
+    const sl = chipsEl.scrollLeft;
+    chipsEl.innerHTML = CA_FILTERS.map(([k, label, fn]) => {
+      const n = all.filter(fn).length;
+      return `<button class="filter-btn ca-chip${_caFilter===k?' active':''}" onclick="setClientActivityFilter('${k}')">${label} <span class="ca-chip-n">${n}</span></button>`;
+    }).join('');
+    chipsEl.scrollLeft = sl;
+  }
 
   const searchEl = document.getElementById('clientActivitySearch');
   const search = (searchEl?.value || '').trim().toLowerCase();
+  const fn = (CA_FILTERS.find(f => f[0] === _caFilter) || CA_FILTERS[0])[2];
+  let activeList = all.filter(fn);
+  if (search) activeList = activeList.filter(c => c.name.toLowerCase().includes(search) || (c.email||'').toLowerCase().includes(search));
 
-  let activeList = Object.values(_clientActivityMap);
-  if (search) activeList = activeList.filter(c => c.name.toLowerCase().includes(search));
-
-  // Ordenar: primero online, luego con carrito (los fríos primero, para que salten a la vista), luego más minutos
-  activeList = activeList.sort((a, b) => {
-    if (a.isOnline !== b.isOnline) return b.isOnline ? 1 : -1;
-    if (a.isCartFrio !== b.isCartFrio) return b.isCartFrio ? 1 : -1;
-    if (a.pendingSkus.length !== b.pendingSkus.length) return b.pendingSkus.length - a.pendingSkus.length;
-    return b.estimatedMinutes - a.estimatedMinutes;
-  });
+  const t = d => d ? d.getTime() : 0;
+  const sorters = {
+    reciente: (a, b) => (b.isOnline - a.isOnline) || (t(b.lastSeenDate) - t(a.lastSeenDate)),
+    tiempo:   (a, b) => (b.estimatedMinutes - a.estimatedMinutes) || (t(b.lastSeenDate) - t(a.lastSeenDate)),
+    carrito:  (a, b) => (b.cartMonto - a.cartMonto) || (b.pendingSkus.length - a.pendingSkus.length),
+    nombre:   (a, b) => a.name.localeCompare(b.name, 'es'),
+  };
+  activeList.sort(sorters[_caSort] || sorters.reciente);
 
   if (!activeList.length) {
-    container.innerHTML = `<div class="empty">${search ? 'Ningún cliente coincide con la búsqueda' : 'Sin actividad registrada en este período'}</div>`;
+    container.innerHTML = `<div class="empty">${search ? 'Ningún cliente coincide con la búsqueda' : 'No hay clientes en este filtro'}</div>`;
     return;
   }
-
   container.innerHTML = activeList.map(_renderClientActivityCard).join('');
 }
 
 function _renderClientActivityCard(c) {
   const uid = c.profile.id;
   const cartCount = c.pendingSkus.length;
-  const timeStr = c.estimatedMinutes >= 60
-    ? `${Math.floor(c.estimatedMinutes/60)}h ${c.estimatedMinutes%60}m`
-    : `${c.estimatedMinutes} min`;
 
   const lastSeenStr = c.isOnline
-    ? '<span style="color:var(--green);font-weight:700;">🟢 En línea ahora</span>'
-    : (c.lastSeenDate ? `Últ. vez: ${fmtDateTime(c.lastSeenDate)}` : 'Sin registros rec.');
+    ? '<span class="ca-online">● En línea ahora</span>'
+    : (c.lastSeenDate ? `<span title="${esc(fmtDateTime(c.lastSeenDate))}">Últ. conexión ${_haceStr(c.lastSeenDate)}</span>` : 'Nunca se conectó');
 
-  // Contacto: mail y teléfono (no todos los clientes tienen teléfono cargado). Si falta el
-  // teléfono pero sí hay una ficha de cliente asociada, se ofrece cargarlo ahí mismo.
   const contactoParts = [];
-  if (c.email) contactoParts.push(`✉️ ${c.email}`);
+  if (c.email) contactoParts.push(`✉️ ${esc(c.email)}`);
   if (c.telefono || c.telefonoWa) {
-    contactoParts.push(`📱 ${c.telefonoWa || c.telefono}`);
+    contactoParts.push(`📱 ${esc(c.telefonoWa || c.telefono)}`);
   } else if (c.clientId) {
     contactoParts.push(`<a href="#" onclick="event.stopPropagation();event.preventDefault();agregarTelefonoCliente('${c.clientId}','${uid}')" style="color:var(--accent);text-decoration:none;">+ agregar teléfono</a>`);
   }
-  const contactoStr = contactoParts.length
-    ? contactoParts.join(' &nbsp;·&nbsp; ')
-    : '<span style="opacity:.5;">Sin datos de contacto</span>';
+  const contactoStr = contactoParts.length ? contactoParts.join(' &nbsp;·&nbsp; ') : '<span style="opacity:.5;">Sin datos de contacto</span>';
 
   const waNumero = (c.telefonoWa || c.telefono || '').replace(/[^0-9]/g, '');
-  const waBtn = waNumero ? `
-        <a href="https://wa.me/${waNumero}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
-           title="Escribir por WhatsApp"
-           style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);flex-shrink:0;font-size:14px;text-decoration:none;">💬</a>
-  ` : '';
+  const waBtn = waNumero
+    ? `<a href="https://wa.me/${waNumero}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Escribir por WhatsApp" class="ca-wa">💬</a>`
+    : '';
 
-  const moraBadge = c.mora ? `<span title="Debe ${fmt(c.mora.saldo)}, hace ${c.mora.diasMora} días sin pagar" style="background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;">⚠️ En mora</span>` : '';
-  const nuevoBadge = c.neverPurchased ? `<span style="background:rgba(74,124,255,.15);color:var(--accent);border:1px solid rgba(74,124,255,.3);padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;">🆕 Nunca compró</span>` : '';
+  const tags = [];
+  if (!c.approved) tags.push('<span class="ca-tag ca-tag-muted">⏳ Sin aprobar</span>');
+  if (c.mora) tags.push(`<span class="ca-tag ca-tag-red" title="Hace ${c.mora.diasMora} días sin pagar">⚠️ Mora ${fmt(c.mora.saldo)}</span>`);
+  if (c.neverPurchased) tags.push('<span class="ca-tag ca-tag-blue">🆕 Nunca compró</span>');
+  else if (c.lastOrderDate) tags.push(`<span class="ca-tag ca-tag-muted" title="${esc(fmtDateTime(c.lastOrderDate))}">Últ. pedido ${_haceStr(c.lastOrderDate)}</span>`);
 
   const cartBadge = cartCount > 0
-    ? (c.isCartFrio
-        ? `<div title="Hace más de 24hs que estos productos están en el carrito sin comprarse" style="background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;">🥶 ${cartCount} ítems</div>`
-        : `<div style="background:rgba(245,166,35,.15);color:var(--accent2);border:1px solid rgba(245,166,35,.3);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;">🛒 ${cartCount} ítems</div>`)
-    : `<div style="font-size:11px;color:var(--muted);opacity:.5;">Sin carrito</div>`;
+    ? `<div class="ca-cart${c.isCartFrio ? ' frio' : ''}" title="${c.isCartFrio ? 'Más de 24 h en el carrito sin comprarse' : 'Productos en el carrito'}">${c.isCartFrio ? '🥶' : '🛒'} ${cartCount} · ${fmt(c.cartMonto)}</div>`
+    : '';
+
+  const stats = c.visits
+    ? `<div class="ca-stat-main" title="${c.timeEstimated ? 'Estimado a partir de la actividad (antes de medir sesiones)' : 'Tiempo medido por sesiones'}">${c.timeEstimated ? '≈ ' : ''}${_fmtMin(c.estimatedMinutes)}</div><div class="ca-stat-sub">${c.visits} visita${c.visits!==1?'s':''} · ${c.viewsCount} vistas</div>`
+    : `<div class="ca-stat-sub">Sin visitas<br>en el período</div>`;
 
   return `
-    <div onclick="openClientDetailModal('${uid}')" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-      <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
-        <div style="width:36px;height:36px;border-radius:50%;background:${c.isOnline?'rgba(34,197,94,.15)':'var(--surface)'};border:1.5px solid ${c.isOnline?'var(--green)':'var(--border)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:${c.isOnline?'var(--green)':'var(--muted)'};flex-shrink:0;">
-          ${c.name.charAt(0).toUpperCase()}
-        </div>
-        <div style="min-width:0;flex:1;">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
-            ${moraBadge}${nuevoBadge}
-          </div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${lastSeenStr}</div>
-          <div style="font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${contactoStr}</div>
-        </div>
+    <div class="ca-card${c.isOnline ? ' online' : ''}" onclick="openClientDetailModal('${uid}')">
+      <div class="ca-avatar">${esc(c.name.charAt(0).toUpperCase())}</div>
+      <div class="ca-main">
+        <div class="ca-name-row"><span class="ca-name">${esc(c.name)}</span>${tags.join('')}</div>
+        <div class="ca-meta">${lastSeenStr}</div>
+        <div class="ca-meta ca-contact">${contactoStr}</div>
       </div>
-
-      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
-        <div style="text-align:right;">
-          <div style="font-size:12px;font-weight:700;color:var(--text);">${c.interactionCount} conex.</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:1px;">⏱ ${timeStr}</div>
-        </div>
+      <div class="ca-side">
+        <div class="ca-stats">${stats}</div>
         ${cartBadge}
-        ${waBtn}
-        <div style="font-size:16px;color:var(--muted);">&rsaquo;</div>
       </div>
+      ${waBtn}
     </div>
   `;
 }
@@ -2125,8 +2247,8 @@ function _renderHistorialRow(r){
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:10px;">
       <div style="min-width:0;flex:1;">
-        <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.nombre || ('SKU ' + r.codigo)}</div>
-        <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">SKU ${r.codigo}${r.marca ? ' · ' + r.marca : ''} · ${campoLabel} · ${fmtFechaAR(r.changed_at_ar)}</div>
+        <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(r.nombre || ('SKU ' + r.codigo))}</div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">SKU ${esc(r.codigo)}${r.marca ? ' · ' + esc(r.marca) : ''} · ${campoLabel} · ${fmtFechaAR(r.changed_at_ar)}</div>
       </div>
       <div style="text-align:right;flex-shrink:0;">
         <div style="font-size:12px;color:var(--muted);text-decoration:line-through;">${fmt(anterior)}</div>
@@ -2196,20 +2318,18 @@ async function openClientDetailModal(uid) {
 
   const waNumero = (info.telefonoWa || info.telefono || '').replace(/[^0-9]/g, '');
   const contactBits = [];
-  if (info.email) contactBits.push(`<a href="mailto:${info.email}" style="color:var(--accent);text-decoration:none;">✉️ ${info.email}</a>`);
-  if (waNumero) contactBits.push(`<a href="https://wa.me/${waNumero}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;">💬 ${info.telefonoWa || info.telefono}</a>`);
-  else if (info.telefono) contactBits.push(`📱 ${info.telefono}`);
+  if (info.email) contactBits.push(`<a href="mailto:${esc(info.email)}" style="color:var(--accent);text-decoration:none;">✉️ ${esc(info.email)}</a>`);
+  if (waNumero) contactBits.push(`<a href="https://wa.me/${waNumero}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;">💬 ${esc(info.telefonoWa || info.telefono)}</a>`);
+  else if (info.telefono) contactBits.push(`📱 ${esc(info.telefono)}`);
   else if (info.clientId) contactBits.push(`<a href="#" onclick="event.preventDefault();agregarTelefonoCliente('${info.clientId}','${uid}').then(()=>openClientDetailModal('${uid}'))" style="color:var(--accent);text-decoration:none;">+ agregar teléfono</a>`);
   document.getElementById('modalClientContact').innerHTML = contactBits.join('') || '<span style="opacity:.5;">Sin datos de contacto</span>';
 
-  const timeStr = info.estimatedMinutes >= 60 
-    ? `${Math.floor(info.estimatedMinutes/60)}h ${info.estimatedMinutes%60}m` 
-    : `${info.estimatedMinutes} min`;
+  const timeStr = (info.timeEstimated ? '≈ ' : '') + _fmtMin(info.estimatedMinutes);
 
   document.getElementById('modalClientKPIs').innerHTML = `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
       <div style="font-size:16px;font-weight:800;color:var(--accent);">${info.interactionCount}</div>
-      <div style="font-size:10px;color:var(--muted);">Conexiones</div>
+      <div style="font-size:10px;color:var(--muted);">Visitas</div>
     </div>
     <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
       <div style="font-size:16px;font-weight:800;color:var(--green);">${timeStr}</div>
@@ -2254,8 +2374,8 @@ async function openClientDetailModal(uid) {
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--surface);border-radius:8px;">
         <div style="min-width:0;flex:1;">
-          <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${prod.name || prod.producto}</div>
-          <div style="font-size:10px;color:var(--muted);">SKU: ${sku} ${prod.brand ? '· '+prod.brand : ''}</div>
+          <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(prod.name || prod.producto)}</div>
+          <div style="font-size:10px;color:var(--muted);">SKU: ${esc(sku)} ${prod.brand ? '· '+esc(prod.brand) : ''}</div>
         </div>
         <div style="font-size:12px;font-weight:700;color:var(--text);flex-shrink:0;">
           ${prod.price ? fmt(prod.price) : '-'}
@@ -2308,7 +2428,7 @@ function renderPosKPIs(posOrders, posClients){
           <span class="rank-pos">${i+1}</span>
           <div style="flex:1;min-width:0;">
             <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;">
-              <span class="rank-name" style="flex:1">${nombre}</span>
+              <span class="rank-name" style="flex:1">${esc(nombre)}</span>
               <span style="font-size:12px;font-weight:700;color:var(--accent2);white-space:nowrap">${fmt(d.monto)}</span>
             </div>
             <div class="rank-bar-wrap"><div class="rank-bar" style="width:${Math.round(d.monto/max*100)}%"></div></div>
@@ -2322,15 +2442,15 @@ function renderPosKPIs(posOrders, posClients){
   const ultEl = document.getElementById('posUltimasVentas');
   if(ultEl){
     if(!posOrders.length){ ultEl.innerHTML='<div class="empty">Sin ventas en este período</div>'; return; }
-    ultEl.innerHTML = posOrders.map(o => {
+    ultEl.innerHTML = posOrders.slice(0,20).map(o => {
       const nombre = clientMap[o.client_id] || '—';
       const fecha  = o.fecha ? new Date(o.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}) : '—';
       const hora   = o.fecha ? new Date(o.fecha).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : '';
       return `<div class="order-row" style="margin-bottom:6px;">
         <div class="order-row-header">
           <div>
-            <span style="font-size:12px;font-weight:700;">${nombre}</span>
-            ${o.ticket_display ? `<span style="font-size:10px;color:var(--muted);margin-left:6px">#${o.ticket_display}</span>` : ''}
+            <span style="font-size:12px;font-weight:700;">${esc(nombre)}</span>
+            ${o.ticket_display ? `<span style="font-size:10px;color:var(--muted);margin-left:6px">#${esc(o.ticket_display)}</span>` : ''}
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
             <span class="order-total">${fmt(o.total||0)}</span>
@@ -2672,12 +2792,12 @@ function renderAbandoned(containerId, data){
     };
     return `<div class="abandoned-row">
       <div class="abandoned-product">
-        <span>${productName}</span>
+        <span>${esc(productName)}</span>
         <span class="abandoned-sku">${users.length} usuario${users.length!==1?'s':''}</span>
       </div>
       <div class="abandoned-users">
         ${users.map(u=>`<div class="abandoned-user">
-          <span class="abandoned-user-name">👤 ${u.nombre}</span>
+          <span class="abandoned-user-name">👤 ${esc(u.nombre)}</span>
           <span class="abandoned-user-time">${timeAgo(u.created_at)}</span>
         </div>`).join('')}
       </div>
@@ -2693,7 +2813,7 @@ function renderRanking(containerId, data, limit, unit){
   el.innerHTML=sorted.map(([name,val],i)=>`
     <div class="rank-row">
       <span class="rank-pos">${i+1}</span>
-      <span class="rank-name">${name}</span>
+      <span class="rank-name">${esc(name)}</span>
       <div class="rank-bar-wrap"><div class="rank-bar-fill" style="width:${Math.round(val/max*100)}%"></div></div>
       <span class="rank-val">${val} ${unit}</span>
     </div>`).join('');
@@ -2731,24 +2851,27 @@ function renderHeatmap(views){
   document.getElementById('heatLabels').innerHTML=Array.from({length:24},(_,i)=>`<div class="heat-label">${i}</div>`).join('');
 }
 
+let _ordersById={};
 function renderAllOrders(orders){
   const el=document.getElementById('allOrders');
   document.getElementById('ordersCount').textContent=`${orders.length} pedido${orders.length!==1?'s':''}`;
   if(!orders.length){ el.innerHTML=`<div class="empty">Sin pedidos en este período</div>`; return; }
+  _ordersById={};
   el.innerHTML=orders.map(o=>{
+    _ordersById[o.id]=o;
     const items=Array.isArray(o.items)?o.items:[];
-    const itemsStr=items.map(i=>`${i.qty}× ${i.name}`).join(', ');
+    const itemsStr=items.map(i=>`${esc(i.qty)}× ${esc(i.name)}`).join(', ');
     const via=o.via||'whatsapp';
     return `<div class="order-row">
       <div class="order-row-header">
         <div>
-          <span style="font-size:13px;font-weight:700;">${o.nombre_cliente||'Sin nombre'}</span>
-          <span class="order-via ${via}" style="margin-left:8px;">${via==='pdf'?'📄 PDF':'💬 WhatsApp'}</span>
+          <span style="font-size:13px;font-weight:700;">${esc(o.nombre_cliente||'Sin nombre')}</span>
+          <span class="order-via ${esc(via)}" style="margin-left:8px;">${via==='pdf'?'📄 PDF':'💬 WhatsApp'}</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="order-total">${fmt(o.total)}</span>
-          <button onclick="descargarPedidoCatalogo(${JSON.stringify(o).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar PDF">📄</button>
-          <button onclick="descargarOrderExcel(${JSON.stringify(o).replace(/"/g,'&quot;')})" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar Excel">📊</button>
+          <button onclick="descargarPedidoCatalogo(_ordersById['${esc(o.id)}'])" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar PDF">📄</button>
+          <button onclick="descargarOrderExcel(_ordersById['${esc(o.id)}'])" style="background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;" title="Descargar Excel">📊</button>
         </div>
       </div>
       <div class="order-meta">${fmtDateTime(o.created_at)} · ${items.length} producto${items.length!==1?'s':''}</div>
@@ -2837,9 +2960,11 @@ function renderProdStats(){
   const el = document.getElementById('prodStats');
   if(!el) return;
   const total = prodData.length;
-  const enStock = prodData.filter(p=>p.stock==='STOCK').length;
-  const sinStock = prodData.filter(p=>p.stock==='NOSTOCK').length;
-  const preventa = prodData.filter(p=>p.stock==='PREVENTA').length;
+  // sync.py guarda STOCK / STOCK LIQUIDACION / PREVENTA (<eta>) / PREVENTA PROX. / NOSTOCK / NOSTOCK LIQUIDACION
+  const st = p => String(p.stock||'');
+  const enStock = prodData.filter(p=>st(p).startsWith('STOCK')).length;
+  const sinStock = prodData.filter(p=>st(p).startsWith('NOSTOCK')).length;
+  const preventa = prodData.filter(p=>st(p).startsWith('PREVENTA')).length;
   const beepaw = prodData.filter(p=>p.brand==='BEEPAW').length;
   el.innerHTML = [
     ['📦 Total', total, ''],
@@ -2859,12 +2984,12 @@ function renderProdTable(data){
   const tbody = document.getElementById('prodTableBody');
   if(!tbody) return;
   if(!data.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">Sin resultados</td></tr>'; return; }
-  const stockColor = s => s==='STOCK'?'var(--green)':s==='PREVENTA'?'var(--accent)':'var(--red)';
+  const stockColor = s => String(s||'').startsWith('STOCK')?'var(--green)':String(s||'').startsWith('PREVENTA')?'var(--accent)':'var(--red)';
   tbody.innerHTML = data.map(p=>`
     <tr style="border-bottom:1px solid var(--border);">
-      <td style="padding:7px 6px;color:var(--muted);font-family:monospace;">${p.sku}</td>
-      <td style="padding:7px 6px;">${p.name}</td>
-      <td style="padding:7px 6px;"><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--border);">${p.brand}</span></td>
+      <td style="padding:7px 6px;color:var(--muted);font-family:monospace;">${esc(p.sku)}</td>
+      <td style="padding:7px 6px;">${esc(p.name)}</td>
+      <td style="padding:7px 6px;"><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:var(--border);">${esc(p.brand)}</span></td>
       <td style="padding:7px 6px;text-align:right;">$${p.price.toLocaleString('es-AR')}</td>
       <td style="padding:7px 6px;text-align:right;">${p.pvp?'$'+p.pvp.toLocaleString('es-AR'):'-'}</td>
       <td style="padding:7px 6px;text-align:center;">${p.iva}%</td>
@@ -3109,7 +3234,7 @@ async function handleExcelUpload(event){
       html += `<h4 style="color:var(--green);margin:12px 0 6px;">🟢 Nuevos (${nuevos.length})</h4>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
         <tr style="border-bottom:1px solid var(--border);"><th>SKU</th><th>Nombre</th><th>Marca</th><th>Precio</th><th>Stock</th></tr>
-        ${nuevos.slice(0,30).map(p=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${p.sku}</td><td style="padding:4px 6px;">${p.name}</td><td style="padding:4px 6px;">${p.brand}</td><td style="padding:4px 6px;">${fmt(p.price)}</td><td style="padding:4px 6px;">${stockBadge(p.stock)}</td></tr>`).join('')}
+        ${nuevos.slice(0,30).map(p=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${esc(p.sku)}</td><td style="padding:4px 6px;">${esc(p.name)}</td><td style="padding:4px 6px;">${esc(p.brand)}</td><td style="padding:4px 6px;">${fmt(p.price)}</td><td style="padding:4px 6px;">${stockBadge(p.stock)}</td></tr>`).join('')}
         ${nuevos.length>30?`<tr><td colspan="5" style="padding:4px 6px;color:var(--muted);">...y ${nuevos.length-30} más</td></tr>`:''}
       </table></div>`;
     }
@@ -3122,7 +3247,7 @@ async function handleExcelUpload(event){
           const c=currentMap[p.sku];
           const precioChg=c.price!==p.price?`<span style="color:var(--muted);">${fmt(c.price)}</span> → <b>${fmt(p.price)}</b>`:fmt(p.price);
           const stockChg=c.stock!==p.stock?`${stockBadge(c.stock)} → ${stockBadge(p.stock)}`:stockBadge(p.stock);
-          return `<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${p.sku}</td><td style="padding:4px 6px;">${p.name}</td><td style="padding:4px 6px;">${precioChg}</td><td style="padding:4px 6px;">${stockChg}</td></tr>`;
+          return `<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${esc(p.sku)}</td><td style="padding:4px 6px;">${esc(p.name)}</td><td style="padding:4px 6px;">${precioChg}</td><td style="padding:4px 6px;">${stockChg}</td></tr>`;
         }).join('')}
         ${actualizados.length>30?`<tr><td colspan="4" style="padding:4px 6px;color:var(--muted);">...y ${actualizados.length-30} más</td></tr>`:''}
       </table></div>`;
@@ -3132,7 +3257,7 @@ async function handleExcelUpload(event){
       html += `<h4 style="color:var(--red);margin:16px 0 6px;">🔴 Faltantes → NOSTOCK (${faltantes.length})</h4>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
         <tr style="border-bottom:1px solid var(--border);"><th>SKU</th><th>Nombre</th><th>Marca</th></tr>
-        ${faltantes.slice(0,30).map(p=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${p.sku}</td><td style="padding:4px 6px;">${p.name}</td><td style="padding:4px 6px;">${p.brand}</td></tr>`).join('')}
+        ${faltantes.slice(0,30).map(p=>`<tr style="border-bottom:1px solid var(--border);"><td style="padding:4px 6px;color:var(--muted);">${esc(p.sku)}</td><td style="padding:4px 6px;">${esc(p.name)}</td><td style="padding:4px 6px;">${esc(p.brand)}</td></tr>`).join('')}
         ${faltantes.length>30?`<tr><td colspan="3" style="padding:4px 6px;color:var(--muted);">...y ${faltantes.length-30} más</td></tr>`:''}
       </table></div>`;
     }
@@ -3395,7 +3520,7 @@ async function limpiezaLoadUsuarios(){
   if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin usuarios</div>'; return; }
   el.innerHTML = data.map(u =>
     _limpiezaRow(u.id,
-      `<b>${u.nombre||'Sin nombre'}</b> <span style="color:var(--muted);">${u.approved?'✅ Aprobado':'⏳ Pendiente'} · ${new Date(u.created_at).toLocaleDateString('es-AR')}</span>`,
+      `<b>${esc(u.nombre||'Sin nombre')}</b> <span style="color:var(--muted);">${u.approved?'✅ Aprobado':'⏳ Pendiente'} · ${new Date(u.created_at).toLocaleDateString('es-AR')}</span>`,
       'usuarios')
   ).join('');
 }
@@ -3411,7 +3536,7 @@ async function limpiezaLoadCatalogo(){
   if(!data||!data.length){ el.innerHTML='<div style="color:var(--muted);font-size:12px;">Sin pedidos</div>'; return; }
   el.innerHTML = data.map(o =>
     _limpiezaRow(o.id,
-      `<b>${o.nombre_cliente||'Sin nombre'}</b> · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.created_at).toLocaleDateString('es-AR')} · ${o.via||''}</span>`,
+      `<b>${esc(o.nombre_cliente||'Sin nombre')}</b> · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.created_at).toLocaleDateString('es-AR')} · ${esc(o.via||'')}</span>`,
       'catalogo')
   ).join('');
 }
@@ -3428,7 +3553,7 @@ async function limpiezaLoadPOS(){
   el.innerHTML = data.map(o => {
     const cliente = o.clients?.nombre || 'Sin cliente';
     return _limpiezaRow(o.id,
-      `<b>${o.ticket_display||o.id.slice(0,8)}</b> · ${cliente} · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.fecha).toLocaleDateString('es-AR')}</span>`,
+      `<b>${esc(o.ticket_display||o.id.slice(0,8))}</b> · ${esc(cliente)} · $${(o.total||0).toLocaleString('es-AR')} · <span style="color:var(--muted);">${new Date(o.fecha).toLocaleDateString('es-AR')}</span>`,
       'pos');
   }).join('');
 }
@@ -3447,7 +3572,7 @@ async function limpiezaLoadClientes(){
   
   el.innerHTML = _limpiezaData.clientes.map(c =>
     _limpiezaRow(c.id,
-      `<b>${c.nombre||'Sin nombre'}</b> · ${c.telefono||'sin tel'} · ${c.email||''} <span style="color:var(--muted);">${ventaCount[c.id]?'📦 '+ventaCount[c.id]+' ventas':''}</span>`,
+      `<b>${esc(c.nombre||'Sin nombre')}</b> · ${esc(c.telefono||'sin tel')} · ${esc(c.email||'')} <span style="color:var(--muted);">${ventaCount[c.id]?'📦 '+ventaCount[c.id]+' ventas':''}</span>`,
       'clientes')
   ).join('');
 }
@@ -3497,8 +3622,8 @@ function limpiezaUnificarClientes(){
             <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:pointer;">
               <input type="radio" name="clientePrincipal" value="${c.id}" ${i===0?'checked':''} style="accent-color:var(--accent);width:16px;height:16px;">
               <div>
-                <div style="font-size:13px;font-weight:600;">${c.nombre||'Sin nombre'}</div>
-                <div style="font-size:11px;color:var(--muted);">${c.telefono||'sin tel'} ${c.email?'· '+c.email:''}</div>
+                <div style="font-size:13px;font-weight:600;">${esc(c.nombre||'Sin nombre')}</div>
+                <div style="font-size:11px;color:var(--muted);">${esc(c.telefono||'sin tel')} ${c.email?'· '+esc(c.email):''}</div>
               </div>
             </label>`).join('')}
         </div>
