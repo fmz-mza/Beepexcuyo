@@ -5707,9 +5707,48 @@
       const changes = await refreshCatalog();
       if (changes && changes.length) showToast(`🔄 Actualizamos tu pedido: ${_changesSummary(changes)}`);
     }
-    document.addEventListener('visibilitychange', () => refreshCatalogIfStale(CATALOG_STALE_MS));
-    window.addEventListener('pageshow', e => { if (e.persisted) refreshCatalogIfStale(CATALOG_STALE_MS); });
+    // ── Versión de la página ──
+    // deploy.yml reemplaza el marcador de APP_VERSION por el commit publicado y escribe version.json. Si se publicó
+    // una versión más nueva, la página se recarga sola la próxima vez que el cliente vuelve a la
+    // pestaña (no mientras la está usando). Es seguro: carrito, nombre y observaciones están en
+    // localStorage, y los filtros en sessionStorage.
+    const APP_VERSION = '__BUILD__';
+    let _newVersion = null;
+    async function checkAppVersion() {
+      if (APP_VERSION.startsWith('__')) return; // copia local, sin publicar
+      try {
+        const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+        if (!r.ok) return;
+        const { v } = await r.json();
+        if (v && v !== APP_VERSION) _newVersion = v;
+      } catch (e) { }
+    }
+    function reloadForNewVersion() {
+      if (!_newVersion || _isRecovering || _orderSending || _verifyingSend) return false;
+      try {
+        // Una sola vez por versión: si el CDN todavía sirve la vieja, no entrar en un bucle de recargas
+        if (sessionStorage.getItem('beepex_reload_for') === _newVersion) return false;
+        sessionStorage.setItem('beepex_reload_for', _newVersion);
+        sessionStorage.setItem('beepex_auto_reload', '1'); // para no mostrar el "¡Hola de nuevo!" otra vez
+      } catch (e) { return false; }
+      saveCart();
+      const u = new URL(location.href);
+      u.searchParams.set('v', _newVersion); // URL nueva: ni el CDN ni el navegador sirven la copia vieja
+      location.replace(u.toString());
+      return true;
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      if (reloadForNewVersion()) return;
+      refreshCatalogIfStale(CATALOG_STALE_MS);
+    });
+    window.addEventListener('pageshow', e => {
+      if (!e.persisted) return;
+      if (reloadForNewVersion()) return;
+      refreshCatalogIfStale(CATALOG_STALE_MS);
+    });
     setInterval(() => refreshCatalogIfStale(60 * 60 * 1000), 5 * 60 * 1000);
+    setInterval(checkAppVersion, 20 * 60 * 1000);
 
     // Antes de enviar: precios y stock al momento. true = seguir con el envío.
     let _verifyingSend = false;
@@ -10250,7 +10289,11 @@ _${text}_`;
 
       // Auth en paralelo (no bloquea el catálogo)
       initAuth();
-      setTimeout(() => { if (!_isRecovering) openWelcome(); }, 600);
+      // Tras una recarga automática por versión nueva no se repite el "¡Hola de nuevo!"
+      let autoReload = false;
+      try { autoReload = sessionStorage.getItem('beepex_auto_reload') === '1'; sessionStorage.removeItem('beepex_auto_reload'); } catch (e) { }
+      if (!autoReload) setTimeout(() => { if (!_isRecovering) openWelcome(); }, 600);
+      setTimeout(checkAppVersion, 60 * 1000);
     })();
   </script>
 </body>

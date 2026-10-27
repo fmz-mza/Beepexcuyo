@@ -146,6 +146,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
 .filter-btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;min-height:36px;}
 .filter-btn:hover{color:var(--text);border-color:var(--accent);}
+.order-stale{margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.3);font-size:11.5px;}
+.order-stale ul{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:2px;}
 .ca-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
 .ca-kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:0;}
 .ca-kpi-val{font-size:18px;font-weight:800;line-height:1.1;}
@@ -2852,9 +2854,25 @@ function renderHeatmap(views){
 }
 
 let _ordersById={};
+// Pedidos enviados con precios que ya no eran los del catálogo (ej. una pestaña abierta desde antes
+// de una publicación). Lo marca el trigger de la migración 0008 al guardar el pedido; precios sin IVA.
+function _preciosViejosHtml(o){
+  const dif=Array.isArray(o.precios_desactualizados)?o.precios_desactualizados:[];
+  if(!dif.length) return '';
+  const qtyBySku={}; (Array.isArray(o.items)?o.items:[]).forEach(i=>{ qtyBySku[i.sku]=(qtyBySku[i.sku]||0)+(Number(i.qty)||0); });
+  let neto=0;
+  const rows=dif.map(d=>{
+    if(d.actual==null) return `<li>${esc(d.nombre||'SKU '+d.sku)} <span style="color:var(--muted)">(SKU ${esc(d.sku)})</span>: ya no está en el catálogo · se envió a ${fmt(d.enviado)}</li>`;
+    const q=qtyBySku[d.sku]||1, delta=(d.actual-d.enviado)*q; neto+=delta;
+    return `<li>${esc(d.nombre||'SKU '+d.sku)} <span style="color:var(--muted)">(SKU ${esc(d.sku)})</span>: se envió a ${fmt(d.enviado)}, el precio era ${fmt(d.actual)} <b style="color:${delta>0?'var(--red)':'var(--green)'}">(${delta>0?'+':'−'}${fmt(Math.abs(delta))} en ${q} un.)</b></li>`;
+  }).join('');
+  return `<div class="order-stale"><div style="font-weight:700;color:var(--accent2);margin-bottom:4px;">⚠️ Enviado con precios desactualizados (sin IVA)</div><ul>${rows}</ul>`+
+    (neto?`<div style="margin-top:4px;">Diferencia: <b style="color:${neto>0?'var(--red)':'var(--green)'}">${neto>0?'+':'−'}${fmt(Math.abs(neto))}</b> ${neto>0?'a favor nuestro si se cobra al precio actual':'a favor del cliente'}</div>`:'')+`</div>`;
+}
 function renderAllOrders(orders){
   const el=document.getElementById('allOrders');
-  document.getElementById('ordersCount').textContent=`${orders.length} pedido${orders.length!==1?'s':''}`;
+  const stale=orders.filter(o=>Array.isArray(o.precios_desactualizados)&&o.precios_desactualizados.length).length;
+  document.getElementById('ordersCount').textContent=`${orders.length} pedido${orders.length!==1?'s':''}${stale?` · ⚠️ ${stale} con precios viejos`:''}`;
   if(!orders.length){ el.innerHTML=`<div class="empty">Sin pedidos en este período</div>`; return; }
   _ordersById={};
   el.innerHTML=orders.map(o=>{
@@ -2862,11 +2880,13 @@ function renderAllOrders(orders){
     const items=Array.isArray(o.items)?o.items:[];
     const itemsStr=items.map(i=>`${esc(i.qty)}× ${esc(i.name)}`).join(', ');
     const via=o.via||'whatsapp';
-    return `<div class="order-row">
+    const staleHtml=_preciosViejosHtml(o);
+    return `<div class="order-row"${staleHtml?' style="border-color:rgba(245,166,35,.5);"':''}>
       <div class="order-row-header">
         <div>
           <span style="font-size:13px;font-weight:700;">${esc(o.nombre_cliente||'Sin nombre')}</span>
           <span class="order-via ${esc(via)}" style="margin-left:8px;">${via==='pdf'?'📄 PDF':'💬 WhatsApp'}</span>
+          ${staleHtml?'<span class="ca-tag" style="margin-left:6px;color:var(--accent2);border-color:rgba(245,166,35,.4);">⚠️ Precios viejos</span>':''}
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="order-total">${fmt(o.total)}</span>
@@ -2876,6 +2896,7 @@ function renderAllOrders(orders){
       </div>
       <div class="order-meta">${fmtDateTime(o.created_at)} · ${items.length} producto${items.length!==1?'s':''}</div>
       <div class="order-items" style="margin-top:4px;">${itemsStr}</div>
+      ${staleHtml}
     </div>`;
   }).join('');
 }

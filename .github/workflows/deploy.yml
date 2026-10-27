@@ -7,6 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Versión publicada: el catálogo compara su APP_VERSION con version.json y, si hay una
+      # más nueva, se recarga solo al volver a la pestaña (pestañas que quedan abiertas días).
+      - name: Marcar versión publicada
+        run: |
+          V="${GITHUB_SHA::7}"
+          sed -i "s/__BUILD__/$V/" beepex-cuyo.html
+          printf '{"v":"%s"}\n' "$V" > version.json
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
