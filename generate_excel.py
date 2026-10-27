@@ -123,9 +123,7 @@ def generate_client_excel():
         ws.cell(row=current_row, column=5, value=p.get('rubro'))
         ws.cell(row=current_row, column=6, value=p.get('descripcion'))
         
-        # Precio con parche para 11573 si fuera necesario (consistencia con web)
         precio_v = float(p.get('precio_pesos') or 0)
-        if str(sku) == '11573': precio_v = 59999
 
         c_price = ws.cell(row=current_row, column=7, value=precio_v)
         c_price.number_format = '"$"#,##0'
