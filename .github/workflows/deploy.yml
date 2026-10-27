@@ -1,10 +1,27 @@
 name: Deploy to GitHub Pages
+# Publica el sitio (raíz del repo) con GitHub Actions. En la configuración de Pages el origen
+# es "GitHub Actions", no una rama: lo que se publica es lo que sube este workflow.
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Una publicación a la vez; si llega otro push, la que está en curso termina igual
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       # Versión publicada: el catálogo compara su APP_VERSION con version.json y, si hay una
@@ -13,11 +30,11 @@ jobs:
         run: |
           V="${GITHUB_SHA::7}"
           sed -i "s/__BUILD__/$V/" beepex-cuyo.html
+          grep -q "const APP_VERSION = '$V'" beepex-cuyo.html
           printf '{"v":"%s"}\n' "$V" > version.json
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
-          # Ensure the site is served from the repository root
-          # No destination_dir needed as we want files at root of gh-pages
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
