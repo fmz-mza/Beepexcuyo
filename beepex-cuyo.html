@@ -2591,6 +2591,46 @@
       gap: 8px;
     }
 
+    /* Aviso "Actualizamos tu pedido" (precios/stock que cambiaron desde que se armó) */
+    .cart-notice {
+      flex-shrink: 0;
+      margin: 10px 16px 0;
+      padding: 10px 12px;
+      background: rgba(245, 166, 35, .1);
+      border: 1px solid rgba(245, 166, 35, .35);
+      border-radius: 10px;
+      font-size: 12px;
+      max-height: 22vh;
+      overflow-y: auto;
+    }
+    .cn-head { font-weight: 700; color: var(--accent2); margin-bottom: 6px; }
+    .cart-notice ul, .cn-modal ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+    .cn-name { color: var(--text); }
+    .cn-old { color: var(--muted); text-decoration: line-through; font-weight: 400; }
+    .cn-up { color: var(--red); }
+    .cn-down { color: var(--green); }
+    .cn-out { color: var(--red); font-weight: 600; }
+    .cn-ok {
+      margin-top: 8px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--card); color: var(--text); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .cn-modal-bg {
+      position: fixed; inset: 0; z-index: 10000; background: rgba(0, 0, 0, .7);
+      display: flex; align-items: center; justify-content: center; padding: 16px;
+    }
+    .cn-modal {
+      width: 100%; max-width: 420px; max-height: 85vh; overflow-y: auto;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; font-size: 13px;
+    }
+    .cn-modal-title { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+    .cn-modal-sub { color: var(--muted); margin-bottom: 10px; }
+    .cn-modal-total { margin-top: 12px; font-size: 14px; }
+    .cn-modal-total b { color: var(--accent2); }
+    .cn-modal-btns { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .cn-modal-btns button { flex: 1 1 140px; padding: 11px 12px; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .cn-btn-sec { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+    .cn-btn-main { background: var(--green); color: #fff; border: none; }
+
     .freq-section {
       margin-top: 4px;
     }
@@ -5012,6 +5052,7 @@
       <button class="clear-cart-btn" id="clearCartBtn" onclick="clearCart()" title="Vaciar pedido">🗑</button>
       <button class="close-btn" onclick="closeCart()">✕</button>
     </div>
+    <div class="cart-notice" id="cartNotice" style="display:none"></div>
     <div class="cart-items" id="cartItems"></div>
     <div class="cart-footer">
       <input class="cart-input" id="clientName" placeholder="👤 Tu nombre" oninput="saveCart()">
@@ -5407,8 +5448,9 @@
     // ── Mapa rápido de productos por SKU ─────────────────────────────────────────
     let productMap = {};
 
-    async function loadProducts() {
-      try {
+    // Trae el catálogo de Supabase ya normalizado. No toca el estado global: lo usan tanto la
+    // carga inicial como el refresco automático (refreshCatalog), que si falla conserva lo que hay.
+    async function fetchCatalog() {
         const res = await fetch(
           `${SUPABASE_URL}/rest/v1/productos?select=sku:codigo,name:producto,brand:marca,price:precio_pesos,pvp:precio_pvp,iva,stock:stock_estado,stock_fisico,stock_ingresos,description:descripcion,rubro,ean,agrupador,caracteristica,color,categorizacion,drive_id&order=marca.asc,producto.asc`,
           {
@@ -5462,18 +5504,28 @@
         });
 
         // Ocultar del catálogo los productos con stock físico < 10 que no sean preventa válida (>= 10)
-        products = allRows.filter(p => {
+        const list = allRows.filter(p => {
           if ((p.stock || '').startsWith('PREVENTA')) return (p.stock_ingresos || 0) >= 10;
           return (p.stock_fisico || 0) >= 10;
         });
-        productMeta = {};
+        const meta = {};
         rows.forEach(r => {
           const tags = (r.description || '').toLowerCase();
-          productMeta[String(r.sku)] = { desc: r.description || '', tags: tags };
+          meta[String(r.sku)] = { desc: r.description || '', tags: tags };
         });
-        productMap = Object.fromEntries(products.map(p => [p.sku, p]));
-        // Renderizar chips de rubros después de tener los datos
-        renderRubros();
+        return { products: list, productMeta: meta };
+    }
+    function applyCatalog(data) {
+      products = data.products;
+      productMeta = data.productMeta;
+      productMap = Object.fromEntries(products.map(p => [p.sku, p]));
+      _catalogLoadedAt = Date.now();
+      // Renderizar chips de rubros después de tener los datos
+      renderRubros();
+    }
+    async function loadProducts() {
+      try {
+        applyCatalog(await fetchCatalog());
       } catch (e) {
         console.error('loadProducts error:', e);
         products = [];
@@ -5499,7 +5551,7 @@
     function saveCart() {
       try {
         localStorage.setItem('beepex_cart', JSON.stringify({
-          cart, includeIVA,
+          cart, includeIVA, cartNotice: _cartNotice,
           clientName: document.getElementById('clientName').value,
           clientObs: document.getElementById('clientObs').value
         }));
@@ -5511,12 +5563,13 @@
         if (!raw) return;
         const data = JSON.parse(raw);
         cart = data.cart || {};
+        if (data.cartNotice) _cartNotice = data.cartNotice;
         const hasCatalog = Object.keys(productMap || {}).length > 0;
         if (hasCatalog) {
-          Object.keys(cart).forEach(sku => {
-            const p = productMap[sku];
-            if (p) cart[sku].product = p; else delete cart[sku];
-          });
+          // El carrito guardado tiene los precios de cuando se armó: se pasa a los de hoy y,
+          // si algo cambió, se avisa (antes se reemplazaba y se borraba sin decir nada)
+          const changes = reconcileCart();
+          if (changes.length) setCartNotice(changes);
         }
         if (data.clientName) document.getElementById('clientName').value = data.clientName;
         if (data.clientObs) document.getElementById('clientObs').value = data.clientObs;
@@ -5530,6 +5583,179 @@
         // Modal de bienvenida al cargar
         if (data.clientName) updateCartTitle();
       } catch (e) { localStorage.removeItem('beepex_cart'); }
+    }
+
+    // ── Precios al día: refresco del catálogo y cambios en el carrito ───────────────
+    // Los productos se cargaban una sola vez al abrir la página: un cliente que la deja abierta
+    // días seguía viendo (y enviando el pedido con) los precios de ese día. Ahora:
+    //  1) refreshCatalog() vuelve a traer precios/stock al volver a la pestaña tras 30 min, o cada
+    //     hora con la pestaña visible (sync.py corre cada hora), sin recargar la página;
+    //  2) reconcileCart() pasa el carrito a los precios de hoy y _cartNotice guarda qué cambió
+    //     (precio anterior → nuevo, o "sin stock, lo quitamos") para mostrarlo en el carrito;
+    //  3) antes de enviar el pedido (WhatsApp/PDF) se refresca y, si algo cambió, se pide confirmar.
+    let _catalogLoadedAt = 0, _catalogRefreshing = null;
+    let _cartNotice = { price: {}, out: {} };
+    const CATALOG_STALE_MS = 30 * 60 * 1000;
+
+    // Devuelve la lista de cambios: { type: 'price', sku, name, from, to, iva } | { type: 'out', sku, name, qty }
+    function reconcileCart() {
+      const changes = [];
+      Object.keys(cart).forEach(sku => {
+        const c = cart[sku], old = c.product || {}, p = productMap[sku];
+        if (!p || stockType(p.stock) === 'NOSTOCK') {
+          if (c.qty > 0) changes.push({ type: 'out', sku, name: old.name || `SKU ${sku}`, qty: c.qty });
+          delete cart[sku];
+          return;
+        }
+        if (c.qty > 0 && typeof old.price === 'number' && old.price !== p.price)
+          changes.push({ type: 'price', sku, name: p.name, from: old.price, to: p.price, iva: p.iva });
+        c.product = p;
+      });
+      return changes;
+    }
+    function setCartNotice(changes) {
+      if (!_cartNotice || !_cartNotice.price) _cartNotice = { price: {}, out: {} };
+      changes.forEach(ch => {
+        if (ch.type === 'out') { _cartNotice.out[ch.sku] = { name: ch.name, qty: ch.qty }; delete _cartNotice.price[ch.sku]; return; }
+        const prev = _cartNotice.price[ch.sku];
+        const from = prev ? prev.from : ch.from; // se conserva el precio que el cliente vio primero
+        if (from === ch.to) delete _cartNotice.price[ch.sku];
+        else _cartNotice.price[ch.sku] = { name: ch.name, from, to: ch.to, iva: ch.iva };
+      });
+      saveCart();
+      renderCartNotice();
+    }
+    function cartNoticeCount() {
+      return _cartNotice ? Object.keys(_cartNotice.price || {}).length + Object.keys(_cartNotice.out || {}).length : 0;
+    }
+    function dismissCartNotice() {
+      _cartNotice = { price: {}, out: {} };
+      saveCart();
+      renderCartNotice();
+      renderCart();
+    }
+    const _ivaPrice = (base, iva) => includeIVA ? Math.round(base * (1 + (iva || 0) / 100)) : base;
+    function renderCartNotice() {
+      const el = document.getElementById('cartNotice'); if (!el) return;
+      // Solo cuenta lo que sigue en el carrito (si lo quitó a mano, ya no importa)
+      Object.keys(_cartNotice.price || {}).forEach(sku => { if (!cart[sku]) delete _cartNotice.price[sku]; });
+      if (!cartNoticeCount()) { el.innerHTML = ''; el.style.display = 'none'; return; }
+      const rows = [];
+      Object.values(_cartNotice.price).forEach(x => {
+        const up = x.to > x.from;
+        rows.push(`<li><span class="cn-name">${_listEsc(x.name)}</span> <span class="cn-old">${fmt(_ivaPrice(x.from, x.iva))}</span> → <b class="${up ? 'cn-up' : 'cn-down'}">${fmt(_ivaPrice(x.to, x.iva))}</b></li>`);
+      });
+      Object.values(_cartNotice.out).forEach(x => {
+        rows.push(`<li><span class="cn-name">${_listEsc(x.name)}</span> <span class="cn-out">sin stock · lo quitamos (${x.qty} un.)</span></li>`);
+      });
+      el.innerHTML = `<div class="cn-head">🔄 Actualizamos tu pedido con los precios y el stock de hoy</div><ul>${rows.join('')}</ul>` +
+        `<button type="button" class="cn-ok" onclick="dismissCartNotice()">Entendido</button>`;
+      el.style.display = '';
+    }
+    function cartPriceHtml(c) {
+      const p = c.product, precio = mayorista(p), ch = _cartNotice.price && _cartNotice.price[p.sku];
+      const old = ch ? `<span class="cn-old">${fmt(_ivaPrice(ch.from, ch.iva))}</span> ` : '';
+      return `${old}${fmt(precio)} × ${c.qty} = ${fmt(precio * c.qty)}`;
+    }
+
+    // Vuelve a traer el catálogo y actualiza grilla y carrito sin recargar la página.
+    // Devuelve los cambios del carrito, o null si no se pudo (en ese caso no se toca nada).
+    function refreshCatalog() {
+      if (_catalogRefreshing) return _catalogRefreshing;
+      _catalogRefreshing = (async () => {
+        try {
+          const data = await fetchCatalog();
+          if (!data.products.length) return null; // nunca pisar el catálogo con uno vacío
+          applyCatalog(data);
+          // Las tarjetas de grupo guardan sus variantes: apuntarlas a los productos nuevos
+          Object.values(_groupMap).forEach(g => {
+            g.variants = g.variants.map(v => productMap[v.sku] || v);
+            if (g.cover) g.cover = productMap[g.cover.sku] || g.cover;
+          });
+          const changes = reconcileCart();
+          if (changes.length) setCartNotice(changes);
+          saveCart();
+          updateCount();
+          // Actualizar en el lugar lo que ya está dibujado (sin rearmar la grilla ni mover el scroll)
+          if (listActive()) { _gridRenderKey = ''; renderGrid(); }
+          else {
+            document.querySelectorAll('#grid .card[id^="card-"]:not(.card-group)').forEach(el => {
+              const p = productMap[el.id.slice(5)]; if (p) patchCard(el, p);
+            });
+            refreshGroupCards();
+          }
+          renderCart();
+          return changes;
+        } catch (e) {
+          console.warn('refreshCatalog:', e);
+          return null;
+        } finally {
+          _catalogRefreshing = null;
+        }
+      })();
+      return _catalogRefreshing;
+    }
+    function _changesSummary(changes) {
+      const np = changes.filter(c => c.type === 'price').length, no = changes.filter(c => c.type === 'out').length;
+      const parts = [];
+      if (np) parts.push(`${np} precio${np !== 1 ? 's' : ''} cambi${np !== 1 ? 'aron' : 'ó'}`);
+      if (no) parts.push(`${no} producto${no !== 1 ? 's' : ''} sin stock`);
+      return parts.join(' y ');
+    }
+    async function refreshCatalogIfStale(maxAge) {
+      if (!_catalogLoadedAt || document.hidden || Date.now() - _catalogLoadedAt < maxAge) return;
+      const changes = await refreshCatalog();
+      if (changes && changes.length) showToast(`🔄 Actualizamos tu pedido: ${_changesSummary(changes)}`);
+    }
+    document.addEventListener('visibilitychange', () => refreshCatalogIfStale(CATALOG_STALE_MS));
+    window.addEventListener('pageshow', e => { if (e.persisted) refreshCatalogIfStale(CATALOG_STALE_MS); });
+    setInterval(() => refreshCatalogIfStale(60 * 60 * 1000), 5 * 60 * 1000);
+
+    // Antes de enviar: precios y stock al momento. true = seguir con el envío.
+    let _verifyingSend = false;
+    async function verifyCartBeforeSend() {
+      if (_verifyingSend) return false; // doble toque mientras se verifica
+      _verifyingSend = true;
+      try { return await _verifyCartBeforeSend(); } finally { _verifyingSend = false; }
+    }
+    async function _verifyCartBeforeSend() {
+      const changes = await refreshCatalog();
+      if (changes === null) return true; // sin conexión con la base: no se bloquea el pedido
+      if (!changes.length) return true;
+      if (!Object.values(cart).some(c => c.qty > 0)) {
+        showToast('Los productos de tu pedido se quedaron sin stock');
+        return false;
+      }
+      return confirmCartChanges(changes);
+    }
+    function confirmCartChanges(changes) {
+      return new Promise(resolve => {
+        const items = Object.values(cart).filter(c => c.qty > 0);
+        let sub = 0, ivaTot = 0;
+        items.forEach(c => { sub += c.product.price * c.qty; ivaTot += Math.round(c.product.price * c.qty * c.product.iva / 100); });
+        const total = includeIVA ? sub + ivaTot : sub;
+        const rows = changes.map(ch => ch.type === 'price'
+          ? `<li><span class="cn-name">${_listEsc(ch.name)}</span> <span class="cn-old">${fmt(_ivaPrice(ch.from, ch.iva))}</span> → <b class="${ch.to > ch.from ? 'cn-up' : 'cn-down'}">${fmt(_ivaPrice(ch.to, ch.iva))}</b></li>`
+          : `<li><span class="cn-name">${_listEsc(ch.name)}</span> <span class="cn-out">sin stock · lo quitamos (${ch.qty} un.)</span></li>`).join('');
+        const ov = document.createElement('div');
+        ov.className = 'cn-modal-bg';
+        ov.innerHTML = `<div class="cn-modal" role="dialog" aria-modal="true">
+          <div class="cn-modal-title">Antes de enviar, actualizamos tu pedido</div>
+          <div class="cn-modal-sub">Desde que lo armaste ${_changesSummary(changes)}:</div>
+          <ul>${rows}</ul>
+          <div class="cn-modal-total">Nuevo total: <b>${fmt(total)}</b></div>
+          <div class="cn-modal-btns">
+            <button type="button" class="cn-btn-sec" data-r="0">Revisar pedido</button>
+            <button type="button" class="cn-btn-main" data-r="1">Enviar con precios actualizados</button>
+          </div></div>`;
+        ov.addEventListener('click', e => {
+          const b = e.target.closest('button[data-r]');
+          if (!b && e.target !== ov) return;
+          ov.remove();
+          resolve(!!b && b.dataset.r === '1');
+        });
+        document.body.appendChild(ov);
+      });
     }
 
     // ── Frases motivadoras ───────────────────────────────────────────────────────
@@ -6842,7 +7068,8 @@
         const total = Object.values(cart).filter(c => c.qty > 0).reduce((a, c) =>
           a + (includeIVA ? Math.round(c.product.price * (1 + c.product.iva / 100)) * c.qty : c.product.price * c.qty), 0);
         document.getElementById('wvReturnPhrase').textContent =
-          `Tenés ${itemCount} producto${itemCount !== 1 ? 's' : ''} en tu pedido por ${fmt(total)}. ¿Lo continuamos?`;
+          `Tenés ${itemCount} producto${itemCount !== 1 ? 's' : ''} en tu pedido por ${fmt(total)}.` +
+          (cartNoticeCount() ? ` Lo actualizamos con los precios y el stock de hoy.` : '') + ` ¿Lo continuamos?`;
         const mainBtn = document.getElementById('wvReturnMain');
         const secBtn = document.getElementById('wvReturnSec');
         mainBtn.textContent = 'Ver mi pedido →';
@@ -6999,6 +7226,7 @@
     function renderCart() {
       const items = Object.values(cart).filter(c => c.qty > 0);
       const box = document.getElementById('cartItems');
+      renderCartNotice();
 
       // Botón vaciar — siempre sincronizado con el estado del carrito
       const cb = document.getElementById('clearCartBtn');
@@ -7066,7 +7294,7 @@
           <div class="cart-item-info">
             <div class="cart-item-name">${p.name}</div>
             <div class="cart-item-sku">SKU ${p.sku}</div>
-            <div class="cart-item-price" id="ci-price-${p.sku}">${fmt(precio)} × ${c.qty} = ${fmt(precio * c.qty)}</div>
+            <div class="cart-item-price" id="ci-price-${p.sku}">${cartPriceHtml(c)}</div>
             ${isPrev ? `<div class="cart-item-badge">🕐 ${p.stock}</div>` : ''}
             <div class="cart-item-qty">
               <button onclick="chg('${p.sku}',-1)">−</button>
@@ -7094,7 +7322,7 @@
           const qtyEl = document.getElementById(`ci-qty-${p.sku}`);
           const priceEl = document.getElementById(`ci-price-${p.sku}`);
           if (qtyEl) qtyEl.textContent = c.qty;
-          if (priceEl) priceEl.textContent = `${fmt(precio)} × ${c.qty} = ${fmt(precio * c.qty)}`;
+          if (priceEl) priceEl.innerHTML = cartPriceHtml(c);
         });
       }
       let sub = 0, ivaTot = 0;
@@ -7154,11 +7382,14 @@
         setTimeout(() => { inp.style.borderColor = ''; inp.placeholder = '\uD83D\uDC64 Tu nombre'; }, 3000);
         return;
       }
+      // Precios y stock al momento de enviar (la p\u00E1gina pudo quedar abierta d\u00EDas)
+      if (!(await verifyCartBeforeSend())) return;
       const name = nameRaw;
       const obs = document.getElementById('clientObs').value.trim();
       const today = new Date().toLocaleDateString('es-AR');
       const items = Object.values(cart).filter(c => c.qty > 0);
       if (!items.length) return;
+      if (cartNoticeCount()) { _cartNotice = { price: {}, out: {} }; saveCart(); }
       const groups = {};
       items.forEach(c => { const b = c.product.brand || 'Sin marca'; (groups[b] = groups[b] || []).push(c); });
       let sub = 0, ivaTot = 0;
@@ -7323,11 +7554,15 @@
         setTimeout(() => { inp.style.borderColor = ''; inp.placeholder = '👤 Tu nombre'; }, 3000);
         return;
       }
+      // Precios y stock al momento de enviar (la página pudo quedar abierta días)
+      if (!(await verifyCartBeforeSend())) return;
       const name = nameRaw;
       const obs = document.getElementById('clientObs').value.trim();
       const today = new Date().toLocaleDateString('es-AR');
       const items = Object.values(cart).filter(c => c.qty > 0);
       if (!items.length) return;
+      // Ya se envía con los precios actualizados: el aviso cumplió su función
+      if (cartNoticeCount()) { _cartNotice = { price: {}, out: {} }; saveCart(); }
 
       // Lazy load jsPDF solo cuando se necesita
       if (!window.jspdf) {
@@ -7495,8 +7730,13 @@
         if (navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({ files: [file], title: 'Pedido Beepex Cuyo', text: `Pedido de ${name}` });
-          } catch (e) { console.warn('Share cancelled or failed', e); }
-          return;
+            return;
+          } catch (e) {
+            console.warn('Share cancelled or failed', e);
+            // Si el navegador no lo permite (p. ej. pasó mucho desde el toque por la verificación
+            // de precios), se descarga en vez de no hacer nada. Si el usuario canceló, listo.
+            if (e && e.name !== 'NotAllowedError') return;
+          }
         }
       }
 
