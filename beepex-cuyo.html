@@ -6050,6 +6050,8 @@
       if (!v.caract && !v.color) tags += `<span class="var-tag">${_listEsc(variantLabel(v, title))}</span>`;
       if (no) tags += '<span class="var-tag out">Sin stock</span>';
       else if (t === 'PREVENTA') tags += '<span class="var-tag pv">Preventa</span>';
+      // Igual que en las tarjetas: marca qué variante del grupo está en Oportunidades
+      if (isLiquidacion(v.stock)) tags += '<span class="liqui-fire" aria-label="Liquidación" title="Oportunidad">🔥</span>';
       const price = !userApproved ? '<span class="price-locked" onclick="event.stopPropagation();openAuth()">🔒 Ver precio</span>'
         : (v.price === 0 ? 'Consultar' : fmt(mayorista(v)));
       const stk = variantStockHtml(v);
