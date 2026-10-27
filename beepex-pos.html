@@ -591,8 +591,6 @@ async function loadProducts(){
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
     products = rows.map(p => {
-      const code = String(p.codigo);
-      if(code === '11573') p.precio_pesos = 59999;
       const sFisico = parseFloat(p.stock_fisico) || 0;
       const sIngresos = parseFloat(p.stock_ingresos) || 0;
       if (sFisico < 10 && sIngresos < 10) {

@@ -5472,8 +5472,7 @@
         console.log('loadProducts rows:', rows.length);
         const allRows = rows.map(r => {
           const sku = String(r.sku);
-          let price = r.price;
-          if (sku === '11573') price = 59999;
+          const price = r.price;
           const rawFisico = parseFloat(r.stock_fisico) || 0;
           const rawIngresos = parseFloat(r.stock_ingresos) || 0;
           const sFisico = rawFisico >= 10 ? rawFisico : 0;
