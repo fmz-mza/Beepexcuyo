@@ -5105,6 +5105,7 @@
           <div class="grp-detail-i"><b>Cód</b><span id="gdCod">-</span></div>
           <div class="grp-detail-i"><b>EAN</b><span id="gdEan">-</span></div>
           <div class="grp-detail-i"><b>PVP</b><span id="gdPvp" class="pvp-val">-</span></div>
+          <div class="grp-detail-i"><b>IVA</b><span id="gdIva">-</span></div>
           <div class="grp-detail-i wide"><b>Disponibilidad</b><span id="gdStock">-</span></div>
         </div>
       </div>
@@ -6248,6 +6249,11 @@
       const varied = new Set(prices).size > 1;
       return `${varied ? '<span class="price-from">Desde</span>' : ''}<span class="price">${fmt(min)}</span>`;
     }
+    // "IVA 21%" como en las tarjetas sueltas; si las variantes tuvieran alícuotas distintas, "IVA 10.5% / 21%"
+    function groupIvaLabel(variants) {
+      const ivas = [...new Set(variants.map(v => v.iva))].sort((a, b) => a - b);
+      return `IVA ${ivas.map(i => i + '%').join(' / ')}`;
+    }
     function createGroupCard(g) {
       const cover = g.cover, st = stockType(g.stock);
       const { st: units, pv } = groupStats(g);
@@ -6274,6 +6280,7 @@
         <span class="tag ${brandClass}">${_listEsc(g.brand)}</span>
         <span class="tag ${tagClass}">${_listEsc(stockLabel(g.stock))}</span>${g.variants.some(v => isLiquidacion(v.stock)) ? '<span class="liqui-fire" aria-label="Liquidación">🔥</span>' : ''}
       </div>
+      <div class="iva-label">${groupIvaLabel(g.variants)}</div>
       <div class="prod-name">${_listEsc(g.name)}</div>
       <div class="sku">${nv} variantes</div>
       <div class="g-price">${groupPriceHtml(g)}</div>
@@ -6426,6 +6433,8 @@
       document.getElementById('gdCod').textContent = v.sku;
       document.getElementById('gdEan').textContent = v.ean || '-';
       document.getElementById('gdPvp').textContent = userApproved && v.pvp > 0 ? fmt(v.pvp) : '-';
+      // Al abrir (sin variante elegida) se muestra el del grupo; al elegir una, el de esa variante
+      document.getElementById('gdIva').textContent = initial ? groupIvaLabel(vs).replace('IVA ', '') : `${v.iva}%`;
       let html = grpTotalHtml(vs);
       if (!initial && vs.length > 1) {
         html += `<br><small style="font-weight:400">Esta variante (${_listEsc(variantLabel(v, _grp.g.name))}): ${variantStockHtml(v)}</small>`;
