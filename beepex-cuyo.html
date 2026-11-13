@@ -5904,8 +5904,9 @@
     // ── Tabs de estado ────────────────────────────────────────────────────────────
     // activeStock guarda el tab activo: 'DISP' (stock + liquidación; los sin stock van
     // al final solo si showNoStock, como siempre), 'LIQUIDACION', 'VERANO' o 'PREVENTA'.
-    // 'VERANO' = preventa de temporada: rubro VERANO o "VERANO" en el nombre (camas estera,
-    // mantas refrigerantes...). Esos productos salen de 'PREVENTA' para no repetirse.
+    // 'VERANO' = preventa de temporada: rubro VERANO / MANTAS REFRIGERANTES, o en el nombre
+    // "VERANO", "REFRIGER..." o "REFRESCANTE" (camas estera, mantas...). Salen de 'PREVENTA'
+    // para no repetirse.
     const CAT_TABS = [
       { id: 'DISP', label: 'Disponible', cls: '' },
       { id: 'LIQUIDACION', label: 'Oportunidades', short: 'Oport.', cls: 't-oport' },
@@ -5913,7 +5914,7 @@
       { id: 'PREVENTA', label: 'Preventa', cls: 't-prev' }
     ];
     function isVerano(p) {
-      return /VERANO/i.test(p.rubro || '') || /\bVERANO\b/i.test(p.name || '');
+      return /VERANO|REFRIGER/i.test(p.rubro || '') || /\bVERANO\b|REFRIGER|REFRESCANTE/i.test(p.name || '');
     }
     function tabMatch(p, tab) {
       if (tab === 'LIQUIDACION') return isLiquidacion(p.stock);
