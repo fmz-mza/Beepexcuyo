@@ -336,7 +336,7 @@
       border-color: var(--accent);
     }
 
-    /* Tabs de estado: Disponible / Oportunidades / Preventa */
+    /* Tabs de estado: Disponible / Oportunidades / Verano / Preventa */
     .cat-tabs {
       display: flex;
       border-bottom: 1px solid var(--border);
@@ -349,7 +349,7 @@
       align-items: center;
       justify-content: center;
       gap: 4px;
-      padding: 10px 2px 9px;
+      padding: 10px 1px 9px;
       margin-bottom: -1px;
       background: none;
       border: none;
@@ -376,6 +376,25 @@
 
     .cat-tab.t-prev.active {
       border-bottom-color: var(--preventa);
+    }
+
+    .cat-tab.t-verano.active {
+      border-bottom-color: #22c3e6;
+    }
+
+    /* Con 4 pestañas en un celular angosto, texto y contador más chicos para que entren */
+    @media (max-width: 420px) {
+      .cat-tab { font-size: 11px; gap: 3px; letter-spacing: -.01em; }
+      .cat-tab-n { font-size: 9px; padding: 2px 4px; }
+    }
+
+    .cat-tab .ts { display: none; }
+
+    @media (max-width: 360px) {
+      .cat-tab { font-size: 10px; gap: 2px; }
+      .cat-tab-n { padding: 1px 3px; }
+      .cat-tab .tl { display: none; }
+      .cat-tab .ts { display: inline; }
     }
 
     .cat-tab-n {
@@ -5884,16 +5903,24 @@
 
     // ── Tabs de estado ────────────────────────────────────────────────────────────
     // activeStock guarda el tab activo: 'DISP' (stock + liquidación; los sin stock van
-    // al final solo si showNoStock, como siempre), 'LIQUIDACION' o 'PREVENTA'.
+    // al final solo si showNoStock, como siempre), 'LIQUIDACION', 'VERANO' o 'PREVENTA'.
+    // 'VERANO' = preventa de temporada: rubro VERANO o "VERANO" en el nombre (camas estera,
+    // mantas refrigerantes...). Esos productos salen de 'PREVENTA' para no repetirse.
     const CAT_TABS = [
       { id: 'DISP', label: 'Disponible', cls: '' },
-      { id: 'LIQUIDACION', label: 'Oportunidades', cls: 't-oport' },
+      { id: 'LIQUIDACION', label: 'Oportunidades', short: 'Oport.', cls: 't-oport' },
+      { id: 'VERANO', label: 'Verano', cls: 't-verano' },
       { id: 'PREVENTA', label: 'Preventa', cls: 't-prev' }
     ];
+    function isVerano(p) {
+      return /VERANO/i.test(p.rubro || '') || /\bVERANO\b/i.test(p.name || '');
+    }
     function tabMatch(p, tab) {
       if (tab === 'LIQUIDACION') return isLiquidacion(p.stock);
-      if (tab === 'PREVENTA') return stockType(p.stock) === 'PREVENTA';
-      return stockType(p.stock) !== 'PREVENTA';
+      const pv = stockType(p.stock) === 'PREVENTA';
+      if (tab === 'VERANO') return pv && isVerano(p);
+      if (tab === 'PREVENTA') return pv && !isVerano(p);
+      return !pv;
     }
     // Reglas previas a tab/marca/rubro/búsqueda (SKUs deshabilitados y "sin stock")
     function baseVisible(p) {
@@ -5904,7 +5931,7 @@
       const el = document.getElementById('catTabs');
       if (!el) return;
       if (saleMode) { el.innerHTML = ''; el.style.display = 'none'; return; }
-      const counts = { DISP: 0, LIQUIDACION: 0, PREVENTA: 0 };
+      const counts = { DISP: 0, LIQUIDACION: 0, VERANO: 0, PREVENTA: 0 };
       products.forEach(p => {
         if (!baseVisible(p)) return;
         for (const t in counts) if (tabMatch(p, t)) counts[t]++;
@@ -5912,7 +5939,7 @@
       if (!CAT_TABS.some(t => t.id === activeStock) || (activeStock !== 'DISP' && !counts[activeStock])) activeStock = 'DISP';
       el.style.display = '';
       el.innerHTML = CAT_TABS.filter(t => t.id === 'DISP' || counts[t.id] > 0).map(t =>
-        `<button role="tab" aria-selected="${activeStock === t.id}" class="cat-tab ${t.cls} ${activeStock === t.id ? 'active' : ''}" onclick="setTab('${t.id}')">${t.label}<span class="cat-tab-n">${counts[t.id]}</span></button>`
+        `<button role="tab" aria-selected="${activeStock === t.id}" class="cat-tab ${t.cls} ${activeStock === t.id ? 'active' : ''}" onclick="setTab('${t.id}')">${t.short ? `<span class="tl">${t.label}</span><span class="ts">${t.short}</span>` : t.label}<span class="cat-tab-n">${counts[t.id]}</span></button>`
       ).join('');
     }
     function setTab(t) {
