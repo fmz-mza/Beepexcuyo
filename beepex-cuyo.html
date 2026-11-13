@@ -8,9 +8,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>Beepex Cuyo — Catálogo Mayorista</title>
-  <link rel="icon" type="image/png" href="https://favicon.im/beepex.com.ar?larger=true">
-  <link rel="apple-touch-icon" href="https://favicon.im/beepex.com.ar?larger=true">
+  <title>HitPaw — Catálogo Mayorista</title>
+  <link rel="icon" type="image/svg+xml" href="hitpaw-icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap"
@@ -98,15 +99,12 @@
     }
 
     .logo-icon {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-      overflow: hidden;
+      width: 48px;
+      height: 44px;
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: var(--card);
     }
 
     .logo-text {
@@ -122,6 +120,13 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .logo-text h1.brand-tag {
+      font-size: 11px;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: var(--muted);
     }
 
     .logo-text p {
@@ -4903,7 +4908,7 @@
     function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
     gtag('config', 'G-8SNQ2GERGG', {
-      page_title: 'Catálogo Mayorista Beepex Cuyo',
+      page_title: 'Catálogo Mayorista HitPaw',
       page_location: window.location.href
     });
   </script>
@@ -4928,11 +4933,11 @@
         onclick="document.getElementById('siteBanner').classList.remove('visible')">✕</button>
     </div>
     <div class="header-inner">
-      <div class="logo-icon"><img src="https://favicon.im/beepex.com.ar?larger=true" width="38" height="38" alt="Beepex"
-          style="display:block;width:38px;height:38px;object-fit:contain;"
+      <div class="logo-icon"><img src="hitpaw-logo.svg" width="48" height="44" alt="HitPaw"
+          style="display:block;width:48px;height:44px;object-fit:contain;"
           onerror="this.parentElement.textContent='🐾'"></div>
       <div class="logo-text">
-        <h1>Beepex Cuyo</h1>
+        <h1 class="brand-tag">Mayorista</h1>
         <p>Catálogo</p>
         <p id="catalogMonth">Marzo 2026</p>
         <div style="position:relative;">
@@ -5193,7 +5198,7 @@
   </div>
   <div class="auth-overlay" id="authOverlay">
     <div class="auth-modal">
-      <img class="auth-hero" src="images/Foto-Beepex.jpeg" alt="Beepex" onerror="this.style.display='none'">
+      <img class="auth-hero" src="images/Foto-Beepex.jpeg" alt="HitPaw" onerror="this.style.display='none'">
       <div class="auth-body">
         <div class="auth-title" id="authTitle">Accedé al catálogo</div>
         <div class="auth-sub" id="authSub">Registrate para ver precios y realizar pedidos</div>
@@ -5227,7 +5232,7 @@
   </div>
   <div class="welcome-overlay" id="welcomeOverlay">
     <div class="welcome-modal">
-      <img class="welcome-hero" src="images/Foto-Beepex.jpeg" alt="Beepex" onerror="this.style.display='none'">
+      <img class="welcome-hero" src="images/Foto-Beepex.jpeg" alt="HitPaw" onerror="this.style.display='none'">
       <div class="welcome-body">
 
         <!-- VISTA: No logueado (primera vez) -->
@@ -7445,7 +7450,7 @@
       const totalU = items.reduce((a, c) => a + c.qty, 0);
       const hasPrev = items.some(c => stockType(c.product.stock) === 'PREVENTA');
 
-      let msg = "\uD83D\uDC3E *PEDIDO BEEPEX CUYO*\n━━━━━━━━━━━━━━━━━━\n";
+      let msg = "\uD83D\uDC3E *PEDIDO HITPAW*\n━━━━━━━━━━━━━━━━━━\n";
       msg += "\uD83D\uDC64 *Cliente:* " + name + "\n\uD83D\uDCC5 *Fecha:* " + today + "\n\uD83D\uDCB0 *Precios:* " + (includeIVA ? "Con IVA" : "Sin IVA") + "\n━━━━━━━━━━━━━━━━━━\n\n";
       Object.entries(groups).forEach(([brand, list]) => {
         msg += "\uD83D\uDCE6 *" + brand + "*\n";
@@ -7688,7 +7693,7 @@
 
       // Header
       doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-      doc.text('BEEPEX CUYO', 40, y, { align: 'center' }); y += 5;
+      doc.text('HITPAW', 40, y, { align: 'center' }); y += 5;
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
       doc.text('PEDIDO MAYORISTA', 40, y, { align: 'center' }); y += 4;
       doc.setLineWidth(.3); doc.line(4, y, 76, y); y += 4;
@@ -7763,20 +7768,20 @@
 
       doc.line(4, y, 76, y); y += 4;
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-      doc.text('Beepex Cuyo', 40, y, { align: 'center' });
+      doc.text('HitPaw', 40, y, { align: 'center' });
 
       // Guardar pedido en Supabase
       saveOrderSupabase('pdf', obs);
 
       // Compartir o descargar
       const pdfBlob = doc.output('blob');
-      const fileName = `Pedido_Beepex_${name.replace(/\s+/g, '_')}_${today.replace(/\//g, '-')}.pdf`;
+      const fileName = `Pedido_HitPaw_${name.replace(/\s+/g, '_')}_${today.replace(/\//g, '-')}.pdf`;
 
       if (navigator.share && navigator.canShare) {
         const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
         if (navigator.canShare({ files: [file] })) {
           try {
-            await navigator.share({ files: [file], title: 'Pedido Beepex Cuyo', text: `Pedido de ${name}` });
+            await navigator.share({ files: [file], title: 'Pedido HitPaw', text: `Pedido de ${name}` });
             return;
           } catch (e) {
             console.warn('Share cancelled or failed', e);
@@ -8058,13 +8063,13 @@
         y += 16;
       }
 
-      // ── Footer con marca Beepex ───────────────────────────────────────────
+      // ── Footer con marca HitPaw ───────────────────────────────────────────
       y += 16;
       ctx.fillStyle = 'rgba(255,255,255,0.06)';
       ctx.fillRect(0, y, W, 1); y += 20;
       ctx.font = '24px system-ui,sans-serif';
       ctx.fillStyle = '#4a4b55'; ctx.textAlign = 'center';
-      ctx.fillText('🐾 Beepex Cuyo', W / 2, y + 24);
+      ctx.fillText('🐾 HitPaw', W / 2, y + 24);
 
       // ── Convertir a blob ──────────────────────────────────────────────────
       const blob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.95));

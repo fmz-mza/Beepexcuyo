@@ -6,9 +6,10 @@
 <meta name="theme-color" content="#0a0b0f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Beepex POS</title>
-<link rel="icon" type="image/png" href="https://favicon.im/beepex.com.ar?larger=true">
-<link rel="apple-touch-icon" href="https://favicon.im/beepex.com.ar?larger=true">
+<title>HitPaw POS</title>
+<link rel="icon" type="image/svg+xml" href="hitpaw-icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -35,7 +36,8 @@ input,select,textarea{font-family:inherit;}
 /* AUTH */
 #authGate{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;}
 .auth-box{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:36px 24px;width:100%;max-width:340px;display:flex;flex-direction:column;gap:14px;text-align:center;}
-.auth-logo{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;}
+.auth-logo{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:10px;}
+.auth-logo img{width:62px;height:auto;display:block;}
 .auth-logo span{color:var(--accent);}
 .auth-sub{font-size:13px;color:var(--muted2);line-height:1.5;}
 .auth-inp{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:13px 16px;font-size:16px;color:var(--text);outline:none;width:100%;transition:border .2s;}
@@ -269,7 +271,7 @@ input,select,textarea{font-family:inherit;}
 <!-- AUTH -->
 <div id="authGate">
   <div class="auth-box">
-    <div class="auth-logo">🐾 Beepex <span>POS</span></div>
+    <div class="auth-logo"><img src="hitpaw-logo.svg" alt="HitPaw"><span>POS</span></div>
     <div class="auth-sub">Punto de venta · Acceso autorizado</div>
     <input class="auth-inp" id="aEmail" type="email" placeholder="Email" autocomplete="email">
     <input class="auth-inp" id="aPass" type="password" placeholder="Contraseña">
@@ -1199,7 +1201,7 @@ async function compartirPDF(){
   let y = 8;
 
   doc.setFont('helvetica','bold'); doc.setFontSize(13);
-  doc.text('BEEPEX CUYO', 40, y, {align:'center'}); y+=5;
+  doc.text('HITPAW', 40, y, {align:'center'}); y+=5;
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
   doc.text('Punto de Venta', 40, y, {align:'center'}); y+=4;
   doc.setLineWidth(.3); doc.line(4,y,76,y); y+=4;
@@ -1264,7 +1266,7 @@ async function compartirPDF(){
 
   y+=2; doc.line(4,y,76,y); y+=4;
   doc.setFontSize(8);
-  doc.text('Beepex Cuyo - Gracias!', 40, y, {align:'center'});
+  doc.text('HitPaw - Gracias!', 40, y, {align:'center'});
 
   const filename = 'ticket-'+order.ticket_display+'.pdf';
 
@@ -1296,7 +1298,7 @@ async function compartirPDFSoloPago(){
   let y = 8;
 
   doc.setFont('helvetica','bold'); doc.setFontSize(13);
-  doc.text('BEEPEX CUYO', 40, y, {align:'center'}); y+=5;
+  doc.text('HITPAW', 40, y, {align:'center'}); y+=5;
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
   doc.text('Comprobante de Pago', 40, y, {align:'center'}); y+=4;
   doc.setLineWidth(.3); doc.line(4,y,76,y); y+=4;
@@ -1322,7 +1324,7 @@ async function compartirPDFSoloPago(){
   }
   doc.setFont('helvetica','normal'); doc.setFontSize(8);
   doc.line(4,y,76,y); y+=4;
-  doc.text('Beepex Cuyo - Gracias!', 40, y, {align:'center'});
+  doc.text('HitPaw - Gracias!', 40, y, {align:'center'});
 
   const filename = 'pago-'+(client?.nombre||'cliente').replace(/\s+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.pdf';
   if(navigator.canShare){
@@ -1345,7 +1347,7 @@ function shareWA(){
   const {order, items, totalVenta, pagado, saldoAnterior, saldoRestante, saldoCobrado:pagadoSaldo, pagadoVenta} = t;
   const vuelto = Math.max(0, pagado - (pagadoVenta||0) - (pagadoSaldo||0));
 
-  let msg = '🐾 *BEEPEX CUYO*\n';
+  let msg = '🐾 *HITPAW*\n';
   msg += 'Ticket #'+order.ticket_display+'\n';
   msg += '📅 '+new Date(order.fecha).toLocaleDateString('es-AR')+'\n';
   if(client) msg += '👤 '+client.nombre+'\n';
@@ -1394,7 +1396,7 @@ function shareWASoloPago(){
   const client = clients.find(x=>x.id===t.clientId);
   const ml = {efectivo:'Efectivo', transferencia:'Transferencia', cta_cte:'Cuenta Corriente'};
 
-  let msg = '🐾 *BEEPEX CUYO*\n';
+  let msg = '🐾 *HITPAW*\n';
   msg += 'Comprobante de Pago\n';
   msg += '📅 '+new Date(t.fecha).toLocaleDateString('es-AR')+'\n';
   if(client) msg += '👤 '+client.nombre+'\n';

@@ -6,8 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="robots" content="noindex,nofollow">
-<title>Beepex Admin</title>
-<link rel="icon" type="image/png" href="https://favicon.im/beepex.com.ar?larger=true">
+<title>HitPaw Admin</title>
+<link rel="icon" type="image/svg+xml" href="hitpaw-icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js">
@@ -34,7 +35,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 #authGate{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
 .auth-box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:32px 28px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px;}
 .auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
-.auth-logo img{width:32px;height:32px;border-radius:8px;}
+.auth-logo img{width:44px;height:auto;}
 .auth-logo span{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;}
 .auth-title{font-size:15px;font-weight:700;color:var(--muted);}
 .auth-input{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:15px;font-family:inherit;outline:none;transition:border-color .2s;}
@@ -49,7 +50,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 /* ── Header ── */
 .admin-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:52px;flex-shrink:0;position:sticky;top:0;z-index:100;}
 .admin-header-left{display:flex;align-items:center;gap:10px;}
-.admin-header-left img{width:28px;height:28px;border-radius:6px;}
+.admin-header-left img{width:36px;height:auto;}
 .admin-header-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;}
 .admin-header-badge{font-size:10px;font-weight:700;background:var(--accent);color:#fff;padding:2px 8px;border-radius:20px;}
 @media(max-width:480px){.admin-header-badge{display:none;}.admin-back-btn{display:none;}}
@@ -324,8 +325,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 <div id="authGate">
   <div class="auth-box">
     <div class="auth-logo">
-      <img src="https://favicon.im/beepex.com.ar?larger=true" alt="Beepex" onerror="this.style.display='none'">
-      <span>Beepex Admin</span>
+      <img src="hitpaw-logo.svg" alt="HitPaw" onerror="this.style.display='none'">
+      <span>HitPaw Admin</span>
     </div>
     <div class="auth-title">Acceso restringido</div>
     <input class="auth-input" id="loginEmail" type="email" placeholder="Email" autocomplete="email">
@@ -339,8 +340,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 <div id="app">
   <header class="admin-header">
     <div class="admin-header-left">
-      <img src="https://favicon.im/beepex.com.ar?larger=true" alt="Beepex" onerror="this.style.display='none'">
-      <span class="admin-header-title">Beepex Admin</span>
+      <img src="hitpaw-logo.svg" alt="HitPaw" onerror="this.style.display='none'">
+      <span class="admin-header-title">HitPaw Admin</span>
       <span class="admin-header-badge">⚙️ Admin</span>
     </div>
     <div class="admin-header-right">
@@ -2544,7 +2545,7 @@ function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMont
 
   // Header
   doc.setFont('helvetica','bold'); doc.setFontSize(13);
-  doc.text('BEEPEX CUYO', 40, y, {align:'center'}); y+=5;
+  doc.text('HITPAW', 40, y, {align:'center'}); y+=5;
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
   doc.text(titulo, 40, y, {align:'center'}); y+=4;
   doc.setLineWidth(.3); doc.line(4,y,76,y); y+=4;
@@ -2636,7 +2637,7 @@ function buildAdminPDF(titulo, numero, fecha, cliente, items, subtotal, descMont
 
   doc.setFont('helvetica','normal'); doc.setFontSize(8);
   doc.line(4,y,76,y); y+=4;
-  doc.text('Beepex Cuyo', 40, y, {align:'center'});
+  doc.text('HitPaw', 40, y, {align:'center'});
 
   return doc;
 }
@@ -3062,7 +3063,7 @@ async function downloadProductsExcel(){
       'CÓDIGO EAN': p.ean || ''
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mapped), 'PRODUCTOS');
-    XLSX.writeFile(wb, `BEEPEX_productos_${new Date().toISOString().slice(0,10)}.xlsx`);
+    XLSX.writeFile(wb, `HitPaw_productos_${new Date().toISOString().slice(0,10)}.xlsx`);
     showToast('✅ Excel descargado');
   } catch(e){ showToast('❌ Error: '+e.message); }
 }
@@ -3081,9 +3082,9 @@ async function downloadExcelClientes(){
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    // Nombre dinámico solicitado: Beepex-(Fecha).xlsx
+    // Nombre dinámico solicitado: HitPaw-(Fecha).xlsx
     const fecha = new Date().toISOString().slice(0, 10);
-    a.download = `Beepex-${fecha}.xlsx`;
+    a.download = `HitPaw-${fecha}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -3403,7 +3404,7 @@ async function generarAlertasMora(){
 
     // 4. Mensaje resumen al vendedor
     if(waVendedor){
-      let msgVendedor = '🐾 *BEEPEX CUYO — Clientes en mora*\n';
+      let msgVendedor = '🐾 *HITPAW — Clientes en mora*\n';
       msgVendedor += `📅 ${new Date().toLocaleDateString('es-AR')}\n`;
       msgVendedor += `⚠️ ${pendientes.length} cliente(s) con deuda vencida > 30 días\n\n`;
       pendientes.forEach((m, i) => {
@@ -3413,7 +3414,7 @@ async function generarAlertasMora(){
         if(m.telefono)  msgVendedor += `   📱 ${m.telefono}\n`;
         msgVendedor += '\n';
       });
-      msgVendedor += '━━━━━━━━━━━━━━\n_Enviado desde Beepex Admin_';
+      msgVendedor += '━━━━━━━━━━━━━━\n_Enviado desde HitPaw Admin_';
       window.open(`https://wa.me/${waVendedor}?text=${encodeURIComponent(msgVendedor)}`, '_blank');
       await new Promise(r => setTimeout(r, 800));
     }
@@ -3423,9 +3424,9 @@ async function generarAlertasMora(){
       const tel = m.telefono_wa || normalizarWA(m.telefono||'');
       if(tel){
         let msgCliente  = `Hola *${m.nombre}* 👋\n\n`;
-        msgCliente += `Te contactamos de *Beepex Cuyo* para avisarte que tenés una deuda pendiente de *${fmt(m.saldo)}*`;
+        msgCliente += `Te contactamos de *HitPaw* para avisarte que tenés una deuda pendiente de *${fmt(m.saldo)}*`;
         if(m.dias_mora) msgCliente += ` (vencida hace ${m.dias_mora} días)`;
-        msgCliente += `.\n\nComunicate con nosotros para regularizar tu cuenta.\n\n🐾 _Beepex Cuyo_`;
+        msgCliente += `.\n\nComunicate con nosotros para regularizar tu cuenta.\n\n🐾 _HitPaw_`;
         window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgCliente)}`, '_blank');
         await new Promise(r => setTimeout(r, 600));
       }

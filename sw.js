@@ -1,4 +1,4 @@
-const CACHE = 'beepex-v5';
+const CACHE = 'beepex-v6';
 const ASSETS = [
   'beepex-cuyo.html',
   'beepex-pos.html',
