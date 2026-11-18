@@ -179,8 +179,11 @@ def upload_webp(bucket_name, path, img, quality, sku):
         if "already exists" not in str(upload_err).lower():
             print(f"❌ Error Storage en {sku} ({path}): {upload_err}")
 
-def process_image(drive_id, sku):
-    """Descarga, optimiza y sube la imagen a Supabase Storage"""
+def process_image(drive_id, sku, solo_drive=False):
+    """Descarga, optimiza y sube la imagen a Supabase Storage.
+    Devuelve (url_publica, vino_de_drive) o (None, False).
+    solo_drive=True: no cae a los repos de GitHub (tienen las fotos viejas); se usa al
+    reemplazar una foto porque el proveedor la cambió en Drive."""
     bucket_name = FOTOS_BUCKET
     file_path = f"{sku}.webp"
     
@@ -209,7 +212,7 @@ def process_image(drive_id, sku):
     naming_patterns = [f"SKU_{sku}", f"{sku}"]
     extensions = [".jpg", ".png", ".JPG", ".jpeg", ".PNG"]
 
-    for repo in repos:
+    for repo in ([] if solo_drive else repos):
         for pattern in naming_patterns:
             for ext in extensions:
                 source_urls.append(f"{repo}/{pattern}{ext}")
@@ -228,7 +231,8 @@ def process_image(drive_id, sku):
 
     if not img_data:
         print(f"❌ No se encontró imagen para SKU {sku} en ninguna fuente.")
-        return None
+        return None, False
+    vino_de_drive = "drive.google.com" in used_url or "googleusercontent.com" in used_url
 
     try:
         print(f"📷 Procesando {sku} desde {used_url[:50]}...")
@@ -252,10 +256,10 @@ def process_image(drive_id, sku):
         # ~4 MB decodificada en RAM; la miniatura ~0.6 MB (clave en celulares).
         upload_webp(bucket_name, thumb_path(sku), make_thumb(img), THUMB_QUALITY, sku)
 
-        return supabase.storage.from_(bucket_name).get_public_url(file_path)
+        return supabase.storage.from_(bucket_name).get_public_url(file_path), vino_de_drive
     except Exception as e:
         print(f"⚠️ Error procesando {sku}: {e}")
-        return None
+        return None, False
 
 def get_variant_key(name):
     if not name:
@@ -309,7 +313,7 @@ def run_sync():
         except Exception:
             pass
 
-    stats = {"nuevos": 0, "actualizados": 0, "precios_cambiados": 0, "fotos_procesadas": 0}
+    stats = {"nuevos": 0, "actualizados": 0, "precios_cambiados": 0, "fotos_procesadas": 0, "fotos_actualizadas": 0}
     logs = []
 
     for row in products:
@@ -432,7 +436,7 @@ def run_sync():
         # 2. Verificar existencia y datos previos para evitar re-procesamiento innecesario
         existing = {}
         try:
-            res_existing = supabase.table(PRODUCT_TABLE).select("precio_pesos", "img_url").eq("codigo", sku).execute()
+            res_existing = supabase.table(PRODUCT_TABLE).select("precio_pesos", "img_url", "foto_drive_id").eq("codigo", sku).execute()
             if res_existing.data:
                 existing = res_existing.data[0]
         except:
@@ -466,15 +470,27 @@ def run_sync():
         if drive_id:
             product_data["drive_id"] = drive_id
 
-        # Lógica de Imagen: Si no tiene imagen en Supabase, intentamos buscarla
+        # Lógica de Imagen. foto_drive_id = archivo de Drive del que salió la foto que
+        # tenemos en Storage (migración 0010):
+        #  - sin foto: se busca (Drive y, si falla, los repos de GitHub)
+        #  - el proveedor cambió la foto en Drive (drive_id != foto_drive_id): se rebaja,
+        #    solo desde Drive; si Drive falla se mantiene la actual y se reintenta en la
+        #    próxima corrida
         if not existing.get("img_url"):
-            img_url = process_image(foto_id, sku)
+            img_url, de_drive = process_image(foto_id, sku)
             if img_url:
                 product_data["img_url"] = img_url
+                if de_drive and drive_id:
+                    product_data["foto_drive_id"] = drive_id
                 stats["fotos_procesadas"] += 1
         else:
-            # Mantener la que ya existe
             product_data["img_url"] = existing["img_url"]
+            if drive_id and drive_id != existing.get("foto_drive_id"):
+                img_url, de_drive = process_image(drive_id, sku, solo_drive=True)
+                if img_url and de_drive:
+                    product_data["foto_drive_id"] = drive_id
+                    stats["fotos_actualizadas"] += 1
+                    logs.append(f"📷 FOTO NUEVA: {sku} - {nombre}")
 
         try:
             # Upsert usando 'codigo' como identificador único
@@ -499,6 +515,7 @@ def run_sync():
     summary += f"- Actualizados: {stats['actualizados']}\n"
     summary += f"- Cambios precio: {stats['precios_cambiados']}\n"
     summary += f"- Fotos procesadas: {stats['fotos_procesadas']}\n"
+    summary += f"- Fotos cambiadas por el proveedor: {stats['fotos_actualizadas']}\n"
     
     if logs:
         log_text = "\n".join(logs[:15]) # Top 15 cambios

@@ -3,7 +3,8 @@
 sync.py baja la foto de un SKU una sola vez (cuando img_url está vacío); si el proveedor
 la cambia después, la nuestra queda vieja. Este script vuelve a bajar desde Drive
 (productos.drive_id) los SKUs indicados en la variable SKUS (separados por espacio o coma)
-y pisa fotos/<sku>.webp (1024px) y fotos/thumbs/<sku>.webp (400px).
+y pisa fotos/<sku>.webp (1024px) y fotos/thumbs/<sku>.webp (400px). Desde la migración 0010
+sync.py ya rebaja sola la foto cuando cambia el drive_id; esto sirve para forzar SKUs puntuales.
 Solo usa Drive: si Drive no responde, el SKU se saltea (no cae al fallback de GitHub,
 que tiene las fotos viejas). Se corre desde .github/workflows/refresh-photos.yml."""
 import os
@@ -58,6 +59,7 @@ def main():
         original.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
         upload_webp(FOTOS_BUCKET, f"{sku}.webp", original, 75, sku)
         upload_webp(FOTOS_BUCKET, thumb_path(sku), make_thumb(img), THUMB_QUALITY, sku)
+        supabase.table(PRODUCT_TABLE).update({"foto_drive_id": drive_id}).eq("codigo", sku).execute()
         ok += 1
         print(f"📷 {sku}: {img.size[0]}x{img.size[1]} → {original.size[0]}x{original.size[1]}")
     print(f"Listo: {ok} reemplazadas, {len(fallidos)} fallidas {' '.join(fallidos)}")
