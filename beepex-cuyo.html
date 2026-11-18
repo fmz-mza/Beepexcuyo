@@ -5904,9 +5904,10 @@
     // ── Tabs de estado ────────────────────────────────────────────────────────────
     // activeStock guarda el tab activo: 'DISP' (stock + liquidación; los sin stock van
     // al final solo si showNoStock, como siempre), 'LIQUIDACION', 'VERANO' o 'PREVENTA'.
-    // 'VERANO' = preventa de temporada: rubro VERANO / MANTAS REFRIGERANTES, o en el nombre
-    // "VERANO", "REFRIGER..." o "REFRESCANTE" (camas estera, mantas...). Salen de 'PREVENTA'
-    // para no repetirse.
+    // 'VERANO' = productos de temporada CON STOCK: rubro VERANO / MANTAS REFRIGERANTES, o en
+    // el nombre "VERANO", "REFRIGER..." o "REFRESCANTE" (camas estera, mantas...). Salen de
+    // 'DISP' para no repetirse (nov/2026: ingresó la temporada). La preventa de verano va a
+    // 'PREVENTA' como cualquier otra.
     const CAT_TABS = [
       { id: 'DISP', label: 'Disponible', cls: '' },
       { id: 'LIQUIDACION', label: 'Oportunidades', short: 'Oport.', cls: 't-oport' },
@@ -5918,10 +5919,11 @@
     }
     function tabMatch(p, tab) {
       if (tab === 'LIQUIDACION') return isLiquidacion(p.stock);
-      const pv = stockType(p.stock) === 'PREVENTA';
-      if (tab === 'VERANO') return pv && isVerano(p);
-      if (tab === 'PREVENTA') return pv && !isVerano(p);
-      return !pv;
+      const t = stockType(p.stock);
+      const ver = t === 'STOCK' && isVerano(p);
+      if (tab === 'VERANO') return ver;
+      if (tab === 'PREVENTA') return t === 'PREVENTA';
+      return t !== 'PREVENTA' && !ver;
     }
     // Reglas previas a tab/marca/rubro/búsqueda (SKUs deshabilitados y "sin stock")
     function baseVisible(p) {
