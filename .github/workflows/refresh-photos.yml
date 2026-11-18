@@ -1,0 +1,30 @@
+name: Reemplazar fotos desde Drive (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      skus:
+        description: 'SKUs a reemplazar por la foto actual del proveedor (separados por espacio)'
+        required: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Reemplazar fotos/<sku>.webp y thumbs
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        SKUS: ${{ inputs.skus }}
+      run: python refresh_photos.py
